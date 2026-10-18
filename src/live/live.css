@@ -1,0 +1,29 @@
+/* Signed-in, live-workspace surfaces: onboarding cards, platform console, members. */
+.auth-invite { display: grid; gap: 4px; padding: 14px 0; border-bottom: 1px solid #ececef; }
+.auth-invite p { font-size: 14px; line-height: 1.45; }
+.auth-invite small { color: #6b6b73; }
+.auth-invite .auth-primary, .auth-inline-form .auth-primary { margin-top: 10px; }
+.auth-inline-form { display: grid; gap: 14px; margin-top: 8px; }
+.auth-demo + .auth-demo { margin-top: 4px; }
+
+.console-page { max-width: 920px; margin: 0 auto; padding: 40px 16px 64px; display: grid; gap: 16px; background: var(--bg); min-height: 100vh; align-content: start; }
+.console-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.console-head h1 { font-size: 28px; font-weight: 800; }
+.console-notice { padding: 10px 12px; border-radius: 8px; font-size: 13px; border: 1px solid var(--line); background: var(--panel); }
+.console-notice.is-error { border-color: color-mix(in srgb, var(--stop, #d92d20) 35%, transparent); color: var(--stop, #b42318); }
+.console-notice.is-info { border-color: color-mix(in srgb, var(--ok, #12805c) 30%, transparent); }
+.console-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.console-list > li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.console-list > li:first-child { border-top: 0; }
+.console-list small { font-size: 12px; color: var(--muted); }
+.console-actions, .console-inline { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.console-inline input, .console-actions select, .console-inline select, .console-form input, .console-form select { min-height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); font: inherit; font-size: 13px; }
+.console-inline input { min-width: 220px; flex: 1; }
+.console-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; align-items: end; }
+.console-form label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.members-panel h4 { margin-top: 6px; font-size: 13px; font-weight: 700; }
+
+.account-chip { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.account-chip b { font-size: 13px; }
+.account-chip small { color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+@media (max-width: 720px) { .account-chip small { display: none; } .console-head { flex-direction: column; } }

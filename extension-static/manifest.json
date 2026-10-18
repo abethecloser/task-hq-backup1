@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Task-HQ Companion",
+  "short_name": "Task-HQ",
+  "version": "0.3.1",
+  "description": "Task-HQ Companion: your next task, what needs attention, Speed to Lead and Critical Focus, with the full app one click away. Local demo data only.",
+  "action": {
+    "default_title": "Task-HQ \u2014 My Work",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications"
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Q",
+        "mac": "Alt+Q"
+      },
+      "description": "Open Task-HQ Companion"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

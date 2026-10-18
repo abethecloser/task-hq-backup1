@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": [],
+    "paths": {
+      "npm:@supabase/supabase-js@2.117.2": [
+        "./node_modules/@supabase/supabase-js/dist/index.d.mts"
+      ]
+    }
+  },
+  "include": [
+    "supabase/functions/dispatch/handler.ts",
+    "supabase/functions/dispatch/logic.ts",
+    "supabase/functions/dispatch/persistence.ts",
+    "supabase/functions/dispatch/automation/*.ts",
+    "supabase/functions/dispatch/core/*.ts",
+    "supabase/functions/dispatch/index.ts",
+    "supabase/functions/runtime.d.ts"
+  ]
+}

@@ -1,0 +1,241 @@
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+/* Brutalist look — optional, per browser (People can switch it in Policy & data or the
+   sidebar footer; src/ui/look.ts). Every rule is scoped to :root[data-look="brutalist"],
+   so the default Studio look is untouched. References: ~/Projects/design/brutalist. */
+/* ── Brutalist pass ────────────────────────────────────────────────────────
+   Heavy grotesk display, monospace captions, hard 1px ink rules, square
+   corners, flat fields and hard offset shadows instead of soft depth.
+   No serif, no italics. Quest orange stays the single accent. */
+:root[data-look="brutalist"] {
+  --ink-rule: #111214;
+  --hair: rgb(17 18 20 / 13%);
+  --hair-2: rgb(17 18 20 / 28%);
+  --radius: 2px;
+  --shadow: none;
+  --shadow-lift: 4px 4px 0 var(--ink-rule);
+  --shadow-lg: 8px 8px 0 rgb(17 18 20 / 92%);
+  --canvas: #f3f4f5;
+  --rail-bg: #ffffff;
+  --sidebar-bg: #fbfbfb;
+  --context-bg: #f7f7f8;
+}
+/* Monospace captions: every eyebrow, label, count and table head. */
+:root[data-look="brutalist"] .eyebrow,
+:root[data-look="brutalist"] .section-label,
+:root[data-look="brutalist"] .context-label,
+:root[data-look="brutalist"] .ctx-label,
+:root[data-look="brutalist"] .ctx-eyebrow,
+:root[data-look="brutalist"] .decision-kind,
+:root[data-look="brutalist"] .answer small,
+:root[data-look="brutalist"] .registry-row.is-head,
+:root[data-look="brutalist"] .people-row.is-head,
+:root[data-look="brutalist"] .board-head,
+:root[data-look="brutalist"] .ctx-grid dt,
+:root[data-look="brutalist"] .decision-facts dt,
+:root[data-look="brutalist"] .profile-facts dt,
+:root[data-look="brutalist"] .panel-notes h2,
+:root[data-look="brutalist"] .note-kind,
+:root[data-look="brutalist"] .sig-item small,
+:root[data-look="brutalist"] .legend-cols h4,
+:root[data-look="brutalist"] .demo-flag,
+:root[data-look="brutalist"] .kicker,
+:root[data-look="brutalist"] .situation-kicker,
+:root[data-look="brutalist"] .drawer-kicker,
+:root[data-look="brutalist"] .workspace-chip,
+:root[data-look="brutalist"] .filters-count,
+:root[data-look="brutalist"] .ctx-sub,
+:root[data-look="brutalist"] .ctx-history time,
+:root[data-look="brutalist"] .lens span,
+:root[data-look="brutalist"] .panel-count,
+:root[data-look="brutalist"] .nav-count,
+:root[data-look="brutalist"] .rec-mark {
+  font-family: var(--mono); letter-spacing: .06em;
+}
+:root[data-look="brutalist"] .eyebrow,
+:root[data-look="brutalist"] .section-label,
+:root[data-look="brutalist"] .context-label,
+:root[data-look="brutalist"] .ctx-label,
+:root[data-look="brutalist"] .answer small,
+:root[data-look="brutalist"] .decision-kind { font-size: 11px; font-weight: 500; color: var(--ink-2); }
+:root[data-look="brutalist"] .view-head .lede { font-size: 15px; color: var(--ink-2); }
+:root[data-look="brutalist"] .situation-headline,
+:root[data-look="brutalist"] .empty h3,
+:root[data-look="brutalist"] .panel h3,
+:root[data-look="brutalist"] .brief-card h3 { font-family: var(--display); font-weight: 900; letter-spacing: -.03em; }
+:root[data-look="brutalist"] .situation-headline { text-transform: none; }
+
+/* Square everything. */
+:root[data-look="brutalist"] .btn,
+:root[data-look="brutalist"] .chip,
+:root[data-look="brutalist"] .pill,
+:root[data-look="brutalist"] .tag,
+:root[data-look="brutalist"] .icon-btn,
+:root[data-look="brutalist"] input,
+:root[data-look="brutalist"] select,
+:root[data-look="brutalist"] textarea,
+:root[data-look="brutalist"] .lens,
+:root[data-look="brutalist"] .lens span,
+:root[data-look="brutalist"] .segmented,
+:root[data-look="brutalist"] .segmented button,
+:root[data-look="brutalist"] .search-field input,
+:root[data-look="brutalist"] .registry-table,
+:root[data-look="brutalist"] .board-col,
+:root[data-look="brutalist"] .board-card,
+:root[data-look="brutalist"] .panel,
+:root[data-look="brutalist"] .empty,
+:root[data-look="brutalist"] .context.is-drawer,
+:root[data-look="brutalist"] .sig-item,
+:root[data-look="brutalist"] .sig-metric,
+:root[data-look="brutalist"] .answer,
+:root[data-look="brutalist"] .decision,
+:root[data-look="brutalist"] .brief-card,
+:root[data-look="brutalist"] .confirm-bar,
+:root[data-look="brutalist"] .exec-row,
+:root[data-look="brutalist"] .brief-item,
+:root[data-look="brutalist"] .ctx-link,
+:root[data-look="brutalist"] .role-chip,
+:root[data-look="brutalist"] .status-chip,
+:root[data-look="brutalist"] .prepared,
+:root[data-look="brutalist"] .demo-flag,
+:root[data-look="brutalist"] .workspace-chip,
+:root[data-look="brutalist"] .note-item,
+:root[data-look="brutalist"] .panel-section-head,
+:root[data-look="brutalist"] .panel-more button,
+:root[data-look="brutalist"] .nav-item,
+:root[data-look="brutalist"] .nav-create,
+:root[data-look="brutalist"] .review-launcher,
+:root[data-look="brutalist"] .toast,
+:root[data-look="brutalist"] .unread-badge,
+:root[data-look="brutalist"] .rail-unread,
+:root[data-look="brutalist"] .panel-count,
+:root[data-look="brutalist"] .nav-count,
+:root[data-look="brutalist"] .rec-mark,
+:root[data-look="brutalist"] .signal-totals span,
+:root[data-look="brutalist"] .situation,
+:root[data-look="brutalist"] .callout,
+:root[data-look="brutalist"] .modal,
+:root[data-look="brutalist"] .offer-form,
+:root[data-look="brutalist"] .lens-bar,
+:root[data-look="brutalist"] .seam-toggle,
+:root[data-look="brutalist"] .person-chip,
+:root[data-look="brutalist"] .avatar {
+  border-radius: var(--radius);
+}
+:root[data-look="brutalist"] .avatar { border-radius: 0; }
+
+/* Hard rules on the structural containers; light hairlines inside them. */
+:root[data-look="brutalist"] .rail { border-right: 1px solid var(--ink-rule); }
+:root[data-look="brutalist"] .workspace-panel { border-right: 1px solid var(--ink-rule); }
+:root[data-look="brutalist"] .panel-head { border-bottom: 1px solid var(--ink-rule); }
+:root[data-look="brutalist"] .topbar { border-bottom: 1px solid var(--ink-rule); background: rgb(243 244 245 / 92%); }
+:root[data-look="brutalist"] .context { border-left: 1px solid var(--ink-rule); }
+:root[data-look="brutalist"] .context-head { border-bottom: 1px solid var(--ink-rule); }
+:root[data-look="brutalist"] .registry-table,
+:root[data-look="brutalist"] .panel,
+:root[data-look="brutalist"] .answer,
+:root[data-look="brutalist"] .decision,
+:root[data-look="brutalist"] .brief-card,
+:root[data-look="brutalist"] .lens-bar,
+:root[data-look="brutalist"] .board-card,
+:root[data-look="brutalist"] .sig-metric,
+:root[data-look="brutalist"] .sig-item,
+:root[data-look="brutalist"] .empty,
+:root[data-look="brutalist"] .context-task .context-body > .situation,
+:root[data-look="brutalist"] .context-task .ctx-grid,
+:root[data-look="brutalist"] .context-task .ctx-deps,
+:root[data-look="brutalist"] .context-task .ctx-history,
+:root[data-look="brutalist"] .context-task .ctx-done,
+:root[data-look="brutalist"] .context-task .drawer-details {
+  border: 1px solid var(--ink-rule); box-shadow: none;
+}
+:root[data-look="brutalist"] .empty { border-style: dashed; }
+:root[data-look="brutalist"] .decision.sev-critical { box-shadow: inset 6px 0 0 var(--danger); }
+:root[data-look="brutalist"] .decision.sev-high { box-shadow: inset 6px 0 0 var(--accent); }
+:root[data-look="brutalist"] .decision { border-left-width: 1px; padding-left: 24px; }
+:root[data-look="brutalist"] .sig-item.sev-critical { box-shadow: inset 4px 0 0 var(--danger); }
+:root[data-look="brutalist"] .sig-item.sev-high { box-shadow: inset 4px 0 0 var(--accent); }
+:root[data-look="brutalist"] .sig-item { border-left-width: 1px; padding-left: 14px; }
+:root[data-look="brutalist"] .registry-row.is-head { background: var(--ink-rule); color: #fff; }
+:root[data-look="brutalist"] .registry-row.is-selected { background: var(--accent-pale); box-shadow: inset 6px 0 0 var(--accent); }
+:root[data-look="brutalist"] .registry-row:not(.is-head):hover { background: #f4f4f5; }
+:root[data-look="brutalist"] .cell-task-text strong,
+:root[data-look="brutalist"] .board-card strong { font-weight: 800; letter-spacing: -.01em; }
+
+/* Hard offset shadow is the only "lift". */
+:root[data-look="brutalist"] .board-card:hover,
+:root[data-look="brutalist"] .answer:hover,
+:root[data-look="brutalist"] .sig-item:hover,
+:root[data-look="brutalist"] .exec-row:hover,
+:root[data-look="brutalist"] .btn-primary:hover:not(:disabled),
+:root[data-look="brutalist"] .review-launcher:hover {
+  transform: translate(-2px, -2px); box-shadow: var(--shadow-lift);
+}
+:root[data-look="brutalist"] .board-card.is-selected { border-color: var(--accent); box-shadow: 4px 4px 0 var(--accent); }
+:root[data-look="brutalist"] .answer.is-hot { box-shadow: inset 0 6px 0 var(--accent); }
+:root[data-look="brutalist"] .answer.is-warn { box-shadow: inset 0 6px 0 var(--ink-rule); }
+:root[data-look="brutalist"] .answer.is-hot:hover { box-shadow: inset 0 6px 0 var(--accent), var(--shadow-lift); }
+
+/* Controls */
+:root[data-look="brutalist"] .btn { font-weight: 800; letter-spacing: .01em; }
+:root[data-look="brutalist"] .btn-primary { box-shadow: none; }
+:root[data-look="brutalist"] .btn-ghost { border-color: var(--ink-rule); }
+:root[data-look="brutalist"] .lens-bar { padding: 0; gap: 0; }
+:root[data-look="brutalist"] .lens { min-height: 40px; border-right: 1px solid var(--ink-rule); font-weight: 800; }
+:root[data-look="brutalist"] .lens:last-child { border-right: 0; }
+:root[data-look="brutalist"] .lens.is-active { background: var(--ink-rule); }
+:root[data-look="brutalist"] .segmented { border-color: var(--ink-rule); padding: 0; }
+:root[data-look="brutalist"] .segmented button { min-height: 32px; font-family: var(--mono); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+:root[data-look="brutalist"] .segmented button.is-on { background: var(--ink-rule); color: #fff; box-shadow: none; }
+:root[data-look="brutalist"] .registry-tools select,
+:root[data-look="brutalist"] .search-field input { border-color: var(--ink-rule); }
+:root[data-look="brutalist"] .seam-toggle { border-color: var(--ink-rule); box-shadow: 2px 2px 0 var(--ink-rule); }
+:root[data-look="brutalist"] .seam-toggle:hover { box-shadow: 3px 3px 0 var(--accent); border-color: var(--ink-rule); }
+:root[data-look="brutalist"] .rail .nav-item.is-active { background: var(--ink-rule); color: #fff; box-shadow: none; }
+:root[data-look="brutalist"] .rail .nav-item.is-active .nav-pip,
+:root[data-look="brutalist"] .rail .nav-item.is-active .rail-unread { box-shadow: 0 0 0 2px var(--ink-rule); }
+:root[data-look="brutalist"] .panel-section-head.is-active { background: var(--ink-rule); color: #fff; box-shadow: none; }
+:root[data-look="brutalist"] .panel-section-head.is-active .panel-count:not(.is-hot) { color: #c9c9cf; }
+:root[data-look="brutalist"] .demo-flag { border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+:root[data-look="brutalist"] .workspace-chip { border: 1px solid var(--ink-rule); background: transparent; }
+:root[data-look="brutalist"] .role-chip { border-color: var(--ink-rule); font-family: var(--mono); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+:root[data-look="brutalist"] .role-chip.role-owner { border-color: var(--accent); background: var(--accent); color: #fff; }
+:root[data-look="brutalist"] .status-chip,
+:root[data-look="brutalist"] .pill,
+:root[data-look="brutalist"] .tag { font-family: var(--mono); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; font-size: 10.5px; }
+:root[data-look="brutalist"] .signal-totals span { border-color: var(--ink-rule); font-family: var(--mono); }
+:root[data-look="brutalist"] .signal-totals b { font-family: var(--display); font-weight: 900; }
+:root[data-look="brutalist"] .sig-dot.is-live { animation: none; box-shadow: none; }
+:root[data-look="brutalist"] .context-signals { background-image: linear-gradient(rgb(17 18 20 / 5%) 1px, transparent 1px), linear-gradient(90deg, rgb(17 18 20 / 5%) 1px, transparent 1px); }
+:root[data-look="brutalist"] .toast { border: 1px solid var(--ink-rule); box-shadow: 6px 6px 0 var(--accent); }
+:root[data-look="brutalist"] .review-launcher { box-shadow: 4px 4px 0 var(--accent); }
+/* One square geometry across the whole app (legacy components included). Only
+   status markers, spinners and dials stay round; they encode state, not decoration. */
+:root[data-look="brutalist"] .shell *,
+:root[data-look="brutalist"] .shell *::before,
+:root[data-look="brutalist"] .shell *::after { border-radius: var(--radius) !important; }
+:root[data-look="brutalist"] .shell :is(.state-dot, .sig-dot, .mode-dot, .note-dot, .beh-dot, .nav-pip, .sev, .pulse, .rec-dot, .aw-dot, .aw-node, .latch-spinner, .dial, .knob, .stamp, .tab-dot, .empty-mark, .hq-switch-knob),
+:root[data-look="brutalist"] .shell :is(.btn-ultra, .tag-ultra, .ctx-history li)::before { border-radius: 50% !important; }
+:root[data-look="brutalist"] .shell .avatar { border-radius: 0 !important; }
+
+@media (max-width: 760px) {
+  :root[data-look="brutalist"] .view-head h1 { font-size: 40px; }
+  :root[data-look="brutalist"] .answer b { font-size: 44px; }
+  :root[data-look="brutalist"] .lens { border-right: 1px solid var(--ink-rule); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-look="brutalist"] .board-card:hover,
+:root[data-look="brutalist"] .answer:hover,
+:root[data-look="brutalist"] .sig-item:hover,
+:root[data-look="brutalist"] .exec-row:hover,
+:root[data-look="brutalist"] .btn-primary:hover:not(:disabled),
+:root[data-look="brutalist"] .review-launcher:hover { transform: none; }
+}
+
+/* Rail labels in the brutalist look: hard black tag, orange offset, mono detail. */
+:root[data-look="brutalist"] .rail-hint { border: 1px solid var(--ink-rule); border-radius: 0; background: var(--ink-rule); box-shadow: 3px 3px 0 var(--accent); }
+:root[data-look="brutalist"] .rail-hint::before { background: var(--ink-rule); }
+:root[data-look="brutalist"] .rail-hint small { font: 500 10.5px/1.3 var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+:root[data-look="brutalist"] .view-head h1 { font: 900 clamp(40px, 5.4vw, 76px)/.9 var(--display); letter-spacing: -.045em; text-transform: uppercase; }
+:root[data-look="brutalist"] .signal-summary { font: 500 13px/1.55 var(--mono); letter-spacing: 0; color: var(--ink); }
+@media (max-width: 760px) { :root[data-look="brutalist"] .view-head h1 { font-size: 40px; } }

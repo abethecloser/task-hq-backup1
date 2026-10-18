@@ -1,0 +1,13 @@
+node_modules/
+dist/
+extension/
+.vercel/
+.env*
+!.env.example
+checkpoints/
+tsconfig.tsbuildinfo
+.vercel
+.serena/
+.claude/settings.local.json
+supabase/.temp/
+.DS_Store

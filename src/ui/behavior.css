@@ -1,0 +1,138 @@
+/* Task-HQ behavioral color system.
+   Surfaces are white-on-white with graphite type. Color appears only when a
+   control is doing something:
+     blue  = activation & progress   amber = attention & assistance
+     green = successful completion   red   = Stop the Line & restrictions
+     graphite = neutral actions
+   Never used as large background fills or decoration. */
+:root {
+  --graphite: #17181b;
+  --graphite-2: #2b2d32;
+  --graphite-soft: #f2f2f3;
+  --act: #2563eb;
+  --act-ink: #1d4ed8;
+  --act-soft: #eef3fe;
+  --attn: #d97706;
+  --attn-ink: #a35a04;
+  --attn-soft: #fdf5e7;
+  --ok: #16a34a;
+  --ok-ink: #15803d;
+  --ok-soft: #edf7f0;
+  --stop: #d42a20;
+  --stop-ink: #b4231a;
+  --stop-soft: #fdeeec;
+  --press-shadow: inset 0 2px 4px rgb(0 0 0 / 22%);
+  --lift: 0 1px 0 rgb(255 255 255 / 9%) inset, 0 1px 2px rgb(17 18 20 / 18%), 0 6px 16px rgb(17 18 20 / 12%);
+}
+
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ── Latch ─────────────────────────────────────────────────────────────── */
+.latch { --tone: var(--act); --tone-ink: var(--act-ink); --tone-soft: var(--act-soft); display: inline-flex; min-width: 0; }
+.latch.tone-complete { --tone: var(--ok); --tone-ink: var(--ok-ink); --tone-soft: var(--ok-soft); }
+.latch.tone-assist { --tone: var(--attn); --tone-ink: var(--attn-ink); --tone-soft: var(--attn-soft); }
+.latch.tone-stop { --tone: var(--stop); --tone-ink: var(--stop-ink); --tone-soft: var(--stop-soft); }
+.latch.tone-neutral { --tone: var(--graphite-2); --tone-ink: var(--graphite); --tone-soft: var(--graphite-soft); }
+
+.latch-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: var(--graphite);
+  color: #fff;
+  box-shadow: var(--lift);
+  cursor: pointer;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .12s ease, box-shadow .15s ease, background .15s ease;
+}
+.latch-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--fill) * 100%);
+  background: var(--tone);
+  transition: width .32s cubic-bezier(.2, .8, .2, 1), background .2s;
+}
+.latch.is-dragging .latch-fill { transition: none; }
+.latch-label { position: relative; flex: 1; min-width: 0; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; font-weight: 750; letter-spacing: -.005em; }
+.latch-thumb {
+  position: absolute;
+  top: 50%;
+  left: calc(4px + var(--fill) * (100% - 8px - var(--thumb)));
+  display: grid;
+  place-items: center;
+  width: var(--thumb);
+  height: var(--thumb);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--tone-ink);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 25%), 0 3px 8px rgb(0 0 0 / 18%);
+  transform: translateY(-50%);
+  transition: left .32s cubic-bezier(.2, .8, .2, 1), transform .12s;
+}
+.latch.is-dragging .latch-thumb { transition: none; }
+.latch-thumb svg { width: 55%; height: 55%; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+/* sizes: label sits right of the resting thumb */
+.latch-lg { --thumb: 44px; }
+.latch-lg .latch-track { height: 54px; padding: 0 22px 0 64px; font-size: 15.5px; }
+.latch-md { --thumb: 34px; }
+.latch-md .latch-track { height: 44px; padding: 0 18px 0 50px; font-size: 13.5px; }
+.latch-sm { --thumb: 22px; }
+.latch-sm .latch-track { height: 30px; padding: 0 12px 0 32px; font-size: 12px; background: #fff; color: var(--graphite); box-shadow: inset 0 0 0 1px var(--line-2, #d6d6db); }
+.latch-sm .latch-thumb { background: var(--graphite); color: #fff; box-shadow: none; }
+.latch-sm .latch-fill { opacity: .14; }
+.latch-sm.is-loading .latch-fill, .latch-sm.is-success .latch-fill { opacity: 1; }
+.latch-sm.is-loading .latch-track, .latch-sm.is-success .latch-track { color: #fff; box-shadow: none; }
+.latch-sm.is-success .latch-thumb, .latch-sm.is-loading .latch-thumb { background: #fff; color: var(--tone-ink); }
+
+/* states */
+.latch-track:hover:not(:disabled) { background: var(--graphite-2); }
+.latch-track:hover:not(:disabled) .latch-thumb { transform: translateY(-50%) translateX(3px); }
+.latch-sm .latch-track:hover:not(:disabled) { background: #fff; box-shadow: inset 0 0 0 1px var(--graphite); }
+.latch.is-press .latch-track { transform: translateY(1px); box-shadow: var(--press-shadow); }
+.latch.is-press .latch-thumb { transform: translateY(-50%) scale(.94); }
+.latch.is-loading .latch-track { cursor: progress; }
+.latch.is-success .latch-track { animation: latch-snap .26s cubic-bezier(.2, 1.4, .4, 1); }
+.latch.is-error .latch-track { animation: latch-shake .36s ease; }
+.latch.is-disabled .latch-track { background: var(--graphite-soft); color: #7b7e85; box-shadow: inset 0 0 0 1px #e3e3e6; cursor: not-allowed; }
+.latch.is-disabled .latch-thumb { background: #fff; color: #9a9ca3; box-shadow: 0 0 0 1px #e3e3e6; }
+.latch-track:focus-visible { outline: 3px solid color-mix(in srgb, var(--tone) 40%, transparent); outline-offset: 3px; }
+.latch-spinner { width: 46%; height: 46%; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: latch-spin .7s linear infinite; }
+
+@keyframes latch-snap { 0% { transform: scale(.985); } 60% { transform: scale(1.012); } 100% { transform: none; } }
+@keyframes latch-shake { 0%, 100% { transform: none; } 25% { transform: translateX(-5px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
+@keyframes latch-spin { to { transform: rotate(360deg); } }
+
+/* ── Switch ────────────────────────────────────────────────────────────── */
+.hq-switch { --tone: var(--act); display: inline-flex; align-items: center; gap: 10px; min-height: 36px; padding: 0 4px; border: 0; background: none; color: var(--ink); font: 650 13px var(--font); cursor: pointer; }
+.hq-switch.tone-stop { --tone: var(--stop); }
+.hq-switch.tone-neutral { --tone: var(--graphite); }
+.hq-switch-track { position: relative; width: 44px; height: 26px; flex: none; border-radius: 999px; background: #e4e4e7; box-shadow: inset 0 1px 2px rgb(0 0 0 / 12%); transition: background .18s; }
+.hq-switch-knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 25%), 0 2px 6px rgb(0 0 0 / 12%); transition: transform .2s cubic-bezier(.2, .8, .2, 1); }
+.hq-switch.is-on .hq-switch-track { background: var(--tone); }
+.hq-switch.is-on .hq-switch-knob { transform: translateX(18px); }
+.hq-switch:hover:not(:disabled) .hq-switch-knob { box-shadow: 0 1px 2px rgb(0 0 0 / 25%), 0 3px 9px rgb(0 0 0 / 18%); }
+.hq-switch:active:not(:disabled) .hq-switch-knob { width: 23px; }
+.hq-switch.is-on:active:not(:disabled) .hq-switch-knob { transform: translateX(15px); }
+.hq-switch:disabled { opacity: .45; cursor: not-allowed; }
+.hq-switch-state { min-width: 22px; color: var(--muted); font-size: 11.5px; font-weight: 700; }
+.hq-switch:focus-visible { outline: 3px solid color-mix(in srgb, var(--tone) 35%, transparent); outline-offset: 2px; border-radius: 8px; }
+
+/* ── Semantic status dot (small, never a fill) ─────────────────────────── */
+.beh-dot { display: inline-block; width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--graphite-2); }
+.beh-dot.tone-progress { background: var(--act); }
+.beh-dot.tone-complete { background: var(--ok); }
+.beh-dot.tone-assist { background: var(--attn); }
+.beh-dot.tone-stop { background: var(--stop); }
+
+@media (prefers-reduced-motion: reduce) {
+  .latch-fill, .latch-thumb, .hq-switch-knob, .hq-switch-track { transition: none !important; }
+  .latch.is-success .latch-track, .latch.is-error .latch-track { animation: none !important; }
+}

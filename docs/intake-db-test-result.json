@@ -1,0 +1,8 @@
+{
+  "runId": "9798580f-3d62-4e1a-8b5d-7013f67966c1",
+  "executed": false,
+  "passed": false,
+  "blocked": true,
+  "reason": "Set TASK_HQ_TEST_DATABASE_URL for the explicitly authorized non-production database.",
+  "at": "2026-10-17T23:18:50.209Z"
+}
