@@ -7,6 +7,10 @@ import '@fontsource/hanken-grotesk/600.css';
 import './activation.css';
 type Employee={id:string;name:string;role:string;status:string;affiliation_confirmed:boolean;expires_at:string|null};
 const client=supabase();
+// A single-use activation link carries the code in the fragment (#code=…), which browsers never send
+// to the server or in referrers. Read it once at load, then remove it from the address bar and history.
+function codeFromLink(){const m=/(?:^#|&)code=([^&]+)/.exec(location.hash);if(!m)return '';history.replaceState(null,'',location.pathname+location.search);try{return decodeURIComponent(m[1]!);}catch{return '';}}
+const linkCode=new URLSearchParams(location.search).has('admin')?'':codeFromLink();
 const home=import.meta.env.VITE_TASK_HQ_HOME || '/';
 async function call(body:Record<string,unknown>){
  if(!client)throw new Error('Supabase is not configured.');
@@ -15,7 +19,9 @@ async function call(body:Record<string,unknown>){
  if(data.error)throw new Error(data.error);return data;
 }
 function EmployeeActivation(){
- const[code,setCode]=useState(''),[identity,setIdentity]=useState<{employee_id:string;name:string;company:string}|null>(null),[confirmed,setConfirmed]=useState(false),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[done,setDone]=useState(false);
+ const[code,setCode]=useState(linkCode),[identity,setIdentity]=useState<{employee_id:string;name:string;company:string}|null>(null),[confirmed,setConfirmed]=useState(false),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[done,setDone]=useState(false);
+ // Opened from a link: look the code up straight away, so the employee lands on their identity.
+ useEffect(()=>{if(!linkCode)return;setBusy(true);call({action:'preview',code:linkCode}).then(result=>setIdentity(result.data)).catch(err=>setError((err as Error).message)).finally(()=>setBusy(false));},[]);
  async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{
   if(!identity){const result=await call({action:'preview',code});setIdentity(result.data);}
   else{await call({action:'redeem',code,employee:identity.employee_id,confirmed,email,password});
