@@ -367,7 +367,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         onSelect={id => go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
-          ? <><LookSwitch compact /><ModeChip quest={quest} /><p>Signed in as {live.email} · {ROLE_LABELS[live.role]}{live.isPlatformAdmin ? ' · platform admin (separate)' : ''}</p><button type="button" className="link exit-demo" onClick={live.onSignOut}>Sign out</button></>
+          ? <><LookSwitch compact /><ModeChip quest={quest} /><p>Signed in as {me.name && !me.name.includes('@') ? me.name : live.email} · {ROLE_LABELS[live.role]}{live.isPlatformAdmin ? ' · platform admin (separate)' : ''}</p><button type="button" className="link exit-demo" onClick={live.onSignOut}>Sign out</button></>
           : <><LookSwitch compact /><ModeChip quest={quest} /><p><b>Task-HQ Demo</b> · synthetic people and data. Changes stay on this device; teammates are not notified.</p>{onExitDemo && <button type="button" className="link exit-demo" onClick={onExitDemo}>Leave demo · sign in</button>}</>}
       />
       {!sidebar.isMobile && (

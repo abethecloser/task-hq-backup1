@@ -58,7 +58,7 @@ function UserChip({ quest }: { quest: Quest }) {
       trigger={<><span className="user-chip-mark" aria-hidden="true">{firstName(state, actor, '?').slice(0, 1).toUpperCase()}</span><span className="user-chip-text"><b>{firstName(state, actor, 'You')}</b><small>{role}</small></span><TopIcon d="M6 9l6 6 6-6" small /></>}>
       {live
         ? <>
-            <p className="menu-note">{live.email}<br />{role} of {live.org.name}</p>
+            <p className="menu-note">{me?.name && me.name !== live.email ? <><b>{me.name}</b><br />{live.email}</> : live.email}<br />{role} of {live.org.name}</p>
             {live.canSwitch && <button type="button" role="menuitem" onClick={() => { setOpen(false); live.onLeaveWorkspace(); }}>{live.isPlatformAdmin ? 'Platform console' : 'Switch workspace'}</button>}
             <button type="button" role="menuitem" onClick={() => { setOpen(false); live.onSignOut(); }}>Sign out</button>
           </>

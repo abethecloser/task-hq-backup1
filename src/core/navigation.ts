@@ -9,6 +9,8 @@ export interface NavigationAccess {
   full: boolean;
   /** View ids that are under construction for everyone else. */
   restricted: string[];
+  /** Sections reopened per organization by the caller's role there (e.g. People & Roles for owners). */
+  byOrg?: Record<string, string[]>;
 }
 
 export const UNDER_CONSTRUCTION = 'Under construction :)';
@@ -31,7 +33,17 @@ export function canNavigate(access: NavigationAccess, view: string): boolean {
 /** The server's answer, or CLOSED when it is missing or malformed. */
 export function parseNavigation(data: unknown): NavigationAccess {
   if (!data || typeof data !== 'object') return CLOSED;
-  const { full, restricted } = data as { full?: unknown; restricted?: unknown };
+  const { full, restricted, by_org: byOrg } = data as { full?: unknown; restricted?: unknown; by_org?: unknown };
   if (typeof full !== 'boolean' || !Array.isArray(restricted) || !restricted.every(item => typeof item === 'string')) return CLOSED;
-  return { full, restricted };
+  const reopened: Record<string, string[]> = {};
+  if (byOrg && typeof byOrg === 'object' && !Array.isArray(byOrg)) {
+    for (const [org, sections] of Object.entries(byOrg)) if (Array.isArray(sections)) reopened[org] = sections.filter((item): item is string => typeof item === 'string');
+  }
+  return { full, restricted, byOrg: reopened };
+}
+
+/** The access that applies inside one organization: its role-reopened sections are open. */
+export function forOrg(access: NavigationAccess, orgId: string): NavigationAccess {
+  const reopened = access.byOrg?.[orgId] ?? [];
+  return reopened.length ? { ...access, restricted: access.restricted.filter(view => !reopened.includes(view)) } : access;
 }

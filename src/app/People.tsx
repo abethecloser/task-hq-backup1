@@ -128,6 +128,8 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
         </div>
         {isAdmin && (
           <div className="head-actions">
+            {/* Same origin, so the signed-in session carries over to activation administration. */}
+            <a className="btn btn-ghost" href="/activate/index.html?admin=1" title="Generate, regenerate or revoke one-time activation codes for confirmed employees">Activation codes</a>
             {chosen.length > 0 && <button type="button" className="btn btn-ghost" onClick={() => setReviewing(true)}>Review invitations ({chosen.length})</button>}
             <button type="button" className="btn btn-primary" disabled={!staged} onClick={() => setEditing('new')}
               title={staged ? 'Add someone to the directory. No account, access or email.' : 'Needs the team-staging database update (pending approval).'}>+ Add person</button>

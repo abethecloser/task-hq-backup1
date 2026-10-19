@@ -10,7 +10,7 @@ import type { LiveAccount, OrgRole } from '../app/LiveContext.tsx';
 import { createLiveBackend } from '../adapter/live.ts';
 import { Glyph } from '../auth/AuthScreen.tsx';
 import { PRODUCT } from '../core/workspace.ts';
-import { CLOSED, parseNavigation } from '../core/navigation.ts';
+import { CLOSED, forOrg, parseNavigation } from '../core/navigation.ts';
 import type { NavigationAccess } from '../core/navigation.ts';
 import { PlatformConsole } from './PlatformConsole.tsx';
 import './live.css';
@@ -99,7 +99,7 @@ function LiveWorkspace({ client, context, membership, navigation, onSignOut, onL
     searchOrgs: context.memberships.map(m => ({ id: m.org_id, name: m.name })),
     onOpenWorkspace: (id, hash) => { if (context.memberships.some(m => m.org_id === id)) { history.replaceState(null, '', hash); onChoose(id); } },
     adminOrgs: context.memberships.filter(item => item.role === 'owner' || item.role === 'admin').map(item => ({ id: item.org_id, name: item.name })),
-    navigation,
+    navigation: forOrg(navigation, membership.org_id),
   }), [client, context, org, membership.role, navigation, onSignOut, onLeave, canLeave, onChoose]);
   useEffect(() => { document.title = `${org.name} — ${PRODUCT.name}`; }, [org.name]);
   return <LiveContext.Provider value={account}><App backend={backend} /></LiveContext.Provider>;
