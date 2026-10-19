@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { UNDER_CONSTRUCTION } from '../core/navigation.ts';
 import type { ReactNode } from 'react';
 import { useDropdown } from '../ui/useDropdown.tsx';
 import { firstName, person } from '../core/selectors.ts';
@@ -8,12 +9,12 @@ import { ROLE_LABELS, useLive } from './LiveContext.tsx';
 
 // Primary destinations share one persistent, horizontally scrollable navigation.
 // Task tabs reuse the registry lenses; other destinations keep their existing routes.
-export interface TopTab { id: string; label: string; count?: number; hot: boolean; active: boolean; allowed: boolean }
+export interface TopTab { id: string; label: string; count?: number; hot: boolean; active: boolean; allowed: boolean; restricted?: boolean }
 
-export function TopBar({ quest, demo, focused, unread, askOpen, tabs, onTab, onSearch, onAsk, onBell, onMenu, menuOpen }: {
+export function TopBar({ quest, demo, focused, unread, askOpen, tabs, onTab, onSearch, searchOpen = true, onAsk, onBell, onMenu, menuOpen }: {
   quest: Quest; demo: boolean; focused: boolean; unread: number;
   askOpen: boolean; tabs: TopTab[];
-  onTab: (id: string) => void; onSearch: (text: string) => void; onAsk: () => void; onBell: () => void; onMenu: () => void; menuOpen: boolean;
+  onTab: (id: string) => void; onSearch: (text: string) => void; /** False while Search is under construction for this account. */ searchOpen?: boolean; onAsk: () => void; onBell: () => void; onMenu: () => void; menuOpen: boolean;
 }) {
   const [query, setQuery] = useState('');
   return (
@@ -22,16 +23,17 @@ export function TopBar({ quest, demo, focused, unread, askOpen, tabs, onTab, onS
       {demo && <span className="demo-flag" title="Synthetic people and data on this device. Not company work.">Demo · synthetic</span>}
       <nav className="top-nav top-tabs" aria-label="Primary navigation" tabIndex={0}>
         {tabs.map(tab => (
-          <button key={tab.id} type="button" className={`top-tab ${tab.active ? 'is-active' : ''}`} aria-current={tab.active ? 'page' : undefined} disabled={!tab.allowed} onClick={() => onTab(tab.id)}>
-            {tab.label}{tab.count !== undefined && <span className={tab.hot ? 'is-hot' : ''}>{tab.count}</span>}
+          <button key={tab.id} type="button" className={`top-tab ${tab.active ? 'is-active' : ''} ${tab.restricted ? 'is-restricted' : ''}`} aria-current={tab.active ? 'page' : undefined} disabled={!tab.allowed}
+            aria-disabled={tab.restricted || undefined} aria-label={tab.restricted ? `${tab.label}, under construction` : undefined} title={tab.restricted ? UNDER_CONSTRUCTION : undefined} onClick={() => onTab(tab.id)}>
+            {tab.label}{tab.count !== undefined && !tab.restricted && <span className={tab.hot ? 'is-hot' : ''}>{tab.count}</span>}
           </button>
         ))}
       </nav>
       <div className="topbar-right">
         {focused && <span className="focus-chip">Critical Focus</span>}
-        <form className="search-field top-search" role="search" onSubmit={event => { event.preventDefault(); if (query.trim()) { onSearch(query.trim()); setQuery(''); } }}>
+        <form className={`search-field top-search ${searchOpen ? '' : 'is-restricted'}`} role="search" title={searchOpen ? undefined : UNDER_CONSTRUCTION} onSubmit={event => { event.preventDefault(); if (query.trim()) { onSearch(query.trim()); setQuery(''); } }}>
           <TopIcon d="M16 16l5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" />
-          <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search tasks, people, projects" aria-label="Search" />
+          <input value={query} onChange={event => setQuery(event.target.value)} placeholder={searchOpen ? 'Search tasks, people, projects' : 'Search · under construction :)'} aria-label={searchOpen ? 'Search' : 'Search, under construction'} />
         </form>
         {!focused && <button type="button" className={`top-icon ${askOpen ? 'is-on' : ''}`} aria-label="Ask your tasks" aria-expanded={askOpen} onClick={onAsk}><TopIcon d={SPARK} /></button>}
         <button type="button" className="top-icon" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'} onClick={onBell}>

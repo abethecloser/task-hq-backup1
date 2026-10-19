@@ -52,6 +52,7 @@ import { demoTools } from '../adapter/tools.ts';
 import { Tools } from './Tools.tsx';
 import { CompanySignals } from './CompanySignals.tsx';
 import { notificationsFor } from './notifications.ts';
+import { CLOSED, UNDER_CONSTRUCTION, canNavigate } from '../core/navigation.ts';
 import type { Notification } from './notifications.ts';
 
 export type View = 'home' | 'reports' | 'all-tasks' | 'inbox' | 'tools' | 'company-work' | 'needs-attention' | 'leads' | 'executive' | 'people' | 'feedback' | 'activity' | 'settings' | 'agents' | 'relationships' | 'search';
@@ -210,7 +211,18 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const snoozeKey = sidebar.snoozes.map(item => `${item.id}:${item.until}`).join(',');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const awareAttention = useMemo(() => attentionFor(state, minute * 60000, actor, sidebar.snoozes), [state, minute, actor, snoozeKey]);
-  const view: View = allowed(requested) && (requested !== 'executive' || hasDesk) ? requested : 'home';
+  // Temporary restricted navigation: the server decides (core/navigation.ts); demo and failures restrict.
+  const access = live?.navigation ?? CLOSED;
+  const open = (next: View) => canNavigate(access, next);
+  const underConstruction = () => quest.say(UNDER_CONSTRUCTION);
+  const view: View = allowed(requested) && open(requested) && (requested !== 'executive' || hasDesk) ? requested : 'home';
+
+  // A restricted address (typed, deep link, back button or a link inside a panel) lands on Home.
+  useEffect(() => {
+    if (open(requested)) return;
+    setRequested('home');
+    history.replaceState(null, '', '#/home');
+  }, [requested, access]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // When temporary access ends, close anything opened with it.
   useEffect(() => {
@@ -219,6 +231,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   }, [focused, grant, taskId, state.focus]);
 
   function go(next: View) {
+    if (!open(next)) { underConstruction(); return; }
     setRequested(next);
     setTaskId(null);
     history.pushState(null, '', next === 'leads' && leadId ? `#/leads/${leadId}` : `#/${next}`);
@@ -232,6 +245,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     history.replaceState(null, '', `#/${view}`);
   }
   function openLead(id: string) {
+    if (!open('leads')) { underConstruction(); return; }
     setLeadId(id); setRequested('leads'); setTaskId(null);
     history.replaceState(null, '', `#/leads/${id}`);
   }
@@ -252,6 +266,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   }
 
   function openSearch(text: string) {
+    if (!open('search')) { underConstruction(); return; }
     setRequested('search'); setTaskId(null); setSearchNonce(value => value + 1);
     history.replaceState(null, '', `#/search?q=${encodeURIComponent(text)}`);
   }
@@ -348,7 +363,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
           onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
-        items={nav.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, locked: !allowed(item.id), info: info[item.id] }))}
+        items={nav.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, locked: !allowed(item.id), restricted: !open(item.id), info: info[item.id] }))}
         onSelect={id => go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
@@ -364,8 +379,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
       <main className="main">
         <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen}
-          tabs={[...LENSES.map(lens => ({ id: lens, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && registryView.lens === lens, allowed: allowed('all-tasks') })), ...primary.map(item => ({ id: item.id, label: item.label, count: item.count, hot: false, active: view === item.id, allowed: allowed(item.id) }))]}
-          onTab={id => { if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} onSearch={openSearch} onAsk={() => setAskOpen(open => !open)} onBell={() => sidebar.showTab('inbox')}
+          tabs={[...LENSES.map(lens => ({ id: lens, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && registryView.lens === lens, allowed: allowed('all-tasks') })), ...primary.map(item => ({ id: item.id, label: item.label, count: item.count, hot: false, active: view === item.id, allowed: allowed(item.id), restricted: !open(item.id) }))]}
+          onTab={id => { if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} onSearch={openSearch} searchOpen={open('search')} onAsk={() => setAskOpen(value => !value)} onBell={() => sidebar.showTab('inbox')}
           onMenu={sidebar.openMobile} menuOpen={sidebar.mobileOpen} />
 
         <FeedbackBar quest={quest}><CompanySignals quest={quest} onOpen={openTask} /></FeedbackBar>
@@ -379,7 +394,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
                 unseen={{ count: inboxUnread, latest: inbox.items.find(item => !sidebar.read.has(item.id))?.title }} onUnseen={() => sidebar.showTab('inbox')}
                 mentions={mentions} read={sidebar.read}
                 onOpen={openTask} onOpenLead={openLead} onCreate={() => setCreating(true)}
-                onOpenMention={item => { sidebar.markRead([item.id]); location.hash = `#/inbox/${encodeURIComponent(item.channelId ?? '')}/${encodeURIComponent(item.messageId ?? '')}`; }}
+                onOpenMention={item => { if (!open('inbox')) { underConstruction(); return; } sidebar.markRead([item.id]); location.hash = `#/inbox/${encodeURIComponent(item.channelId ?? '')}/${encodeURIComponent(item.messageId ?? '')}`; }}
                 onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} onActivity={() => go('activity')} />
             : view === 'all-tasks' ? <AllTasks quest={quest} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} registry={registry} />
             : view === 'reports' ? (hasDesk ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} /> : <Activity quest={quest} onOpen={openTask} />)
@@ -399,12 +414,20 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         </section>
 
         <nav className="tabbar" aria-label="Task-HQ sections">
-          {(['home', 'all-tasks', 'inbox', 'needs-attention', 'leads'] as View[]).map(id => nav.find(item => item.id === id)).filter(item => !!item).map(item => (
-            <button key={item.id} type="button" className={view === item.id ? 'is-active' : ''} disabled={!allowed(item.id)} onClick={() => go(item.id)}>
-              {item.icon}<span>{item.label.replace('Speed to Lead', 'Leads').replace('Needs Attention', 'Attention').replace('All Tasks', 'Tasks')}</span>
-              {item.hot && allowed(item.id) && <i className="tab-dot" />}
-            </button>
-          ))}
+          {[
+            { id: 'home' as View, label: 'Home', hot: false, icon: <Icon d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" /> },
+            { id: 'all-tasks' as View, label: 'Tasks', hot: false, icon: <Icon d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v2H4z" /> },
+            ...(['inbox', 'needs-attention', 'leads'] as View[]).map(id => nav.find(item => item.id === id)).filter(item => !!item),
+          ].map(item => {
+            const restricted = !open(item.id);
+            return (
+              <button key={item.id} type="button" className={`${view === item.id ? 'is-active' : ''} ${restricted ? 'is-restricted' : ''}`} disabled={!allowed(item.id)}
+                aria-disabled={restricted || undefined} title={restricted ? UNDER_CONSTRUCTION : undefined} onClick={() => (item.id === 'all-tasks' ? openLens(registryView.lens) : go(item.id))}>
+                {item.icon}<span>{item.label.replace('Speed to Lead', 'Leads').replace('First Response', 'Leads').replace('Needs Attention', 'Attention').replace('All Tasks', 'Tasks')}</span>
+                {restricted ? <span className="sr-only">, under construction</span> : item.hot && allowed(item.id) && <i className="tab-dot" />}
+              </button>
+            );
+          })}
         </nav>
       </main>
 

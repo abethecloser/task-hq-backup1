@@ -351,3 +351,14 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .signals-empty { padding: 12px; color: var(--muted); }
 @media (max-width: 1000px) { .company-signals { flex-wrap: wrap; gap: 4px; } .company-signal-preview { flex-basis: 100%; } }
 
+
+/* ── Temporary restricted navigation (core/navigation.ts) ──────────────────
+   Sections under construction keep their place and icon, muted; they stay focusable
+   and announce "under construction". Remove these rules with the restriction. */
+.nav-item.is-restricted .nav-icon, .top-tab.is-restricted, .panel-nav button.is-restricted, .tabbar button.is-restricted { opacity: .42; }
+.nav-item.is-restricted:hover .nav-icon, .nav-item.is-restricted:focus-visible .nav-icon, .top-tab.is-restricted:hover, .top-tab.is-restricted:focus-visible,
+.panel-nav button.is-restricted:hover, .panel-nav button.is-restricted:focus-visible { opacity: .7; }
+:is(.nav-item, .top-tab, .panel-nav button, .tabbar button).is-restricted { cursor: help; }
+.top-tab.is-restricted:hover { background: transparent; }
+.panel-soon { margin-left: auto; color: var(--faint); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.top-search.is-restricted { opacity: .55; }

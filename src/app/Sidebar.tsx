@@ -5,6 +5,7 @@
 // Awareness.tsx). On mobile the rail is hidden, so the drawer also carries navigation.
 // Open state, width, tab, read items and snoozes are saved per person in localStorage;
 // they are presentation preferences on this device, not backend records.
+import { UNDER_CONSTRUCTION } from '../core/navigation.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import type { Snooze } from '../core/awareness.ts';
@@ -121,6 +122,8 @@ export interface SidebarItem {
   hot?: boolean;
   active: boolean;
   locked: boolean;
+  /** Temporarily under construction for this account: shown muted, stays focusable, never navigates. */
+  restricted?: boolean;
   /** Short, role-appropriate line shown under the section in the panel. */
   info?: string;
 }
@@ -218,15 +221,18 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
         <nav className="nav" aria-label="Task-HQ sections">
           {items.map(item => {
             const unread = unreadIn(notifications, read, item.id);
-            const name = `${item.label}${item.count ? `, ${item.count}${item.hot ? ' need attention' : ''}` : ''}${unread ? `, ${unread} unread` : ''}${item.locked ? ' — locked during Critical Focus' : ''}`;
+            // Critical Focus locking takes precedence over the temporary under-construction state.
+            const muted = !item.locked && !!item.restricted;
+            const name = muted ? `${item.label}, under construction` : `${item.label}${item.count ? `, ${item.count}${item.hot ? ' need attention' : ''}` : ''}${unread ? `, ${unread} unread` : ''}${item.locked ? ' — locked during Critical Focus' : ''}`;
             return (
-              <button key={item.id} type="button" className={`nav-item ${item.active ? 'is-active' : ''} ${item.locked ? 'is-locked' : ''}`}
-                disabled={item.locked} aria-current={item.active ? 'page' : undefined} aria-label={name}
-                {...hintFor(item.label, item.locked ? 'Locked during Critical Focus' : [item.info?.replace(/\.$/, ''), unread ? `${unread} unread` : ''].filter(Boolean).join(' · ') || undefined)}
+              <button key={item.id} type="button" className={`nav-item ${item.active ? 'is-active' : ''} ${item.locked ? 'is-locked' : ''} ${muted ? 'is-restricted' : ''}`}
+                disabled={item.locked} aria-disabled={muted || undefined} aria-current={item.active ? 'page' : undefined} aria-label={name}
+                {...hintFor(item.label, item.locked ? 'Locked during Critical Focus' : muted ? UNDER_CONSTRUCTION : [item.info?.replace(/\.$/, ''), unread ? `${unread} unread` : ''].filter(Boolean).join(' · ') || undefined)}
                 onClick={() => { setHint(null); onSelect(item.id); control.afterNavigate(); }}>
                 <span className="nav-icon">
                   {item.icon}
                   {item.locked ? <i className="nav-pip is-locked" aria-hidden="true" />
+                    : muted ? null
                     : unread > 0 ? <span className="rail-unread" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>
                     : item.hot && <i className="nav-pip" aria-hidden="true" />}
                 </span>
@@ -271,10 +277,12 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
                 <span aria-hidden="true">+</span> New task
               </button>
               {items.map(item => (
-                <button key={item.id} type="button" className={item.active ? 'is-active' : ''} disabled={item.locked} aria-current={item.active ? 'page' : undefined}
-                  onClick={() => { onSelect(item.id); control.afterNavigate(); }}>
+                <button key={item.id} type="button" className={`${item.active ? 'is-active' : ''} ${!item.locked && item.restricted ? 'is-restricted' : ''}`} disabled={item.locked} aria-current={item.active ? 'page' : undefined}
+                  aria-disabled={(!item.locked && item.restricted) || undefined} title={!item.locked && item.restricted ? UNDER_CONSTRUCTION : undefined}
+                  onClick={() => { onSelect(item.id); if (!item.restricted) control.afterNavigate(); }}>
                   {item.icon}<span>{item.label}</span>
-                  {item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`}>{item.count}</span> : null}
+                  {!item.locked && item.restricted ? <small className="panel-soon">Under construction :)</small>
+                    : item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`}>{item.count}</span> : null}
                 </button>
               ))}
             </nav>

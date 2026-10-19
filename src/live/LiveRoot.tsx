@@ -10,6 +10,8 @@ import type { LiveAccount, OrgRole } from '../app/LiveContext.tsx';
 import { createLiveBackend } from '../adapter/live.ts';
 import { Glyph } from '../auth/AuthScreen.tsx';
 import { PRODUCT } from '../core/workspace.ts';
+import { CLOSED, parseNavigation } from '../core/navigation.ts';
+import type { NavigationAccess } from '../core/navigation.ts';
 import { PlatformConsole } from './PlatformConsole.tsx';
 import './live.css';
 
@@ -35,6 +37,7 @@ export const errorText = (reason: unknown) => {
 
 export function LiveRoot({ client, onSignOut, onDemo }: { client: SupabaseClient; onSignOut: () => void; onDemo: () => void }) {
   const [context, setContext] = useState<MyContext | null>(null);
+  const [navigation, setNavigation] = useState<NavigationAccess>(CLOSED);
   const [error, setError] = useState('');
   const [orgId, setOrgId] = useState<string | null>(() => { try { return localStorage.getItem(ORG_KEY); } catch { return null; } });
   const [console_, setConsole] = useState(false);
@@ -44,6 +47,9 @@ export function LiveRoot({ client, onSignOut, onDemo }: { client: SupabaseClient
     setError('');
     const { data, error: rpcError } = await client.rpc('my_context');
     if (rpcError || !data) { setError(rpcError ? errorText(rpcError) : 'Could not load your account.'); return; }
+    // Which sections this account may open. Any failure restricts (never blocks sign-in).
+    const access = await client.rpc('my_navigation');
+    setNavigation(access.error ? CLOSED : parseNavigation(access.data));
     setContext(data as MyContext);
   }, [client]);
   useEffect(() => { void refresh(); }, [refresh]);
@@ -68,7 +74,7 @@ export function LiveRoot({ client, onSignOut, onDemo }: { client: SupabaseClient
     return <PlatformConsole client={client} context={context} onOpen={choose} onSignOut={onSignOut} onRefresh={refresh} />;
   }
   if (membership) {
-    return <LiveWorkspace key={membership.org_id} client={client} context={context} membership={membership} onSignOut={onSignOut}
+    return <LiveWorkspace key={membership.org_id} client={client} context={context} membership={membership} navigation={navigation} onSignOut={onSignOut}
       onLeave={() => (context.is_platform_admin ? setConsole(true) : choose(null))} canLeave={context.memberships.length > 1 || context.is_platform_admin} onChoose={choose} />;
   }
   if (context.memberships.length > 1) {
@@ -82,8 +88,8 @@ export function LiveRoot({ client, onSignOut, onDemo }: { client: SupabaseClient
   return <NoWorkspace client={client} context={context} onRefresh={refresh} onSignOut={onSignOut} onDemo={onDemo} />;
 }
 
-function LiveWorkspace({ client, context, membership, onSignOut, onLeave, canLeave, onChoose }: {
-  client: SupabaseClient; context: MyContext; membership: MyContext['memberships'][number]; onSignOut: () => void; onLeave: () => void; canLeave: boolean; onChoose: (id: string) => void;
+function LiveWorkspace({ client, context, membership, navigation, onSignOut, onLeave, canLeave, onChoose }: {
+  client: SupabaseClient; context: MyContext; membership: MyContext['memberships'][number]; navigation: NavigationAccess; onSignOut: () => void; onLeave: () => void; canLeave: boolean; onChoose: (id: string) => void;
 }) {
   const org = useMemo(() => ({ id: membership.org_id, slug: membership.slug, name: membership.name }), [membership.org_id, membership.slug, membership.name]);
   const backend = useMemo(() => createLiveBackend(client, SUPABASE_URL, PUBLISHABLE_KEY, org, context.user_id), [client, org, context.user_id]);
@@ -93,7 +99,8 @@ function LiveWorkspace({ client, context, membership, onSignOut, onLeave, canLea
     searchOrgs: context.memberships.map(m => ({ id: m.org_id, name: m.name })),
     onOpenWorkspace: (id, hash) => { if (context.memberships.some(m => m.org_id === id)) { history.replaceState(null, '', hash); onChoose(id); } },
     adminOrgs: context.memberships.filter(item => item.role === 'owner' || item.role === 'admin').map(item => ({ id: item.org_id, name: item.name })),
-  }), [client, context, org, membership.role, onSignOut, onLeave, canLeave, onChoose]);
+    navigation,
+  }), [client, context, org, membership.role, navigation, onSignOut, onLeave, canLeave, onChoose]);
   useEffect(() => { document.title = `${org.name} — ${PRODUCT.name}`; }, [org.name]);
   return <LiveContext.Provider value={account}><App backend={backend} /></LiveContext.Provider>;
 }

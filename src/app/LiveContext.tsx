@@ -1,5 +1,6 @@
 // Signed-in, live-workspace context (absent in the Task-HQ Demo).
 import { createContext, useContext } from 'react';
+import type { NavigationAccess } from '../core/navigation.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type OrgRole = 'owner' | 'admin' | 'supervisor' | 'member' | 'reviewer';
@@ -18,6 +19,8 @@ export interface LiveAccount {
   onOpenWorkspace?: (id: string, hash: string) => void;
   /** Organizations this account administers (owner/admin); for choosing affiliation when staging people. */
   adminOrgs: { id: string; name: string }[];
+  /** Temporary restricted navigation, as decided by the server (public.my_navigation). */
+  navigation: NavigationAccess;
 }
 
 export const LiveContext = createContext<LiveAccount | null>(null);
