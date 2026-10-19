@@ -15,7 +15,7 @@ import { ROLE_LABELS, useLive } from './LiveContext.tsx';
 import type { LiveAccount, OrgRole } from './LiveContext.tsx';
 import { PersonForm, PlanWork, invitationMessage } from './StagedTeam.tsx';
 import { ORG_ROLES, canManageMember, grantableRoles, isOrgAdmin } from './authority.ts';
-import { STATUS_LABEL, activationLink, activationMessage, nextAction } from '../core/people-access.ts';
+import { PRODUCTION_ORIGIN, STATUS_LABEL, activationLink, activationMessage, linkMessage, nextAction, provisionPath } from '../core/people-access.ts';
 import type { PersonAccess } from '../core/people-access.ts';
 import type { Staged } from './StagedTeam.tsx';
 
@@ -26,7 +26,7 @@ interface Overview {
 }
 
 /** A freshly issued activation link: shown once, never stored on this device. */
-interface Issued { name: string; email: string; link: string; code: string; message: string; expiresAt: string }
+interface Issued { id: string; kind: 'link' | 'invite'; name: string; email: string; link: string; code: string; message: string; expiresAt: string }
 
 /** The employee-activation function's error text, when it sent one. */
 async function functionError(error: unknown) {
@@ -85,8 +85,12 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
   const [planning, setPlanning] = useState<string | null>(null);
   // Authoritative per-person status (public.org_people_access); null until loaded or if unavailable.
   const [access, setAccess] = useState<PersonAccess[] | null>(null);
-  const [issued, setIssued] = useState<Issued | null>(null);
+  // Setup messages from the last provisioning run: shown once, never stored on this device.
+  const [issued, setIssued] = useState<Issued[]>([]);
   const [confirmAdmin, setConfirmAdmin] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [provisioning, setProvisioning] = useState<string[]>([]);
+  const [confirmBulk, setConfirmBulk] = useState(false);
   const [confirmRemoveStaged, setConfirmRemoveStaged] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -96,10 +100,12 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
       live.client.rpc('org_staging_overview', { p_org: live.org.id }),
       live.client.rpc('org_people_access', { p_org: live.org.id }),
     ]);
-    setAccess(people.error ? null : (people.data as PersonAccess[]));
+    const fresh = people.error ? null : (people.data as PersonAccess[]);
+    setAccess(fresh);
     if (error) setNotice({ tone: 'error', text: errorText(error) }); else setData(overview as Overview);
     // Staging is optional: a database without the staging migration simply shows no staged people.
     setStaged(staging.error ? null : (staging.data as Staged[]));
+    return fresh;
   }, [isAdmin, live.client, live.org.id]);
   useEffect(() => { void load(); }, [load]);
 
@@ -112,36 +118,51 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
     return !error;
   }
 
-  // Activation link: confirm affiliation if needed (adding them is the confirmation), then generate.
-  // Generating revokes any earlier open link for the person. The raw code is shown once.
-  async function sendLink(person: PersonAccess) {
-    setBusy(true); setNotice(null); setIssued(null); setConfirmAdmin(null);
+  // Provisioning: one person → a personal single-use setup link (new account, their own password),
+  // or an invitation when their email already has a Task-HQ account (linked, never duplicated).
+  // The server re-checks every step; Admin access needs an owner. Codes are shown once, never stored.
+  async function provisionOne(person: PersonAccess): Promise<Issued | string> {
+    const path = provisionPath(person, live.role) ?? (person.has_account ? 'invite' : 'link');
     if (!person.affiliation_confirmed) {
       const { error } = await live.client.rpc('confirm_staged_affiliation', { p_contact: person.id, p_confirmed: true });
-      if (error) { setBusy(false); setNotice({ tone: 'error', text: errorText(error) }); return; }
+      if (error) return `${person.name}: ${errorText(error)}`;
+    }
+    if (path === 'invite') {
+      const { error } = await live.client.rpc('invite_staged_contact', { p_contact: person.id, p_days: 14 });
+      if (error) return `${person.name}: ${errorText(error)}`;
+      return { id: person.id, kind: 'invite', name: person.name, email: person.email ?? '', link: PRODUCTION_ORIGIN, code: '', expiresAt: '',
+        message: linkMessage(person.name, live.org.name, PRODUCTION_ORIGIN, person.email ?? '') };
     }
     const { data: result, error } = await live.client.functions.invoke('employee-activation', { body: { action: 'generate', org: live.org.id, employee: person.id } });
-    setBusy(false);
-    if (error || !result?.code) { setNotice({ tone: 'error', text: error ? await functionError(error) : 'No link was created. Try again.' }); await load(); return; }
-    const expiresAt = (result.data as { expires_at: string }).expires_at;
-    setIssued({ name: person.name, email: person.email ?? '', code: result.code as string, expiresAt,
-      link: activationLink(location.origin, result.code as string), message: activationMessage(person.name, live.org.name, location.origin, result.code as string, expiresAt) });
-    setNotice({ tone: 'info', text: `Activation link created for ${person.name}. Copy it now — it’s shown only once. Nothing was sent.` });
+    if (error || !result?.code) return `${person.name}: ${error ? await functionError(error) : 'No setup link was created.'}`;
+    const code = result.code as string, expiresAt = (result.data as { expires_at: string }).expires_at;
+    return { id: person.id, kind: 'link', name: person.name, email: person.email ?? '', code, expiresAt,
+      link: activationLink(PRODUCTION_ORIGIN, code), message: activationMessage(person.name, live.org.name, PRODUCTION_ORIGIN, code, expiresAt) };
+  }
+  async function provision(people: PersonAccess[]) {
+    setBusy(true); setNotice(null); setIssued([]); setConfirmAdmin(null); setConfirmBulk(false);
+    setProvisioning(people.map(person => person.id));
+    const done: Issued[] = [], failed: string[] = [];
+    for (const person of people) { const result = await provisionOne(person); if (typeof result === 'string') failed.push(result); else done.push(result); }
+    setProvisioning([]); setPicked([]); setBusy(false); setIssued(done);
+    const links = done.filter(item => item.kind === 'link').length, linked = done.length - links;
+    const summary = [links ? `${links} setup link${links === 1 ? '' : 's'} created` : '', linked ? `${linked} existing account${linked === 1 ? '' : 's'} invited to link` : ''].filter(Boolean).join(' · ');
+    setNotice(failed.length ? { tone: 'error', text: `${summary ? summary + '. ' : ''}Not provisioned — ${failed.join(' · ')}` }
+      : { tone: 'info', text: `${summary}. Copy each message below and send it privately — links are shown only once. Nothing was sent.` });
     await load();
   }
   async function revokeLink(person: PersonAccess) {
-    setBusy(true); setNotice(null); setIssued(null);
+    setBusy(true); setNotice(null); setIssued([]);
     const { error } = await live.client.functions.invoke('employee-activation', { body: { action: 'revoke', org: live.org.id, employee: person.id } });
     setBusy(false);
-    setNotice(error ? { tone: 'error', text: await functionError(error) } : { tone: 'info', text: `${person.name}’s activation link no longer works.` });
+    setNotice(error ? { tone: 'error', text: await functionError(error) } : { tone: 'info', text: `${person.name}’s setup link no longer works.` });
     await load();
   }
-  function act(person: PersonAccess, action: 'send' | 'revoke-link' | 'invite-instead' | 'revoke-invite') {
+  function act(person: PersonAccess, action: 'send' | 'revoke-link' | 'revoke-invite') {
     if (action === 'send') {
       if (person.role === 'admin' && confirmAdmin !== person.id) { setConfirmAdmin(person.id); return; }
-      void sendLink(person);
+      void provision([person]);
     } else if (action === 'revoke-link') void revokeLink(person);
-    else if (action === 'invite-instead') void run(() => live.client.rpc('invite_staged_contact', { p_contact: person.id, p_days: 14 }), `${person.name} invited. Use this only if they already have a Task-HQ account; they accept after signing in with ${person.email}.`).then(ok => { if (ok && person.email) setPrepared({ email: person.email, message: inviteMessage(person.email, person.role as OrgRole, person.work_role) }); });
     else if (person.invitation) void run(() => live.client.rpc('revoke_invitation', { p_invitation: person.invitation!.id }), `${person.name}’s invitation revoked.`);
   }
 
@@ -158,6 +179,10 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
   const statusOf = (id: string) => accessOf(id)?.status;
   const counts = { active: data?.members.length ?? 0, notInvited: pending.filter(item => ['ready', 'needs-email', 'link-expired', 'link-invalid', 'invite-expired'].includes(statusOf(item.id) ?? 'ready')).length, invited: pending.filter(item => ['link-sent', 'invited'].includes(statusOf(item.id) ?? '')).length };
   const stagedEmails = new Set((staged ?? []).map(item => item.email).filter(Boolean));
+  // Bulk provisioning: everyone selectable is eligible right now for this caller.
+  const eligible = pending.map(item => accessOf(item.id)).filter((person): person is PersonAccess => !!person && !!provisionPath(person, live.role));
+  const chosen = eligible.filter(person => picked.includes(person.id));
+  const chosenAdmins = chosen.filter(person => person.role === 'admin');
   const planningPerson = (staged ?? []).find(item => item.id === planning) ?? null;
   const stagedName = (id: string | null) => (staged ?? []).find(item => item.id === id)?.full_name;
   const memberName = (id: string | null) => (data?.members ?? []).find(item => item.user_id === id);
@@ -171,28 +196,35 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
           <p className="eyebrow">{live.org.name} · team</p>
           <h1>People & Access</h1>
           <p className="lede">{isAdmin && staged
-            ? <span className="team-counts"><b>{counts.active}</b> active · <b>{counts.invited}</b> waiting to activate · <b>{counts.notInvited}</b> not invited{data?.requests.length ? <> · <b>{data.requests.length}</b> waiting for approval</> : null}</span>
+            ? <span className="team-counts"><b>{counts.active}</b> active · <b>{counts.invited}</b> setup pending · <b>{counts.notInvited}</b> not provisioned or expired{data?.requests.length ? <> · <b>{data.requests.length}</b> waiting for approval</> : null}</span>
             : <>{rows.length} {rows.length === 1 ? 'member' : 'members'}{data ? ` · ${data.invitations.length} open invitation${data.invitations.length === 1 ? '' : 's'} · ${data.requests.length} waiting for approval` : ''}. Roles are enforced on the server for every change.</>}</p>
         </div>
         {isAdmin && (
           <div className="head-actions">
             <button type="button" className="btn btn-primary" disabled={!staged} onClick={() => setEditing('new')}
-              title={staged ? 'Add someone, choose their roles, then send them an activation link.' : 'Needs the team-staging database update (pending approval).'}>+ Add person</button>
+              title={staged ? 'Add someone, choose their roles, then provision their access.' : 'Needs the team-staging database update (pending approval).'}>+ Add person</button>
           </div>
         )}
       </header>
       {isAdmin && !staged && <p className="boundary">Adding people before inviting them needs the team-staging database update, which hasn’t been applied here yet. Everything else on this page works.</p>}
 
       {notice && <p className={`console-notice is-${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
-      {issued && (
+      {issued.length > 0 && (
         <section className="prepared issued-link" aria-labelledby="issued-title">
-          <p id="issued-title"><b>Activation link for {issued.name}</b> · works once · expires {new Date(issued.expiresAt).toLocaleString()}. Task-HQ doesn’t email anyone — send it{issued.email ? ` to ${issued.email}` : ''} yourself. It won’t be shown again.</p>
-          <textarea readOnly rows={4} value={issued.message} onFocus={event => event.currentTarget.select()} aria-label="Message to send" />
+          <p id="issued-title"><b>Setup messages ({issued.length})</b> · each link is personal, works once and expires in 24 hours. Task-HQ doesn’t email anyone — send each one privately yourself. They won’t be shown again.</p>
+          {issued.map(item => (
+            <div key={item.id} className="issued-item">
+              <p><b>{item.name}</b>{item.email ? ` · ${item.email}` : ''} · {item.kind === 'link' ? `setup link, expires ${new Date(item.expiresAt).toLocaleString()}` : 'existing account — sign in and join'}</p>
+              <textarea readOnly rows={3} value={item.message} onFocus={event => event.currentTarget.select()} aria-label={`Setup message for ${item.name}`} />
+              <span className="people-actions">
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => void navigator.clipboard?.writeText(item.message)}>Copy setup message</button>
+                {item.kind === 'link' && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void navigator.clipboard?.writeText(item.link)}>Copy link only</button>}
+              </span>
+            </div>
+          ))}
           <span className="people-actions">
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => void navigator.clipboard?.writeText(issued.message)}>Copy message</button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => void navigator.clipboard?.writeText(issued.link)}>Copy link only</button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => void navigator.clipboard?.writeText(issued.code)}>Copy code</button>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setIssued(null)}>Done</button>
+            {issued.length > 1 && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void navigator.clipboard?.writeText(issued.map(item => `To ${item.name}${item.email ? ` <${item.email}>` : ''}:\n${item.message}`).join('\n\n'))}>Copy all messages</button>}
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setIssued([])}>Done</button>
           </span>
         </section>
       )}
@@ -240,11 +272,15 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
             const reportsTo = stagedName(item.reports_to_contact) ?? (() => { const m = memberName(item.reports_to_user); return m ? m.full_name || m.email : undefined; })();
             const person = accessOf(item.id);
             const next = person ? nextAction(person, live.role) : null;
-            const label = person ? STATUS_LABEL[person.status] : 'Loading…';
+            const label = provisioning.includes(item.id) ? 'Provisioning…' : person ? STATUS_LABEL[person.status] : 'Loading…';
             const tone = person?.status === 'link-sent' || person?.status === 'invited' ? 'invited' : person?.status === 'link-invalid' || person?.status === 'link-expired' || person?.status === 'invite-expired' ? 'expired' : 'not-invited';
             return (
               <div key={item.id} className="people-row is-staged" role="row">
                 <span role="cell" className="person-cell">
+                  <label className="pick" title={person && provisionPath(person, live.role) ? 'Select to provision' : person?.role === 'admin' && live.role !== 'owner' ? 'Only an owner can provision Admin access' : 'Nothing to provision right now'}>
+                    <input type="checkbox" disabled={!person || !provisionPath(person, live.role) || busy} checked={picked.includes(item.id)} aria-label={`Select ${item.full_name} to provision`}
+                      onChange={event => setPicked(current => event.target.checked ? [...current, item.id] : current.filter(id => id !== item.id))} />
+                  </label>
                   <span className="avatar avatar-md avatar-empty" aria-hidden="true">{item.full_name.split(' ').map(part => part[0]).join('').slice(0, 2).toUpperCase()}</span>
                   <span><b>{item.full_name}</b><small>{[item.title, item.email ?? 'no email yet', item.phone].filter(Boolean).join(' · ')}</small><small>Reports to: {reportsTo ?? 'not set'}</small></span></span>
                 <span role="cell"><span className={`role-chip role-${item.provisional_role}`} title="Applied when they activate.">{ROLE_LABELS[item.provisional_role]}</span></span>
@@ -262,13 +298,12 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmAdmin(null)}>Cancel</button>
                       </span>
                     : <>
-                      {person && next && (next.primary === 'send-link' || next.primary === 'new-link') && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(person, 'send')}>{next.label}</button>}
+                      {person && next && (next.primary === 'send-link' || next.primary === 'new-link' || next.primary === 'link-account') && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(person, 'send')}>{next.label}</button>}
                       {next?.primary === 'owner-only' && <small className="muted" title="Admin access can only be granted by an owner.">Owner sends Admin links</small>}
                       {next?.primary === 'add-email' && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => setEditing(item)}>Add email</button>}
                       {person && next?.secondary.includes('revoke-link') && <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => act(person, 'revoke-link')}>Revoke link</button>}
                       {person && next?.secondary.includes('revoke-invite') && <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => act(person, 'revoke-invite')}>Revoke invitation</button>}
                       <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => setEditing(item)} title={person?.status === 'link-sent' ? 'Saving changes cancels the open activation link' : undefined}>Edit</button>
-                      {person && next?.secondary.includes('invite-instead') && <button type="button" className="link access-alt" disabled={busy} onClick={() => act(person, 'invite-instead')} title="Only for someone who already has a Task-HQ account">Has an account? Invite instead</button>}
                       {person?.status !== 'invited' && person?.status !== 'link-sent' && <button type="button" className="btn btn-ghost btn-sm" disabled={busy} aria-label={`Remove ${item.full_name}`} onClick={() => setConfirmRemoveStaged(item.id)}>Remove…</button>}
                     </>}
                 </span>
@@ -276,6 +311,21 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
             );
           })}
         </div>
+        {isAdmin && staged && eligible.length > 0 && (
+          <div className="select-bar">
+            <button type="button" className="link" disabled={busy} onClick={() => setPicked(chosen.length === eligible.length ? [] : eligible.map(person => person.id))}>{chosen.length === eligible.length ? 'Clear selection' : `Select all ready (${eligible.length})`}</button>
+            {confirmBulk && chosenAdmins.length
+              ? <span className="admin-confirm" role="group" aria-label="Confirm Admin access">
+                  <small>Grants <b>Admin</b> to {chosenAdmins.map(person => person.name).join(', ')}: they can invite people and change roles below Admin.</small>
+                  <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => void provision(chosen)}>Provision {chosen.length}</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmBulk(false)}>Cancel</button>
+                </span>
+              : <>
+                  <span className="muted">Each person gets a personal setup link (24 h) and chooses their own password. Existing accounts are linked, not duplicated.</span>
+                  <button type="button" className="btn btn-primary btn-sm" disabled={!chosen.length || busy} onClick={() => (chosenAdmins.length ? setConfirmBulk(true) : void provision(chosen))}>{busy && provisioning.length ? 'Provisioning…' : `Provision ${chosen.length || ''} selected`}</button>
+                </>}
+          </div>
+        )}
         {activeWithPlans.length > 0 && (
           <div className="ready-plans">
             <h4 className="section-label">Planned work ready to assign</h4>
@@ -328,7 +378,7 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
 
       {editing && <PersonForm live={live} person={editing === 'new' ? null : editing} staged={staged ?? []} members={(data?.members ?? []).map(item => ({ user_id: item.user_id, email: item.email, full_name: item.full_name }))}
         onClose={() => setEditing(null)} onSaved={(message, again) => { setNotice({ tone: 'info', text: message }); void load(); if (!again) setEditing(null); }}
-        onIssued={(message, sent) => { setNotice({ tone: 'info', text: message }); setIssued({ ...sent, link: activationLink(location.origin, sent.code), message: activationMessage(sent.name, live.org.name, location.origin, sent.code, sent.expiresAt) }); setEditing(null); void load(); }} />}
+        onProvision={async (id, message) => { setEditing(null); setNotice({ tone: 'info', text: message }); const fresh = await load(); const person = fresh?.find(item => item.id === id); if (person) await provision([person]); }} />}
       {planningPerson && <PlanWork quest={quest} live={live} person={planningPerson} onClose={() => setPlanning(null)} onChanged={message => { setNotice({ tone: 'info', text: message }); void load(); }} />}
     </div>
   );

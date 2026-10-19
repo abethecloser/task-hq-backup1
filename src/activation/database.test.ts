@@ -50,3 +50,30 @@ test('activation SQL: direct access denied, persistent rate limits, no fake user
  await s.issue();const normal=await addUser(s.db,'normal@test.invalid');assert.equal((await s.db.pg.query<any>('select count(*)::int n from public.memberships where user_id=$1',[normal])).rows[0].n,0);
  }finally{await s.db.close();}
 });
+test('onboarding: status follows the records, expired setup link recovers by reissue, existing accounts are linked not duplicated',async()=>{
+ const s=await setup();try{
+ await s.db.pg.exec(read('supabase/migrations/20261019180000_people_access_status.sql'));
+ await s.db.pg.exec(read('supabase/migrations/20261019210000_people_access_accounts.sql'));
+ const status=async(id=s.employee)=>((await rpcAs(s.db,s.owner,'org_people_access',{p_org:s.org})).data as any[]).find(p=>p.id===id);
+ await s.db.pg.query(`update public.staged_contacts set email='new.hire@test.invalid',updated_at=now() where id=$1`,[s.employee]);
+ assert.deepEqual([(await status()).status,(await status()).has_account],['ready',false]);
+ assert.ok((await rpcAs(s.db,s.outsider,'org_people_access',{p_org:s.org})).error,'non-admins never see onboarding status');
+ // Setup pending → expired → reissued: the old link stops working, the new one works once.
+ await s.issue(s.owner,'a'.repeat(64));assert.equal((await status()).status,'link-sent');
+ await s.db.pg.exec(`update public.team_activation_codes set created_at=now()-interval '2 days',expires_at=now()-interval '1 day' where code_hash=repeat('a',64)`);
+ assert.equal(await s.lookup('a'.repeat(64)),null);assert.equal((await status()).status,'link-expired');
+ assert.equal((await s.issue(s.owner,'b'.repeat(64))).error,null);assert.equal((await status()).status,'link-sent');
+ assert.equal(await s.lookup('a'.repeat(64)),null);
+ const claim=await s.lookup('b'.repeat(64),'new.hire@test.invalid');const user=await s.insert(claim.claim,'new.hire@test.invalid');
+ assert.equal((await status()).status,'active');assert.equal((await status()).member.user_id,user);
+ assert.equal((await s.db.pg.query<any>(`select count(*)::int n from auth.users where email='new.hire@test.invalid'`)).rows[0].n,1,'first setup creates exactly one account');
+ assert.equal(await s.lookup('b'.repeat(64)),null,'a used link is single-use');assert.ok((await s.issue(s.owner,'c'.repeat(64))).error,'no new link once active');
+ // An employee who already has an account: shown as such and linked by invitation, never re-provisioned.
+ const existing=uuid();await s.db.pg.query(`insert into public.staged_contacts(id,org_id,staging_key,full_name,email,affiliation_confirmed,provisional_role) values($1,$2,'existing','Existing Person','outsider@test.invalid',true,'member')`,[existing,s.org]);
+ assert.deepEqual([(await status(existing)).status,(await status(existing)).has_account],['ready',true]);
+ const inv=await rpcAs(s.db,s.owner,'invite_staged_contact',{p_contact:existing,p_days:14});assert.equal(inv.error,null);assert.equal((await status(existing)).status,'invited');
+ assert.equal((await rpcAs(s.db,s.outsider,'accept_invitation',{p_invitation:inv.data})).error,null);
+ assert.equal((await status(existing)).status,'active');
+ assert.equal((await s.db.pg.query<any>(`select count(*)::int n from auth.users where email='outsider@test.invalid'`)).rows[0].n,1,'linking never duplicates the account');
+ }finally{await s.db.close();}
+});

@@ -21,7 +21,7 @@ async function call(body:Record<string,unknown>){
 function EmployeeActivation(){
  const[code,setCode]=useState(linkCode),[identity,setIdentity]=useState<{employee_id:string;name:string;company:string}|null>(null),[confirmed,setConfirmed]=useState(false),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[done,setDone]=useState(false);
  // Opened from a link: look the code up straight away, so the employee lands on their identity.
- useEffect(()=>{if(!linkCode)return;setBusy(true);call({action:'preview',code:linkCode}).then(result=>setIdentity(result.data)).catch(err=>setError((err as Error).message)).finally(()=>setBusy(false));},[]);
+ useEffect(()=>{if(!linkCode)return;setBusy(true);call({action:'preview',code:linkCode}).then(result=>setIdentity(result.data)).catch(err=>{const m=(err as Error).message;setError(/^Code unavailable/.test(m)?'This setup link has expired, was already used, or was replaced by a newer one. Ask your administrator to send you a new link.':m);}).finally(()=>setBusy(false));},[]);
  async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{
   if(!identity){const result=await call({action:'preview',code});setIdentity(result.data);}
   else{await call({action:'redeem',code,employee:identity.employee_id,confirmed,email,password});

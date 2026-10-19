@@ -30,12 +30,13 @@ export const invitationMessage = (org: string, email: string, role: OrgRole, wor
   `You’ve been invited to ${org} on Task-HQ as ${ROLE_LABELS[role]} (${WORK_LABEL[work] ?? work}). Sign in or create an account at ${location.origin} with ${email}, confirm your email, then accept the invitation. It expires in 14 days.`;
 
 /** Add or edit a person in the directory. "Save person" never invites, notifies or grants access;
- * "Save & send activation link" also confirms them and creates their single-use link (sends nothing). */
-export function PersonForm({ live, person, staged, members, onClose, onSaved, onIssued }: {
+ * "Save & provision" saves, then hands the person to People & Access provisioning (setup link, or
+ * account linking when their email already has a Task-HQ account). Nothing is sent. */
+export function PersonForm({ live, person, staged, members, onClose, onSaved, onProvision }: {
   live: LiveAccount; person: Staged | null; staged: Staged[]; members: ActiveMember[];
   onClose: () => void; onSaved: (message: string, again: boolean) => void;
-  /** Called after Save & send activation link with the one-time code (shown once, never stored). */
-  onIssued: (message: string, sent: { name: string; email: string; code: string; expiresAt: string }) => void;
+  /** Called after Save & provision with the saved person's id; the page provisions them. */
+  onProvision: (id: string, message: string) => void;
 }) {
   const [org, setOrg] = useState(live.org.id);
   const [name, setName] = useState(person?.full_name ?? '');
@@ -59,7 +60,7 @@ export function PersonForm({ live, person, staged, members, onClose, onSaved, on
     setError('');
     if (org === NOT_SET_UP) { setError('This company isn’t set up in Task-HQ yet. Nothing was saved.'); return; }
     if (!name.trim()) { setError('Enter the person’s name.'); return; }
-    if (mode === 'invite' && !email.trim()) { setError('Add their email to send an activation link.'); return; }
+    if (mode === 'invite' && !email.trim()) { setError('Add their email to provision access.'); return; }
     setBusy(true);
     const workRole = role === 'reviewer' ? 'reviewer' : work;
     const { data: id, error: rpcError } = await live.client.rpc('save_staged_contact', {
@@ -71,21 +72,10 @@ export function PersonForm({ live, person, staged, members, onClose, onSaved, on
     if (rpcError) { setBusy(false); setError(errorText(rpcError)); return; }
     const where = live.adminOrgs.find(item => item.id === org)?.name ?? live.org.name;
     if (mode === 'invite') {
-      // Adding them yourself is the affiliation confirmation; the server re-checks every step.
-      // Generating a link revokes any earlier one. A failure leaves them saved and says so.
-      const contact = (id as string | null) ?? person?.id ?? null;
-      const confirm = person?.affiliation_confirmed ? { error: null } : await live.client.rpc('confirm_staged_affiliation', { p_contact: contact, p_confirmed: true });
-      const issued = confirm.error ? null : await live.client.functions.invoke('employee-activation', { body: { action: 'generate', org, employee: contact } });
       setBusy(false);
-      if (confirm.error || issued?.error || !issued?.data?.code) {
-        let reason = confirm.error ? errorText(confirm.error) : 'Activation is unavailable.';
-        if (issued?.error) { try { reason = ((await (issued.error as { context: Response }).context.json()) as { error?: string }).error ?? reason; } catch { /* keep the generic reason */ } }
-        // Close and report on the page: the person now exists, so retrying here would add them twice.
-        onSaved(`${name.trim()} was saved to ${where}, but no activation link was created: ${reason} Use Send activation link on their row to try again.`, false);
-        return;
-      }
-      onIssued(`${name.trim()} added. Their activation link is below — copy it now; it’s shown only once. Nothing was sent.`,
-        { name: name.trim(), email: email.trim().toLowerCase(), code: issued.data.code as string, expiresAt: (issued.data.data as { expires_at: string }).expires_at });
+      const contact = (id as string | null) ?? person?.id ?? null;
+      if (!contact) { onSaved(`${name.trim()} was saved to ${where}. Provision them from their row.`, false); return; }
+      onProvision(contact, `${name.trim()} saved. Provisioning…`);
       return;
     }
     setBusy(false);
@@ -131,7 +121,7 @@ export function PersonForm({ live, person, staged, members, onClose, onSaved, on
           </div>
           <label className="field"><span>Responsibilities / notes</span><textarea rows={2} maxLength={500} value={notes} onChange={event => setNotes(event.target.value)} placeholder="What they’ll own, crews, territories…" /></label>
           <p className="boundary">{invitable
-            ? <>{person ? 'Saving changes cancels any activation link already sent. ' : ''}<b>Save & send activation link</b> adds them and creates a single-use link that joins them as {ROLE_LABELS[role]} when they set their password. Nothing is emailed — you get a message to send. <b>Save person</b> only adds them to the directory.</>
+            ? <>{person ? 'Saving changes cancels any activation link already sent. ' : ''}<b>Save & provision</b> adds them and creates a personal single-use setup link (24 h) that joins them as {ROLE_LABELS[role]} once they choose their own password; if their email already has a Task-HQ account, it’s linked instead. Nothing is emailed — you get a message to send. <b>Save person</b> only adds them to the directory.</>
             : 'Planned roles grant nothing. Saving changes the directory only — no account, no access, no email.'}</p>
           {error && <p className="auth-notice is-error form-error" role="alert">{error}</p>}
           <footer className="form-actions">
@@ -139,7 +129,7 @@ export function PersonForm({ live, person, staged, members, onClose, onSaved, on
             {!person && <button type="button" className="btn btn-ghost" disabled={busy || org === NOT_SET_UP} onClick={() => void save('again')}>Save & add another</button>}
             {/* Editing keeps Save changes primary: people waiting on an activation code (no account yet) shouldn't be nudged into an invitation. */}
             <button className={`btn ${person ? 'btn-primary' : 'btn-ghost'}`} disabled={busy || org === NOT_SET_UP}>{busy ? 'Saving…' : person ? 'Save changes' : 'Save person'}</button>
-            {invitable && <button type="button" className={`btn ${person ? 'btn-ghost' : 'btn-primary'}`} disabled={busy || org === NOT_SET_UP || !email.trim()} title={email.trim() ? undefined : 'Add their email to send an activation link'} onClick={() => void save('invite')}>{busy ? 'Working…' : 'Save & send activation link'}</button>}
+            {invitable && <button type="button" className={`btn ${person ? 'btn-ghost' : 'btn-primary'}`} disabled={busy || org === NOT_SET_UP || !email.trim()} title={email.trim() ? undefined : 'Add their email to provision access'} onClick={() => void save('invite')}>{busy ? 'Working…' : 'Save & provision'}</button>}
           </footer>
         </form>
       </section>
