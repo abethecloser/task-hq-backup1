@@ -25,4 +25,4 @@ export interface LiveAccount {
 
 export const LiveContext = createContext<LiveAccount | null>(null);
 export const useLive = () => useContext(LiveContext);
-export const ROLE_LABELS: Record<OrgRole, string> = { owner: 'Owner', admin: 'Admin', supervisor: 'Supervisor', member: 'Member', reviewer: 'Reviewer' };
+export const ROLE_LABELS: Record<OrgRole, string> = { owner: 'Owner', admin: 'Admin', supervisor: 'Supervisor', member: 'Member', reviewer: 'Developer / Observer' };

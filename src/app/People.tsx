@@ -34,13 +34,13 @@ async function functionError(error: unknown) {
 }
 
 const WORK_ROLES = ['manager', 'coordinator', 'field', 'sales', 'estimator'] as const;
-export const WORK_LABELS: Record<string, string> = { manager: 'Manager', coordinator: 'Coordinator', field: 'Field', sales: 'Sales', estimator: 'Estimator', reviewer: 'Reviewer' };
+export const WORK_LABELS: Record<string, string> = { manager: 'Manager', coordinator: 'Coordinator', field: 'Field', sales: 'Sales', estimator: 'Estimator', reviewer: 'Observer' };
 const ORG_ROLE_HELP: Record<OrgRole, string> = {
   owner: 'Full administration, including owners and admins. At least one is required.',
   admin: 'Invites people, approves requests and changes roles below admin.',
   supervisor: 'Operational member; can run attention checks. No member administration.',
   member: 'Operational member. What they can do with work comes from their work role.',
-  reviewer: 'Views and leaves feedback. Never owns or changes operational work.',
+  reviewer: 'Developer / Observer: sees every section read-only and submits bugs and feedback. Never owns or changes work, people, roles or settings — enforced on the server.',
 };
 const WORK_ROLE_HELP: Record<string, string> = {
   manager: 'Approves, decides access, delegates, activates Ultra Priority.',

@@ -22,7 +22,7 @@ export interface Staged {
 export interface ActiveMember { user_id: string; email: string; full_name: string | null }
 
 const WORK = ['manager', 'coordinator', 'field', 'sales', 'estimator'] as const;
-const WORK_LABEL: Record<string, string> = { manager: 'Manager', coordinator: 'Coordinator', field: 'Field', sales: 'Sales', estimator: 'Estimator', reviewer: 'Reviewer' };
+const WORK_LABEL: Record<string, string> = { manager: 'Manager', coordinator: 'Coordinator', field: 'Field', sales: 'Sales', estimator: 'Estimator', reviewer: 'Observer' };
 /** Sentinel for a company that has no Task-HQ organization yet. Never saved anywhere. */
 const NOT_SET_UP = '__not-set-up__';
 
