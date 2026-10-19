@@ -65,7 +65,8 @@ export function nextAction(person: PersonAccess, callerRole: string): NextAction
     case 'needs-email':
       return { primary: 'add-email', label: 'Add email', secondary: [], detail: 'An email is needed to activate' };
     case 'link-sent':
-      return { primary: sending ? 'owner-only' : 'new-link', label: 'New setup link', secondary: sending ? [] : ['revoke-link'],
+      return { primary: sending ? 'owner-only' : 'new-link', label: 'New setup link',
+        secondary: sending ? [] : (['revoke-link'] as Secondary[]).concat(person.invitation && !person.invitation.expired ? ['revoke-invite'] : []),
         detail: `Single use · expires ${when(person.activation!.expires_at)}${invitedDetail ? ` · ${invitedDetail.toLowerCase()}` : ''}` };
     case 'link-invalid':
       return { primary: sending ? 'owner-only' : 'new-link', label: 'Send new setup link', secondary: [], detail: 'Edited, or the issuer’s role changed, after the link was sent' };

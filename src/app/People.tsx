@@ -211,7 +211,7 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
       {notice && <p className={`console-notice is-${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
       {issued.length > 0 && (
         <section className="prepared issued-link" aria-labelledby="issued-title">
-          <p id="issued-title"><b>Setup messages ({issued.length})</b> · each link is personal, works once and expires in 24 hours. Task-HQ doesn’t email anyone — send each one privately yourself. They won’t be shown again.</p>
+          <p id="issued-title"><b>Setup messages ({issued.length})</b> · each link is personal, works once and expires in 24 hours — whoever opens it first can use it. Task-HQ doesn’t email anyone — send each one privately, one person at a time, never to a group. They won’t be shown again.</p>
           {issued.map(item => (
             <div key={item.id} className="issued-item">
               <p><b>{item.name}</b>{item.email ? ` · ${item.email}` : ''} · {item.kind === 'link' ? `setup link, expires ${new Date(item.expiresAt).toLocaleString()}` : 'existing account — sign in and join'}</p>
@@ -223,7 +223,6 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
             </div>
           ))}
           <span className="people-actions">
-            {issued.length > 1 && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void navigator.clipboard?.writeText(issued.map(item => `To ${item.name}${item.email ? ` <${item.email}>` : ''}:\n${item.message}`).join('\n\n'))}>Copy all messages</button>}
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setIssued([])}>Done</button>
           </span>
         </section>

@@ -13,6 +13,8 @@ test('one next action per status', () => {
   const sent = nextAction({ ...base, status: 'link-sent', activation: { expires_at: soon, state: 'valid' } }, 'admin');
   assert.equal(sent.primary, 'new-link');
   assert.deepEqual(sent.secondary, ['revoke-link']);
+  const sentAndInvited = nextAction({ ...base, status: 'link-sent', activation: { expires_at: soon, state: 'valid' }, invitation: { id: 'i', role: 'member', work_role: 'field', expires_at: soon, expired: false } }, 'owner');
+  assert.deepEqual(sentAndInvited.secondary, ['revoke-link', 'revoke-invite'], 'an open invitation stays revocable while a setup link is pending');
   assert.equal(nextAction({ ...base, status: 'link-invalid', activation: { expires_at: soon, state: 'invalidated' } }, 'admin').label, 'Send new setup link');
   const invited = nextAction({ ...base, status: 'invited', invitation: { id: 'i', role: 'member', work_role: 'field', expires_at: soon, expired: false } }, 'owner');
   assert.equal(invited.primary, 'send-link');
