@@ -18,6 +18,10 @@ create table private.restricted_sections (
   restricted_at timestamptz not null default now()
 );
 
+-- No direct client access; read only through the security-definer functions below (owner bypasses RLS).
+alter table private.full_navigation_users enable row level security;
+alter table private.restricted_sections enable row level security;
+
 insert into private.full_navigation_users (user_id, note)
 values ('f1cd1413-e5ee-424f-91b0-3fb109247e99', 'team@enternovum.com: full navigation while sections are rebuilt');
 
