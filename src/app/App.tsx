@@ -13,7 +13,7 @@ import type { Lens, RegistryQuery } from '../core/registry.ts';
 import { LEGACY_LENSES, LENSES, LENS_LABELS, lensCounts, queryTasks } from '../core/registry.ts';
 import { canCreateTask } from '../core/permissions.ts';
 import { insights, insightsFor } from '../core/rules.ts';
-import { activeGrant, activeLeads, canEnter, inFocus, leadBucket, myTasks, person, taskById } from '../core/selectors.ts';
+import { activeGrant, activeLeads, canEnter, inFocus, leadBucket, manages, myTasks, person, taskById } from '../core/selectors.ts';
 import AgentWorkspace from '../AgentWorkspace.tsx';
 import { LookSwitch, ModeChip, BrandMark, ToastBar } from '../ui/components.tsx';
 import { useQuest } from '../ui/useQuest.ts';
@@ -52,7 +52,7 @@ import { demoTools } from '../adapter/tools.ts';
 import { Tools } from './Tools.tsx';
 import { CompanySignals } from './CompanySignals.tsx';
 import { notificationsFor } from './notifications.ts';
-import { CLOSED, UNDER_CONSTRUCTION, canNavigate } from '../core/navigation.ts';
+import { CLOSED, UNDER_CONSTRUCTION, canManage, canNavigate, isManageView } from '../core/navigation.ts';
 import type { Notification } from './notifications.ts';
 
 export type View = 'home' | 'reports' | 'all-tasks' | 'inbox' | 'tools' | 'company-work' | 'needs-attention' | 'leads' | 'executive' | 'people' | 'feedback' | 'activity' | 'settings' | 'agents' | 'relationships' | 'search';
@@ -189,7 +189,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const notifications = useMemo(() => notificationsFor(state, minute * 60000, actor), [state, minute, actor]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const decisions = useMemo(() => decisionDesk(state, minute * 60000, actor).length, [state, minute, actor]);
-  const hasDesk = me.role === 'manager' || decisions > 0;
+  const hasDesk = manages(me) || decisions > 0;
   // One inbox per person: demo channels (this browser) + the task notifications above.
   const messagingStore = useMemo(() => (live ? null : demoMessaging(state.people)), [live]); // eslint-disable-line react-hooks/exhaustive-deps
   const [messaging, setMessaging] = useState(() => messagingStore?.load() ?? null);
@@ -213,7 +213,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const awareAttention = useMemo(() => attentionFor(state, minute * 60000, actor, sidebar.snoozes), [state, minute, actor, snoozeKey]);
   // Temporary restricted navigation: the server decides (core/navigation.ts); demo and failures restrict.
   const access = live?.navigation ?? CLOSED;
-  const open = (next: View) => canNavigate(access, next);
+  // Work / Manage: a permanent permission from organization role (demo: work role), separate from the temporary restriction.
+  const manager = canManage(live ? live.role : me.role === 'manager' ? 'owner' : me.role === 'coordinator' ? 'supervisor' : me.role);
+  const open = (next: View) => (manager || !isManageView(next)) && canNavigate(access, next);
   const underConstruction = () => quest.say(UNDER_CONSTRUCTION);
   const view: View = allowed(requested) && open(requested) && (requested !== 'executive' || hasDesk) ? requested : 'home';
 
@@ -329,6 +331,10 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const primaryIds: View[] = ['company-work', 'people', 'reports'];
   const primary = primaryIds.flatMap(id => navigation.filter(item => item.id === id));
   const nav = navigation.filter(item => !primaryIds.includes(item.id));
+  const mode: 'work' | 'manage' = manager && isManageView(view) ? 'manage' : 'work';
+  // Manage opens on its first section this account can use today; none means it is still under construction.
+  const manageEntry = navigation.find(item => isManageView(item.id) && open(item.id) && allowed(item.id))?.id;
+  const inMode = (id: View) => (mode === 'manage') === isManageView(id);
 
   const selected = taskId ? taskById(state, taskId) : undefined;
   const contextAllowed = selected && (!focused || selected.id === state.focus?.taskId || !!grant);
@@ -363,7 +369,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
           onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
-        items={nav.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, locked: !allowed(item.id), restricted: !open(item.id), info: info[item.id] }))}
+        items={nav.filter(item => inMode(item.id)).map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, locked: !allowed(item.id), restricted: !open(item.id), info: info[item.id] }))}
         onSelect={id => go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
@@ -379,7 +385,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
       <main className="main">
         <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen}
-          tabs={[...LENSES.map(lens => ({ id: lens, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && registryView.lens === lens, allowed: allowed('all-tasks') })), ...primary.map(item => ({ id: item.id, label: item.label, count: item.count, hot: false, active: view === item.id, allowed: allowed(item.id), restricted: !open(item.id) }))]}
+          mode={manager ? { current: mode, entry: !!manageEntry, onChange: next => go(next === 'work' ? 'home' : manageEntry ?? 'home') } : undefined}
+          tabs={mode === 'manage' ? primary.map(item => ({ id: item.id, label: item.label, count: item.count, hot: false, active: view === item.id, allowed: allowed(item.id), restricted: !open(item.id) })) : [...LENSES.map(lens => ({ id: lens, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && registryView.lens === lens, allowed: allowed('all-tasks') }))]}
           onTab={id => { if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} onSearch={openSearch} searchOpen={open('search')} onAsk={() => setAskOpen(value => !value)} onBell={() => sidebar.showTab('inbox')}
           onMenu={sidebar.openMobile} menuOpen={sidebar.mobileOpen} />
 

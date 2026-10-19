@@ -6,7 +6,7 @@ import type { ChangeEvent } from 'react';
 import type { Policy, Role } from '../core/contract.ts';
 import { OPERATIONAL_ROLES } from '../core/contract.ts';
 import { clock } from '../core/time.ts';
-import { hasRole, nameOf } from '../core/selectors.ts';
+import { manages, nameOf, owns, person } from '../core/selectors.ts';
 import type { Quest } from '../ui/useQuest.ts';
 import { useLive } from './LiveContext.tsx';
 import { LookSwitch } from '../ui/components.tsx';
@@ -47,7 +47,9 @@ export function Activity({ quest, onOpen }: { quest: Quest; onOpen: (id: string)
 export function Settings({ quest, onPeople }: { quest: Quest; onPeople?: () => void }) {
   const { state, actor, dispatch, backend } = quest;
   const live = useLive();
-  const isManager = hasRole(state, actor, ['manager']);
+  // Owner and Admin run routine settings; Ultra Priority authority, access windows and the agent pilot stay with the Owner.
+  const isManager = manages(person(state, actor));
+  const isOwner = owns(person(state, actor));
   const [draft, setDraft] = useState<Policy>(state.policy);
   const [confirmReset, setConfirmReset] = useState(false);
   const [outbox, setOutbox] = useState(0);
@@ -64,7 +66,7 @@ export function Settings({ quest, onPeople }: { quest: Quest; onPeople?: () => v
 
       {backend.kind === 'live'
         ? <section className="panel settings"><h3>Members & access</h3><p className="muted">Members, invitations, access requests and roles{live ? ` for ${live.org.name}` : ''} live in People & Roles.</p>{onPeople && <button type="button" className="btn btn-ghost" onClick={onPeople}>Open People & Roles</button>}</section>
-        : <WorkspacePanel quest={quest} isManager={isManager} />}
+        : <WorkspacePanel quest={quest} isManager={isOwner} />}
 
       <TaxonomyPanel quest={quest} isManager={isManager} />
 
@@ -76,8 +78,8 @@ export function Settings({ quest, onPeople }: { quest: Quest; onPeople?: () => v
 
       <section className="panel settings">
         <h3>Ultra Priority</h3>
-        <p className="muted">Governance is undecided on purpose: try both scopes and choose.</p>
-        <fieldset disabled={!isManager}>
+        <p className="muted">Governance is undecided on purpose: try both scopes and choose.{isManager && !isOwner ? ' Only the owner changes these.' : ''}</p>
+        <fieldset disabled={!isOwner}>
           <label className="row-field">Who decides access requests
             <Select value={draft.ultraScope} onChange={event => setDraft({ ...draft, ultraScope: event.target.value as Policy['ultraScope'] })}>
               <option value="manager-context">Only the manager who activated focus</option>
@@ -96,7 +98,7 @@ export function Settings({ quest, onPeople }: { quest: Quest; onPeople?: () => v
         <fieldset disabled={!isManager}>
           <label className="row-field">First-response target (minutes)<input type="number" min={1} value={draft.leadResponseMinutes} onChange={num('leadResponseMinutes')} /></label>
           <label className="row-field">Flag work as stalled after (hours)<input type="number" min={1} value={draft.stalledHours} onChange={num('stalledHours')} /></label>
-          <label className="row-field check-row"><input type="checkbox" checked={draft.agentPilot} onChange={event => setDraft({ ...draft, agentPilot: event.target.checked })} />Show the simulated Agent pilot (off by default; Task-HQ never needs it)</label>
+          <label className="row-field check-row"><input type="checkbox" checked={draft.agentPilot} disabled={!isOwner} onChange={event => setDraft({ ...draft, agentPilot: event.target.checked })} />Show the simulated Agent pilot (off by default; Task-HQ never needs it)</label>
         </fieldset>
         {isManager && <button type="button" className="btn btn-primary" disabled={JSON.stringify(draft) === JSON.stringify(state.policy)} onClick={() => void dispatch({ type: 'policy/update', changes: draft })}>Save policy</button>}
       </section>

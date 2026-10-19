@@ -47,3 +47,18 @@ export function forOrg(access: NavigationAccess, orgId: string): NavigationAcces
   const reopened = access.byOrg?.[orgId] ?? [];
   return reopened.length ? { ...access, restricted: access.restricted.filter(view => !reopened.includes(view)) } : access;
 }
+
+// ── Work / Manage ──────────────────────────────────────────────────────────
+// A permanent permission, separate from the temporary restriction above: Work is daily
+// execution for everyone; Manage (oversight and administration) exists only for roles that
+// coordinate or observe. The server enforces every action either way; this only shapes the UI.
+
+/** Views that belong to Manage. Everything else is Work. */
+export const MANAGE_VIEWS: readonly string[] = ['company-work', 'people', 'reports', 'executive', 'activity', 'feedback', 'settings', 'agents'];
+
+export const isManageView = (view: string) => MANAGE_VIEWS.includes(view);
+
+/** Organization roles that get the Manage workspace. Developer / Observer keeps its read-only view of it. */
+export function canManage(role: string | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'supervisor' || role === 'reviewer';
+}

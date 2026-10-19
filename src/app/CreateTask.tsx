@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 import type { NewTask } from '../core/contract.ts';
 import { localDate } from '../core/time.ts';
 import { hasRole } from '../core/selectors.ts';
+import { canAssignOthers } from '../core/permissions.ts';
 import { PersonSelect } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import type { Draft } from '../core/command.ts';
@@ -14,6 +15,9 @@ export function CreateTask({ quest, onClose, onCreated }: { quest: Quest; onClos
   const { state, actor, now, dispatch } = quest;
   // Managers delegate: creating work doesn't make them its owner by default.
   const delegates = hasRole(state, actor, ['manager']);
+  // Live members create work for themselves or leave it unassigned; assigning others needs a supervisor, admin or owner.
+  const assigns = canAssignOthers(state, actor);
+  const owners = assigns ? state : { ...state, people: state.people.filter(item => item.id === actor) };
   const [draft, setDraft] = useState<NewTask>({ title: '', owner: delegates ? '' : actor, due: localDate(now), priority: 'normal', nextAction: '', approver: '', nextOwner: '', projectId: '', dependsOn: [] });
   const set = (changes: Partial<NewTask>) => setDraft(current => ({ ...current, ...changes }));
   const taxonomyOk = quest.backend.supports?.taskTaxonomy !== false;
@@ -45,8 +49,8 @@ export function CreateTask({ quest, onClose, onCreated }: { quest: Quest; onClos
           <label className="field"><span>Next action</span><ReferenceInput maxLength={200} value={draft.nextAction} onChange={event => set({ nextAction: event.target.value })} placeholder="The first physical step" /></label>
           <label className="field"><span>Description / notes</span><ReferenceTextarea rows={3} value={draft.description ?? ''} maxLength={1000} onChange={event => set({ description: event.target.value })} placeholder="Context, @people and #tags" /></label>
           <div className="form-grid">
-            <label className="field"><span>Owner</span><small className="field-hint">{delegates ? 'Who moves this forward. You don’t have to own what you create.' : 'Accountable for moving this task forward.'}</small><PersonSelect state={state} label="Owner" value={draft.owner ?? ''} emptyLabel={delegates ? 'Choose later (unassigned)' : 'Unassigned'} onChange={owner => set({ owner })} />
-              {proposed.owner && draft.owner !== proposed.owner.id && <button type="button" className="proposal-chip" onClick={() => set({ owner: proposed.owner!.id })}>Proposed: {proposed.owner.name} · <b>Use</b></button>}</label>
+            <label className="field"><span>Owner</span><small className="field-hint">{delegates ? 'Who moves this forward. You don’t have to own what you create.' : 'Accountable for moving this task forward.'}</small><PersonSelect state={owners} label="Owner" value={draft.owner ?? ''} emptyLabel={delegates ? 'Choose later (unassigned)' : 'Unassigned'} onChange={owner => set({ owner })} />
+              {assigns && proposed.owner && draft.owner !== proposed.owner.id && <button type="button" className="proposal-chip" onClick={() => set({ owner: proposed.owner!.id })}>Proposed: {proposed.owner.name} · <b>Use</b></button>}</label>
             <label className="field"><span>Approver</span><PersonSelect state={state} label="Approver" value={draft.approver ?? ''} emptyLabel="No approval needed" onChange={approver => set({ approver })} />
               {proposed.approver && draft.approver !== proposed.approver.id && <button type="button" className="proposal-chip" onClick={() => set({ approver: proposed.approver!.id })}>Proposed: {proposed.approver.name} · <b>Use</b></button>}</label>
             <label className="field"><span>Next-step owner</span><small className="field-hint">Receives the handoff when this work is ready to move on.</small><PersonSelect state={state} label="Next-step owner" value={draft.nextOwner ?? ''} onChange={nextOwner => set({ nextOwner })} /></label>

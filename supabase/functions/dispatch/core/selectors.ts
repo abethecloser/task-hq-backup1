@@ -20,6 +20,20 @@ export function hasRole(state: QuestState, id: string, roles: Role[]) {
   return !!role && roles.includes(role);
 }
 
+// ── Authority ──────────────────────────────────────────────────────────────
+// Live workspaces: authority comes only from organization membership (Person.authority, rebuilt by
+// the server from memberships on every call). Owner and Admin manage; Supervisor coordinates;
+// Member works on their own tasks; Reviewer (Developer / Observer) only leaves feedback.
+// Work roles (manager, coordinator, field, sales, estimator) only route work.
+// The local demo has no memberships, so its work roles stand in exactly as before.
+export const manages = (p: Person | undefined) => (p?.authority ? p.authority === 'owner' || p.authority === 'admin' : p?.role === 'manager');
+export const coordinates = (p: Person | undefined) => manages(p) || (p?.authority ? p.authority === 'supervisor' : p?.role === 'coordinator');
+export const owns = (p: Person | undefined) => (p?.authority ? p.authority === 'owner' : p?.role === 'manager');
+export const observes = (p: Person | undefined) => p?.role === 'reviewer' || p?.authority === 'reviewer';
+/** The role token a policy role list (ultraActivators, ultraApprovers) is matched against. */
+export const actsAs = (p: Person | undefined): Role | 'member' | undefined => (p?.authority ? (manages(p) ? 'manager' : coordinates(p) ? 'coordinator' : p.authority === 'reviewer' ? 'reviewer' : 'member') : p?.role);
+export const allowedBy = (p: Person | undefined, roles: Role[]) => { const token = actsAs(p); return !!token && (roles as string[]).includes(token); };
+
 export function peopleWithRole(state: QuestState, role: Role) {
   return state.people.filter(item => item.role === role);
 }
@@ -99,7 +113,7 @@ export function moveForwardPlan(state: QuestState, task: Task, actor: string): M
   const nextText = unlocks.length
     ? `Unlocks ${unlocks.map(item => `“${item.title}” for ${firstName(state, item.owner || task.nextOwner, 'nobody yet')}`).join(', ')}`
     : task.nextOwner ? `Hands off to ${nameOf(state, task.nextOwner)}` : 'Nothing is waiting on this';
-  const isManagerish = hasRole(state, actor, ['manager', 'coordinator']);
+  const isManagerish = coordinates(person(state, actor));
   const mayMove = task.owner === actor || isManagerish;
 
   if (task.status === 'done') return { canAct: false, label: 'Done', current: 'Completed', effect: '', next: nextText, nextWho };
@@ -118,7 +132,7 @@ export function moveForwardPlan(state: QuestState, task: Task, actor: string): M
     return { canAct: mayMove, label: 'Complete', current: `${firstName(state, task.owner)} is working on it`, effect: 'Marks it Done', next: nextText, nextWho };
   }
   // review
-  const mayApprove = actor === task.approver || hasRole(state, actor, ['manager']);
+  const mayApprove = actor === task.approver || manages(person(state, actor));
   return {
     canAct: mayApprove,
     label: mayApprove ? 'Approve & complete' : `Waiting on ${firstName(state, task.approver, 'approver')}`,
@@ -173,7 +187,7 @@ export function sectionFor(state: QuestState, action: Action): Section | null | 
 }
 
 export function canDecideGrants(state: QuestState, actor: string) {
-  if (!hasRole(state, actor, state.policy.ultraApprovers)) return false;
+  if (!allowedBy(person(state, actor), state.policy.ultraApprovers)) return false;
   if (state.policy.ultraScope === 'company-wide' || !state.focus) return true;
   return state.focus.activatedBy === actor;
 }

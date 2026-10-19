@@ -14,7 +14,7 @@ import { dailySignal } from '../core/executive.ts';
 import type { Lens, RegistryQuery } from '../core/registry.ts';
 import { digest, dueOn, heatGrid, systemInsights } from '../core/dashboard.ts';
 import type { SystemInsight } from '../core/dashboard.ts';
-import { canReopenTask, lockedTaskFields } from '../core/permissions.ts';
+import { canAssignOthers, canEditTask, canReopenTask, lockedTaskFields } from '../core/permissions.ts';
 import { blockingDeps, dependents, firstName, isOpen, isOverdue, leadById, nameOf, projectName, taskById } from '../core/selectors.ts';
 import { localDate, shortDate } from '../core/time.ts';
 import { Avatar, PersonSelect, StatusPill, TaskTags } from '../ui/components.tsx';
@@ -40,6 +40,9 @@ export function TaskContext({ quest, task, docked, onClose, onOpen }: { quest: Q
   const me = state.people.find(item => item.id === actor);
   const reviewer = me?.role === 'reviewer';
   const lockedFields = lockedTaskFields(state, task, actor);
+  // Live members edit their own tasks; on anyone else's they can comment, watch and ask for help where they're involved.
+  const editable = canEditTask(state, task, actor);
+  const assigns = canAssignOthers(state, actor);
   const update = (changes: Partial<EditableTaskFields>) => dispatch({ type: 'task/update', id: task.id, changes });
   const saveText = (key: 'title' | 'nextAction' | 'description' | 'waitingOn', value: string) => { if (value.trim() !== task[key]) void update({ [key]: value.trim() }); };
   const lead = task.leadId ? leadById(state, task.leadId) : undefined;
@@ -63,7 +66,7 @@ export function TaskContext({ quest, task, docked, onClose, onOpen }: { quest: Q
       <div className="context-body">
         <section className="ctx-identity">
           <p className="ctx-eyebrow">{projectName(state, task.projectId) || 'No project'}{task.leadId ? ' · from a lead' : ''}</p>
-          <ReferenceTextarea id="context-title" className="title-edit" rows={2} referenceDocument={task.references?.title} value={title} maxLength={160} readOnly={reviewer}
+          <ReferenceTextarea id="context-title" className="title-edit" rows={2} referenceDocument={task.references?.title} value={title} maxLength={160} readOnly={!editable}
             onChange={event => setTitle(event.target.value)} onBlur={() => saveText('title', title)} aria-label="Task name" />
           <p className="ctx-sub">Created by {nameOf(state, task.createdBy, 'someone')}{created ? ` · ${when(created.at)}` : ''} · updated {when(task.updatedAt)}</p>
           <div className="ctx-tags"><TaskTags state={state} task={task} now={now} /></div>
@@ -86,7 +89,7 @@ export function TaskContext({ quest, task, docked, onClose, onOpen }: { quest: Q
 
         {task.status !== 'done' && (
           <label className="field next-field"><span>Next action</span>
-            <ReferenceInput referenceDocument={task.references?.nextAction} value={nextAction} maxLength={200} readOnly={reviewer} placeholder="The next physical step, in one line" onChange={event => setNextAction(event.target.value)} onBlur={() => saveText('nextAction', nextAction)} onKeyDown={event => { if (event.key === 'Enter') (event.target as HTMLInputElement).blur(); }} />
+            <ReferenceInput referenceDocument={task.references?.nextAction} value={nextAction} maxLength={200} readOnly={!editable} placeholder="The next physical step, in one line" onChange={event => setNextAction(event.target.value)} onBlur={() => saveText('nextAction', nextAction)} onKeyDown={event => { if (event.key === 'Enter') (event.target as HTMLInputElement).blur(); }} />
           </label>
         )}
 
@@ -115,11 +118,14 @@ export function TaskContext({ quest, task, docked, onClose, onOpen }: { quest: Q
           </section>
         )}
 
-        {!reviewer && (
+        {!reviewer && !editable && (
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => void update({ watchers: toggle(task.watchers, actor) })}>{task.watchers.includes(actor) ? 'Stop watching' : 'Watch this task'}</button>
+        )}
+        {editable && (
           <details className="drawer-details">
             <summary>Edit people, dates & dependencies</summary>
             <div className="roles">
-              <label className="field"><span>Owner (does the work)</span><PersonSelect state={state} label="Owner" value={task.owner} emptyLabel="Unassigned" disabled={lockedFields} onChange={id => void update({ owner: id })} /></label>
+              <label className="field"><span>Owner (does the work)</span><PersonSelect state={state} label="Owner" value={task.owner} emptyLabel="Unassigned" disabled={lockedFields || !assigns} onChange={id => void update({ owner: id })} />{!assigns && <small className="field-hint">Use Hand off to pass your task on. A supervisor, admin or owner reassigns work.</small>}</label>
               <label className="field"><span>Next-step owner (receives the handoff)</span><PersonSelect state={state} label="Next-step owner" value={task.nextOwner} onChange={id => void update({ nextOwner: id })} /></label>
               <label className="field"><span>Approver (reviews before done)</span><PersonSelect state={state} label="Approver" value={task.approver} emptyLabel="No approval needed" onChange={id => void update({ approver: id })} /></label>
               <label className="field"><span>Decision owner</span><PersonSelect state={state} label="Decision owner" value={task.decisionOwner} onChange={id => void update({ decisionOwner: id })} /></label>

@@ -22,8 +22,11 @@ export const APP_VERSION = '0.3.1';
 export interface Person {
   id: string;
   name: string;
+  /** Work role: routes work (approvals, handoffs, queues). Never grants system authority on its own. */
   role: Role;
   title: string;
+  /** Organization role from membership, set only by the server. When present it alone decides authority. */
+  authority?: 'owner' | 'admin' | 'supervisor' | 'member' | 'reviewer';
 }
 
 export interface Project {

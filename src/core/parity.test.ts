@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Action, QuestState } from './contract.ts';
 import { apply } from './engine.ts';
-import { canCreateTask, canReopenTask, lockedTaskFields, offersMoveForward } from './permissions.ts';
+import { canAssignOthers, canCreateTask, canEditTask, canReopenTask, lockedTaskFields, offersMoveForward } from './permissions.ts';
 import { seedState } from './seed.ts';
 
 const T0 = new Date('2026-10-17T09:00:00').getTime();
@@ -81,4 +81,43 @@ test('reviewers are offered nothing operational, and the engine agrees', () => {
     }
   }
   assert.equal(ALLOWED_UI_STRICTER.length >= 0, true);
+});
+
+/** The seed as a live workspace: authority from organization role, including a Member whose work title is Manager. */
+function liveStates(): { name: string; state: QuestState }[] {
+  const AUTHORITY: Record<string, 'owner' | 'admin' | 'supervisor' | 'member' | 'reviewer'> = { jordan: 'owner', riley: 'admin', maya: 'supervisor', alex: 'member', sam: 'member', abraham: 'reviewer', 'title-only': 'member' };
+  const base = seedState(T0);
+  const people = [...base.people, { id: 'title-only', name: 'Manager Title', role: 'manager' as const, title: 'Member' }].map(item => ({ ...item, authority: AUTHORITY[item.id] }));
+  return states().map(({ name, state }) => ({ name: `live ${name}`, state: { ...state, people } }));
+}
+
+test('live authority: editing and assigning are offered exactly when the engine accepts them', () => {
+  const mismatch: string[] = [];
+  for (const { name, state } of liveStates()) for (const who of state.people) {
+    for (const task of state.tasks) {
+      const ui = canEditTask(state, task, who.id);
+      const engine = run(state, who.id, { type: 'task/update', id: task.id, changes: { nextAction: 'Parity probe' } });
+      if (!engine.ok && /Critical Focus/.test(engine.error)) continue;
+      if (ui !== engine.ok) mismatch.push(`${name}: edit ${who.id} → ${task.id} ui=${ui} engine=${engine.ok}`);
+    }
+    const other = state.people.find(item => item.id !== who.id && item.role !== 'reviewer')!;
+    const ui = canAssignOthers(state, who.id);
+    const engine = run(state, who.id, { type: 'task/create', task: { title: 'Parity probe', owner: other.id } });
+    if (!engine.ok && /Critical Focus/.test(engine.error)) continue;
+    if (ui !== engine.ok) mismatch.push(`${name}: assign ${who.id} ui=${ui} engine=${engine.ok}`);
+  }
+  assert.deepEqual(mismatch, []);
+  const [live] = liveStates();
+  assert.equal(canAssignOthers(live!.state, 'title-only'), false, 'a Manager work title grants nothing');
+  assert.equal(canAssignOthers(live!.state, 'maya'), true, 'Supervisor coordinates');
+});
+
+test('live authority: Move Work Forward and Ultra locks still agree with the engine', () => {
+  const mismatch: string[] = [];
+  for (const { name, state } of liveStates()) for (const who of state.people) for (const task of state.tasks) {
+    const ui = offersMoveForward(state, task, who.id, T0);
+    const engine = run(state, who.id, { type: 'task/advance', id: task.id }).ok;
+    if (ui !== engine) mismatch.push(`${name}: advance ${who.id} → ${task.id} ui=${ui} engine=${engine}`);
+  }
+  assert.deepEqual(mismatch, []);
 });

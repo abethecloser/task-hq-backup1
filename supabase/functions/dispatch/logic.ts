@@ -31,6 +31,8 @@ export function peopleFrom(members: MemberRow[]): Person[] {
     name: member.name || 'Member',
     role: member.role === 'reviewer' ? 'reviewer' : (WORK_ROLES.includes(member.work_role as Role) ? member.work_role as Role : 'field'),
     title: ROLE_TITLES[member.role] ?? 'Member',
+    // Authority from organization membership only; never from stored state or the work role.
+    authority: (ROLE_TITLES[member.role] ? member.role : 'member') as Person['authority'],
   }));
 }
 

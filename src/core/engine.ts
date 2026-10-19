@@ -12,7 +12,7 @@ import { APP_VERSION, FEEDBACK_CATEGORY_LABELS, FEEDBACK_STATUS_LABELS, OPERATIO
 import { blankLead, blankTask, seedState } from './seed.ts';
 import { PRESETS, presetFor } from './workspace.ts';
 import {
-  activeGrant, blockingDeps, canDecideGrants, firstName, hasRole, inFocus, leadById, nameOf, peopleWithRole, person, sectionFor, taskById,
+  activeGrant, allowedBy, blockingDeps, canDecideGrants, coordinates, firstName, hasRole, inFocus, leadById, manages, nameOf, observes, owns, peopleWithRole, person, sectionFor, taskById,
 } from './selectors.ts';
 import { duration, localDate } from './time.ts';
 
@@ -247,6 +247,8 @@ function validPerson(state: QuestState, id: string | undefined) {
 
 const isFeedbackAction = (action: Action) => action.type.startsWith('feedback/');
 const clip = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+/** Policy fields an Admin may change; the rest (Ultra Priority authority, access windows, agent pilot) stay with the Owner. */
+const ROUTINE_POLICY = new Set(['leadResponseMinutes', 'stalledHours']);
 
 // ── apply ──────────────────────────────────────────────────────────────────
 
@@ -255,7 +257,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
   const now = ctx.now;
   const actor = ctx.actor;
   // Reviewers may only leave and discuss feedback. Checked before anything else, including reset.
-  if (person(input, actor)?.role === 'reviewer' && !isFeedbackAction(action)) {
+  if (observes(person(input, actor)) && !isFeedbackAction(action)) {
     return fail(input, 'Reviewers can view Task-HQ and leave feedback, but can’t change operational work or the workspace.');
   }
   if (action.type === 'demo/reset') {
@@ -272,8 +274,8 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
   d.action = action;
   d.referenceDrafts = Array.isArray(action.referenceDrafts) ? action.referenceDrafts : [];
   const policy = state.policy;
-  const isManager = me.role === 'manager';
-  const managerish = me.role === 'manager' || me.role === 'coordinator';
+  const isManager = manages(me);
+  const managerish = coordinates(me);
 
   switch (action.type) {
     case 'task/comment': {
@@ -290,6 +292,8 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       const t = action.task;
       if (![t.owner, t.nextOwner, t.decisionOwner, t.approver].every(id => validPerson(state, id))) return fail(input, 'One of the chosen people is not in this workspace.');
       if ((t.dependsOn ?? []).some(id => !taskById(state, id))) return fail(input, 'A chosen dependency no longer exists.');
+      // Live members create work for themselves (or leave it unassigned); assigning others needs coordination authority.
+      if (me.authority && t.owner && t.owner !== actor && !managerish) return fail(input, 'Only a supervisor, admin or owner assigns work to someone else. Create it for yourself or leave it unassigned.');
       const shape = classify(state, t);
       if (typeof shape === 'string') return fail(input, shape);
       const task = blankTask(newId(), { ...t, ...shape, title }, actor, now);
@@ -303,7 +307,15 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       if (!task) return fail(input, 'That task no longer exists.');
       const changes = { ...action.changes };
       if (changes.title !== undefined && !changes.title.trim()) return fail(input, 'A task needs a name.');
-      if (task.ultra && !isManager && (changes.owner !== undefined || changes.due !== undefined || changes.priority !== undefined)) return fail(input, 'Only a manager can change owner, due date or priority on an Ultra Priority task.');
+      if (me.authority && !managerish) {
+        // Live members update their own tasks. On anyone else's they may only add or remove themselves as a watcher.
+        const keys = Object.keys(changes).filter(key => (changes as Record<string, unknown>)[key] !== undefined);
+        const watcherOnly = keys.length === 1 && keys[0] === 'watchers' && Array.isArray(changes.watchers)
+          && [...changes.watchers.filter(id => !task.watchers.includes(id)), ...task.watchers.filter(id => !changes.watchers!.includes(id))].every(id => id === actor);
+        if (task.owner !== actor && !watcherOnly && !(task.owner === '' && keys.length === 1 && changes.owner === actor)) return fail(input, `Only ${task.owner ? nameOf(state, task.owner) : 'a coordinator'} or a supervisor, admin or owner can change this task.`);
+        if (changes.owner !== undefined && changes.owner !== task.owner && !(task.owner === '' && changes.owner === actor)) return fail(input, 'Only a supervisor, admin or owner reassigns work. Use Hand off to pass your task on.');
+      }
+      if (task.ultra && !isManager && (changes.owner !== undefined || changes.due !== undefined || changes.priority !== undefined)) return fail(input, 'Only an owner or admin can change owner, due date or priority on an Ultra Priority task.');
       if (![changes.owner, changes.nextOwner, changes.decisionOwner, changes.approver].every(id => validPerson(state, id))) return fail(input, 'That person is not in this workspace.');
       if ('type' in changes || 'tags' in changes || 'dueTime' in changes) {
         const shape = classify(state, { type: changes.type ?? task.type, tags: changes.tags ?? task.tags, dueTime: changes.dueTime ?? task.dueTime, due: changes.due ?? task.due });
@@ -339,17 +351,17 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       }
       const mayMove = task.owner === actor || managerish;
       if (task.status === 'ready') {
-        if (!mayMove) return fail(input, `Only ${nameOf(state, task.owner)} or a coordinator can start this.`);
+        if (!mayMove) return fail(input, `Only ${nameOf(state, task.owner)} or a supervisor, admin or owner can start this.`);
         putTask(d, touch(task, now, { status: 'working' }));
         return commit(d, ctx, newId, { kind: 'task', taskId: task.id, undoable: true, text: `${me.name} started “${task.title}”.`, message: `Work started: ${task.title}` });
       }
       if (task.status === 'blocked') {
-        if (!mayMove && actor !== task.blocker?.helper) return fail(input, 'Only the owner, the person asked to help, or a coordinator can clear this blocker.');
+        if (!mayMove && actor !== task.blocker?.helper) return fail(input, 'Only the task owner, the person asked to help, or a supervisor, admin or owner can clear this blocker.');
         putTask(d, touch(task, now, { status: 'working', blocker: null }));
         return commit(d, ctx, newId, { kind: 'help', taskId: task.id, undoable: true, text: `${me.name} resolved the blocker on “${task.title}”. Back to Working.`, message: `Blocker resolved. ${task.title} is moving again.` });
       }
       if (task.status === 'working') {
-        if (!mayMove) return fail(input, `Only ${nameOf(state, task.owner)} or a coordinator can finish this.`);
+        if (!mayMove) return fail(input, `Only ${nameOf(state, task.owner)} or a supervisor, admin or owner can finish this.`);
         if (task.approver && task.approver !== actor) {
           putTask(d, touch(task, now, { status: 'review' }));
           return commit(d, ctx, newId, { kind: 'approval', taskId: task.id, undoable: true, text: `${me.name} sent “${task.title}” to ${nameOf(state, task.approver)} for approval.`, message: `Sent to ${nameOf(state, task.approver)} for approval.` });
@@ -369,6 +381,8 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       if (task.status === 'done') return fail(input, 'This task is already done.');
       const note = action.note.trim();
       if (!note) return fail(input, 'Say what you need help with.');
+      // Live: help and blockers come from people on the task (owner, approver, next step, decision owner, watchers) or a coordinator.
+      if (me.authority && !managerish && ![task.owner, task.approver, task.nextOwner, task.decisionOwner, ...task.watchers].includes(actor)) return fail(input, 'Only people on this task, or a supervisor, admin or owner, can report a blocker on it.');
       const helper = action.helper ?? '';
       if (!validPerson(state, helper)) return fail(input, 'That person is not in this workspace.');
       putTask(d, touch(task, now, { status: 'blocked', blocker: { note, by: actor, at: now, helper } }));
@@ -378,7 +392,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
     case 'task/resolve': {
       const task = taskById(state, action.id);
       if (!task || task.status !== 'blocked') return fail(input, 'This task is not blocked.');
-      if (task.owner !== actor && actor !== task.blocker?.helper && !managerish) return fail(input, 'Only the owner, the person asked to help, or a coordinator can clear this blocker.');
+      if (task.owner !== actor && actor !== task.blocker?.helper && !managerish) return fail(input, 'Only the task owner, the person asked to help, or a supervisor, admin or owner can clear this blocker.');
       putTask(d, touch(task, now, { status: 'working', blocker: null }));
       return commit(d, ctx, newId, { kind: 'help', taskId: task.id, undoable: true, text: `${me.name} resolved the blocker on “${task.title}”${action.note ? `: “${action.note}”` : ''}.`, message: 'Blocker resolved.' });
     }
@@ -396,7 +410,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
     case 'task/reopen': {
       const task = taskById(state, action.id);
       if (!task || task.status !== 'done') return fail(input, 'Only completed work can be reopened.');
-      if (task.owner !== actor && task.approver !== actor && !managerish) return fail(input, 'Only the owner, the approver, or a coordinator can reopen this.');
+      if (task.owner !== actor && task.approver !== actor && !managerish) return fail(input, 'Only the owner, the approver, or a supervisor, admin or owner can reopen this.');
       const note = action.note.trim();
       if (!note) return fail(input, 'Say why it is being reopened.');
       putTask(d, touch(task, now, { status: 'ready', completedAt: null, nextAction: note }));
@@ -407,15 +421,15 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       const task = taskById(state, action.id);
       if (!task) return fail(input, 'That task no longer exists.');
       if (!person(state, action.to) || !validPerson(state, action.to)) return fail(input, 'Choose who receives the work.');
-      if (task.ultra && !isManager) return fail(input, 'Only a manager can hand off an Ultra Priority task.');
-      if (task.owner && task.owner !== actor && !managerish) return fail(input, `Only ${nameOf(state, task.owner)} or a coordinator can hand this off.`);
+      if (task.ultra && !isManager) return fail(input, 'Only an owner or admin can hand off an Ultra Priority task.');
+      if (task.owner && task.owner !== actor && !managerish) return fail(input, `Only ${nameOf(state, task.owner)} or a supervisor, admin or owner can hand this off.`);
       const note = action.note?.trim() ?? '';
       putTask(d, touch(task, now, { owner: action.to, ...(note ? { nextAction: note } : {}) }));
       return commit(d, ctx, newId, { kind: 'handoff', taskId: task.id, undoable: true, text: `${me.name} handed “${task.title}” to ${nameOf(state, action.to)}${note ? `: “${note}”` : ''}.`, message: `Handed to ${nameOf(state, action.to)}.` });
     }
 
     case 'ultra/activate': {
-      if (!hasRole(state, actor, policy.ultraActivators)) return fail(input, 'Your role is not allowed to activate Ultra Priority under the current policy.');
+      if (!allowedBy(me, policy.ultraActivators)) return fail(input, 'Your role is not allowed to activate Ultra Priority under the current policy.');
       if (state.focus) return fail(input, 'An Ultra Priority task is already active. Release it first.');
       const task = taskById(state, action.taskId);
       if (!task || task.status === 'done') return fail(input, 'Choose an open task.');
@@ -427,7 +441,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
 
     case 'ultra/release': {
       if (!state.focus) return fail(input, 'No Ultra Priority task is active.');
-      if (!hasRole(state, actor, policy.ultraApprovers) && state.focus.activatedBy !== actor) return fail(input, 'Only an approver can release Critical Focus.');
+      if (!allowedBy(me, policy.ultraApprovers) && state.focus.activatedBy !== actor) return fail(input, 'Only an approver can release Critical Focus.');
       const title = taskById(state, state.focus.taskId)?.title ?? 'the task';
       const employee = state.focus.employee;
       endFocus(d, ctx);
@@ -442,7 +456,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       if (state.grants.some(grant => grant.requester === actor && (grant.status === 'pending' || (grant.status === 'approved' && (grant.expiresAt ?? 0) > now)))) return fail(input, 'You already have an open access request.');
       const grant: AccessGrant = { id: newId(), requester: actor, section: action.section, reason, taskId: state.focus.taskId, status: 'pending', requestedAt: now, decidedBy: '', decidedAt: null, durationSec: policy.grantSeconds, expiresAt: null };
       setGrants(d, [grant, ...d.s.grants]);
-      const deciders = state.policy.ultraScope === 'manager-context' ? nameOf(state, state.focus.activatedBy) : 'a manager';
+      const deciders = state.policy.ultraScope === 'manager-context' ? nameOf(state, state.focus.activatedBy) : 'an approver';
       return commit(d, ctx, newId, { kind: 'grant', taskId: grant.taskId, text: `${me.name} requested temporary access to ${SECTION_LABELS[action.section]}: “${reason}”.`, message: `Request sent to ${deciders}. You stay on the critical task until it’s approved.` });
     }
 
@@ -488,7 +502,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
     }
 
     case 'roles/label': {
-      if (!isManager) return fail(input, 'Only a manager can configure work labels.');
+      if (!isManager) return fail(input, 'Only an owner or admin can configure work labels.');
       const label = clip(action.label, 80);
       if (!label || (action.personId && !person(state, action.personId))) return fail(input, 'Choose a label and a workspace member.');
       d.s.workRoles = [...new Set([...(state.workRoles ?? []), label])].slice(-100);
@@ -498,7 +512,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
     case 'lead/tags': {
       const lead = leadById(state, action.id);
       if (!lead) return fail(input, 'That relationship no longer exists.');
-      if (lead.assignee !== actor && !managerish) return fail(input, 'Only the owner or a manager/coordinator can edit relationship tags.');
+      if (lead.assignee !== actor && !managerish) return fail(input, 'Only the lead owner or a supervisor, admin or owner can edit relationship tags.');
       if (!Array.isArray(action.tags) || action.tags.length > 8 || !action.tags.every(tag => typeof tag === 'string' && validTag(tag))) return fail(input, 'Use up to 8 tags with letters, digits and dashes.');
       putLead(d, { ...lead, relationshipTags: [...new Set(action.tags.map(t => canonicalTag(t, referenceScope(state, actor)) ?? tagKey(t)))], updatedAt: now });
       return commit(d, ctx, newId, { kind: 'lead', leadId: lead.id, text: `${me.name} updated relationship tags for ${lead.name}.`, message: 'Relationship tags saved.' });
@@ -516,7 +530,8 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       if (!lead) return fail(input, 'That lead no longer exists.');
       const to = validPerson(state, action.to) ? person(state, action.to) : undefined;
       if (!to) return fail(input, 'Choose who owns this lead.');
-      if (action.to !== actor && !hasRole(state, actor, ['manager', 'coordinator', 'sales'])) return fail(input, 'Only sales, coordinators or managers assign leads to others.');
+      // Live: assigning a lead to someone else is coordination authority. Demo: sales keeps its old routing power.
+      if (action.to !== actor && !(me.authority ? managerish : hasRole(state, actor, ['manager', 'coordinator', 'sales']))) return fail(input, me.authority ? 'Only a supervisor, admin or owner assigns leads to someone else.' : 'Only sales, coordinators or managers assign leads to others.');
       putLead(d, { ...lead, assignee: to.id, assignedAt: lead.assignedAt ?? now, updatedAt: now });
       const waited = duration(now - lead.arrivedAt);
       return commit(d, ctx, newId, { kind: 'lead', leadId: lead.id, undoable: true, text: `${me.name} assigned lead ${lead.name} to ${to.name} (${waited} after arrival).`, message: `${to.name} owns ${lead.name}.${lead.firstResponseAt ? '' : ' First response is due now.'}` });
@@ -604,7 +619,8 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       if (!lead) return fail(input, 'That lead no longer exists.');
       const note = action.note.trim();
       if (!note) return fail(input, 'Say why this needs escalation.');
-      const managers = peopleWithRole(state, 'manager');
+      // Escalations go to the people who manage the workspace (Owner and Admins live; managers in the demo).
+      const managers = state.people.filter(item => manages(item));
       const to = (managers.find(item => item.id !== actor) ?? managers[0])?.id ?? actor;
       const task = blankTask(newId(), { title: `Escalated lead: ${lead.name}`, description: `${lead.need}. ${lead.phone}, ${lead.address}.`, owner: to, decisionOwner: to, due: localDate(now), priority: 'high', projectId: 'office', leadId: lead.id, nextAction: note }, actor, now);
       putTask(d, task);
@@ -620,7 +636,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       return commit(d, ctx, newId, { kind: 'policy', text: `${me.name} registered organization tags.`, message: 'Tags saved. No notifications sent.' });
     }
     case 'taxonomy/update': {
-      if (!isManager) return fail(input, 'Only a manager can change task types and tags.');
+      if (!isManager) return fail(input, 'Only an owner or admin can change task types and tags.');
       const next = cleanTaxonomy(action.taxonomy);
       if (typeof next === 'string') return fail(input, next);
       d.s.taxonomy = next;
@@ -628,7 +644,8 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
     }
 
     case 'policy/update': {
-      if (!isManager) return fail(input, 'Only a manager can change the policy.');
+      if (!isManager) return fail(input, 'Only an owner or admin can change the policy.');
+      if (Object.entries(action.changes).some(([key, value]) => !ROUTINE_POLICY.has(key) && JSON.stringify(value) !== JSON.stringify(policy[key as keyof Policy])) && !owns(me)) return fail(input, 'Only the owner changes Ultra Priority authority, access windows and the agent pilot. Admins can change response and stalled-work thresholds.');
       const next: Policy = { ...policy, ...action.changes };
       const numbers: [keyof Policy, number, number][] = [['grantSeconds', 10, next.maxGrantSeconds], ['maxGrantSeconds', 30, 86_400], ['leadResponseMinutes', 1, 1440], ['stalledHours', 1, 720]];
       for (const [key, min, max] of numbers) {
@@ -669,9 +686,9 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       const item = state.feedback.find(entry => entry.id === action.id);
       if (!item) return fail(input, 'That feedback no longer exists.');
       if (!(action.status in FEEDBACK_STATUS_LABELS)) return fail(input, 'Unknown status.');
-      const triage = me.role === 'manager' || me.role === 'coordinator';
+      const triage = managerish;
       const authorResolving = item.author === actor && action.status === 'resolved';
-      if (!triage && !authorResolving) return fail(input, 'Only a manager or coordinator moves feedback through review. Authors can mark their own feedback resolved.');
+      if (!triage && !authorResolving) return fail(input, 'Only a supervisor, admin or owner moves feedback through review. Authors can mark their own feedback resolved.');
       if (item.status === action.status) return fail(input, `It’s already ${FEEDBACK_STATUS_LABELS[action.status].toLowerCase()}.`);
       d.s.feedback = state.feedback.map(entry => entry.id === item.id ? { ...entry, status: action.status, updatedAt: now, history: [...entry.history, { at: now, by: actor, text: `${me.name} moved it to ${FEEDBACK_STATUS_LABELS[action.status]}.` }] } : entry);
       return commit(d, ctx, newId, { kind: 'feedback', text: `${me.name} marked “${item.title}” ${FEEDBACK_STATUS_LABELS[action.status].toLowerCase()}.`, message: `Marked ${FEEDBACK_STATUS_LABELS[action.status]}.` });
@@ -695,7 +712,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
     case 'feedback/convert': {
       const item = state.feedback.find(entry => entry.id === action.id);
       if (!item) return fail(input, 'That feedback no longer exists.');
-      if (!isManager) return fail(input, 'Only a manager (future Owner/Admin) turns feedback into development work.');
+      if (!isManager) return fail(input, 'Only an owner or admin turns feedback into development work.');
       if (item.linkedTaskId) return fail(input, 'This feedback already has a development task.');
       if (!d.s.projects.some(project => project.id === 'quest-product')) d.s.projects = [...d.s.projects, { id: 'quest-product', name: 'Task-HQ product (development)' }];
       const task = blankTask(newId(), {
@@ -709,7 +726,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
     }
 
     case 'invite/draft': {
-      if (!isManager) return fail(input, 'Only a manager prepares reviewer invitations.');
+      if (!isManager) return fail(input, 'Only an owner or admin prepares reviewer invitations.');
       const email = clip(action.email, 200).toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(input, 'Enter the reviewer’s verified email address.');
       const days = Math.round(action.days);
@@ -720,7 +737,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
     }
 
     case 'invite/revoke': {
-      if (!isManager) return fail(input, 'Only a manager revokes invitations.');
+      if (!isManager) return fail(input, 'Only an owner or admin revokes invitations.');
       const invite = state.invites.find(item => item.id === action.id);
       if (!invite || invite.status === 'revoked') return fail(input, 'That invitation is already revoked.');
       d.s.invites = state.invites.map(item => item.id === invite.id ? { ...item, status: 'revoked', revokedAt: now } : item);
@@ -728,7 +745,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
     }
 
     case 'workspace/update': {
-      if (!isManager) return fail(input, 'Only a manager changes workspace settings.');
+      if (!owns(me)) return fail(input, 'Only the owner changes the workspace name and industry preset.');
       const name = action.changes.name === undefined ? state.workspace.name : clip(action.changes.name, 80);
       if (!name) return fail(input, 'Give the workspace a name.');
       const preset = action.changes.preset ?? state.workspace.preset;
@@ -769,9 +786,9 @@ export function audienceFor(state: QuestState, event: QuestEvent): string[] {
   if (lead) [lead.assignee, lead.escalatedTo].forEach(id => id && ids.add(id));
   if (event.kind === 'grant' || event.kind === 'ultra') {
     if (state.focus) { ids.add(state.focus.employee); ids.add(state.focus.activatedBy); }
-    state.people.filter(item => state.policy.ultraApprovers.includes(item.role)).forEach(item => ids.add(item.id));
+    state.people.filter(item => allowedBy(item, state.policy.ultraApprovers)).forEach(item => ids.add(item.id));
   }
-  if (event.kind === 'lead' && lead && !lead.assignee) state.people.filter(item => item.role === 'manager' || item.role === 'sales').forEach(item => ids.add(item.id));
+  if (event.kind === 'lead' && lead && !lead.assignee) state.people.filter(item => manages(item) || item.role === 'sales').forEach(item => ids.add(item.id));
   ids.delete(event.actor);
   return [...ids];
 }

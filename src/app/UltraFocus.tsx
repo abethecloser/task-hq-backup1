@@ -2,7 +2,7 @@ import { Select } from '../ui/Select.tsx';
 import { useState } from 'react';
 import type { AccessGrant } from '../core/contract.ts';
 import { SECTION_LABELS } from '../core/contract.ts';
-import { canDecideGrants, firstName, hasRole, nameOf, taskById } from '../core/selectors.ts';
+import { allowedBy, canDecideGrants, firstName, nameOf, person, taskById } from '../core/selectors.ts';
 import { clock, duration } from '../core/time.ts';
 import { Avatar } from '../ui/components.tsx';
 import { compose } from '../core/compose.ts';
@@ -64,7 +64,7 @@ export function GrantBar({ quest, grant, onReturn }: { quest: Quest; grant: Acce
 
 export function FocusControl({ quest, onOpen }: { quest: Quest; onOpen: (id: string) => void }) {
   const { state, actor, dispatch, now } = quest;
-  const canActivate = hasRole(state, actor, state.policy.ultraActivators);
+  const canActivate = allowedBy(person(state, actor), state.policy.ultraActivators);
   const canDecide = canDecideGrants(state, actor);
   const [seconds, setSeconds] = useState(state.policy.grantSeconds);
   const [pick, setPick] = useState('');

@@ -11,9 +11,11 @@ import { ROLE_LABELS, useLive } from './LiveContext.tsx';
 // Task tabs reuse the registry lenses; other destinations keep their existing routes.
 export interface TopTab { id: string; label: string; count?: number; hot: boolean; active: boolean; allowed: boolean; restricted?: boolean }
 
-export function TopBar({ quest, demo, focused, unread, askOpen, tabs, onTab, onSearch, searchOpen = true, onAsk, onBell, onMenu, menuOpen }: {
+export function TopBar({ quest, demo, focused, unread, askOpen, mode, tabs, onTab, onSearch, searchOpen = true, onAsk, onBell, onMenu, menuOpen }: {
   quest: Quest; demo: boolean; focused: boolean; unread: number;
   askOpen: boolean; tabs: TopTab[];
+  /** Work / Manage switch, only for accounts with the Manage permission. `entry` is false while every Manage section is under construction. */
+  mode?: { current: 'work' | 'manage'; entry: boolean; onChange: (next: 'work' | 'manage') => void };
   onTab: (id: string) => void; onSearch: (text: string) => void; /** False while Search is under construction for this account. */ searchOpen?: boolean; onAsk: () => void; onBell: () => void; onMenu: () => void; menuOpen: boolean;
 }) {
   const [query, setQuery] = useState('');
@@ -21,6 +23,13 @@ export function TopBar({ quest, demo, focused, unread, askOpen, tabs, onTab, onS
     <header className="topbar">
       <button type="button" className="icon-btn menu-btn" aria-label="Open navigation" aria-controls="quest-sidebar" aria-expanded={menuOpen} onClick={onMenu}><TopIcon d="M4 6h16M4 12h16M4 18h16" /></button>
       {demo && <span className="demo-flag" title="Synthetic people and data on this device. Not company work.">Demo · synthetic</span>}
+      {mode && (
+        <div className="mode-switch" role="group" aria-label="Workspace">
+          <button type="button" className={mode.current === 'work' ? 'is-on' : ''} aria-pressed={mode.current === 'work'} onClick={() => mode.onChange('work')}>Work</button>
+          <button type="button" className={`${mode.current === 'manage' ? 'is-on' : ''} ${mode.entry ? '' : 'is-restricted'}`} aria-pressed={mode.current === 'manage'}
+            aria-disabled={!mode.entry || undefined} title={mode.entry ? undefined : UNDER_CONSTRUCTION} onClick={() => { if (mode.entry) mode.onChange('manage'); }}>Manage</button>
+        </div>
+      )}
       <nav className="top-nav top-tabs" aria-label="Primary navigation" tabIndex={0}>
         {tabs.map(tab => (
           <button key={tab.id} type="button" className={`top-tab ${tab.active ? 'is-active' : ''} ${tab.restricted ? 'is-restricted' : ''}`} aria-current={tab.active ? 'page' : undefined} disabled={!tab.allowed}

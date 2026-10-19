@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CLOSED, RESTRICTABLE, canNavigate, forOrg, parseNavigation } from './navigation.ts';
+import { CLOSED, MANAGE_VIEWS, RESTRICTABLE, canManage, canNavigate, forOrg, isManageView, parseNavigation } from './navigation.ts';
 
 const server = { full: false, restricted: ['people', 'leads', 'reports'] };
 
@@ -37,4 +37,11 @@ test('a role can reopen a section in one organization only (owners keep People &
   assert.equal(canNavigate(forOrg(owner, 'quest'), 'leads'), false, 'other sections stay restricted');
   assert.equal(canNavigate(forOrg(owner, 'elsewhere'), 'people'), false, 'only where they hold the role');
   assert.equal(canNavigate(forOrg(parseNavigation({ full: false, restricted: ['people'] }), 'quest'), 'people'), false, 'older servers without by_org stay restricted');
+});
+
+test('Manage is a permanent permission from organization role, separate from the temporary restriction', () => {
+  assert.deepEqual(['owner', 'admin', 'supervisor', 'reviewer', 'member', undefined].map(canManage), [true, true, true, true, false, false]);
+  assert.ok(isManageView('people') && isManageView('settings') && !isManageView('home') && !isManageView('all-tasks'));
+  // Every Manage view is still subject to the temporary restriction.
+  assert.ok(MANAGE_VIEWS.every(view => !canNavigate(CLOSED, view)));
 });

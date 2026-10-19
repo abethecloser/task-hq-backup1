@@ -269,6 +269,13 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .top-tab.is-active::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px; border-radius: 2px; background: var(--accent); }
 .top-tab:disabled { opacity: .4; }
 
+/* Work / Manage: one app, two permission-based experiences. */
+.mode-switch { display: inline-flex; flex: none; gap: 2px; padding: 3px; border-radius: 10px; background: var(--sunk); }
+.mode-switch button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font-size: 13px; font-weight: 700; }
+.mode-switch button:hover:not(.is-on):not(.is-restricted) { color: var(--ink); }
+.mode-switch button.is-on { background: var(--card); color: var(--accent-ink); box-shadow: 0 1px 2px rgb(17 18 20 / 12%); }
+.mode-switch button.is-restricted { opacity: .42; cursor: default; }
+
 .top-link { display: inline-flex; align-items: center; gap: 4px; padding: 8px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font-size: 13.5px; font-weight: 650; white-space: nowrap; }
 .top-link:hover:not(:disabled), .top-link[aria-expanded="true"] { background: var(--sunk); color: var(--ink); }
 .top-link:disabled { opacity: .4; }
