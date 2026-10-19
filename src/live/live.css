@@ -27,3 +27,8 @@
 .account-chip b { font-size: 13px; }
 .account-chip small { color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
 @media (max-width: 720px) { .account-chip small { display: none; } .console-head { flex-direction: column; } }
+
+/* Waiting room: the optional "ask a workspace by name" form stays tucked away. */
+.auth-more { margin-top: 14px; font-size: 14px; }
+.auth-more summary { cursor: pointer; color: var(--auth-muted, #6b6b6b); font-weight: 600; }
+.auth-more .auth-secondary { margin-top: 12px; width: 100%; }

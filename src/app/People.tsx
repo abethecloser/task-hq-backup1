@@ -21,7 +21,8 @@ import type { Staged } from './StagedTeam.tsx';
 
 interface Overview {
   members: { user_id: string; email: string; full_name: string | null; role: OrgRole; work_role: string; since: string }[];
-  requests: { id: string; email: string; full_name: string | null; message: string; created_at: string }[];
+  /** `waiting`: signed in with no workspace yet (the waiting room), not a request to this workspace by name. */
+  requests: { id: string; email: string; full_name: string | null; message: string; created_at: string; waiting?: boolean }[];
   invitations: { id: string; email: string; role: OrgRole; work_role: string; expires_at: string }[];
 }
 
@@ -233,8 +234,8 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
       {isAdmin && data && data.requests.length > 0 && (
         <section className="panel" aria-labelledby="requests-title">
           <h3 id="requests-title" className="section-label">Waiting for approval <span>{data.requests.length}</span></h3>
-          <p className="muted">These accounts asked to join {live.org.name}. Nothing changes until you approve. Approving adds them with the roles you choose.</p>
-          <ul className="people-list">{data.requests.map(item => <RequestRow key={item.id} item={item} grantable={grantable} busy={busy} onDecide={(approve, role, work) => void run(() => live.client.rpc('decide_access_request', { p_request: item.id, p_approve: approve, p_role: role, p_work_role: work }), approve ? `${item.email} added as ${ROLE_LABELS[role]} · ${WORK_LABELS[work]}.` : `Request from ${item.email} declined.`)} />)}</ul>
+          <p className="muted">People who asked to join {live.org.name}, and everyone in the waiting room (signed in without a workspace). Approving adds them to {live.org.name} right away with the roles you choose; they don’t need to accept anything.</p>
+          <ul className="people-list">{data.requests.map(item => <RequestRow key={item.id} item={item} grantable={grantable} busy={busy} onDecide={(approve, role, work) => void run(() => live.client.rpc('decide_access_request', { p_request: item.id, p_approve: approve, p_role: role, p_work_role: work, p_org: live.org.id }), approve ? `${item.email} added as ${ROLE_LABELS[role]} · ${WORK_LABELS[work]}.` : `Request from ${item.email} declined.`)} />)}</ul>
         </section>
       )}
 
@@ -427,7 +428,7 @@ function RequestRow({ item, grantable, busy, onDecide }: { item: Overview['reque
   const [work, setWork] = useState('field');
   return (
     <li>
-      <span><b>{item.full_name || item.email}</b><small>{item.email} · asked {new Date(item.created_at).toLocaleDateString()}</small>{item.message && <small>“{item.message}”</small>}</span>
+      <span><b>{item.full_name || item.email}</b><small>{item.email} · {item.waiting ? 'in the waiting room since' : 'asked'} {new Date(item.created_at).toLocaleDateString()}</small>{item.message && <small>“{item.message}”</small>}</span>
       <span className="people-actions">
         <Select aria-label="Organization role" value={role} onChange={event => { const next = event.target.value as OrgRole; setRole(next); setWork(defaultWork(next) === 'reviewer' ? 'reviewer' : work === 'reviewer' ? defaultWork(next) : work); }}>{grantable.map(value => <option key={value} value={value}>{ROLE_LABELS[value]}</option>)}</Select>
         <Select aria-label="Work role" value={work} disabled={role === 'reviewer'} onChange={event => setWork(event.target.value)}>{(role === 'reviewer' ? ['reviewer'] : WORK_ROLES).map(value => <option key={value} value={value}>{WORK_LABELS[value]}</option>)}</Select>
