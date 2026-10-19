@@ -42,7 +42,7 @@ import { CriticalFocus, GrantBar } from './UltraFocus.tsx';
 import { FeedbackInbox, ReviewLayer, ReviewerWelcome } from './Review.tsx';
 import { ROLE_LABELS, useLive } from './LiveContext.tsx';
 import type { QuestBackend } from '../adapter/store.ts';
-import { Sidebar, useSidebar } from './Sidebar.tsx';
+import { PANEL_MIN, Sidebar, useSidebar } from './Sidebar.tsx';
 import { Awareness } from './Awareness.tsx';
 import { attentionFor } from '../core/awareness.ts';
 import { Inbox, inboxFor } from './Inbox.tsx';
@@ -53,6 +53,7 @@ import { Tools } from './Tools.tsx';
 import { CompanySignals } from './CompanySignals.tsx';
 import { notificationsFor } from './notifications.ts';
 import { CLOSED, UNDER_CONSTRUCTION, canManage, canNavigate, isManageView } from '../core/navigation.ts';
+import { panelLayout } from '../core/layout.ts';
 import type { Notification } from './notifications.ts';
 
 export type View = 'home' | 'reports' | 'all-tasks' | 'inbox' | 'tools' | 'company-work' | 'needs-attention' | 'leads' | 'executive' | 'people' | 'feedback' | 'activity' | 'settings' | 'agents' | 'relationships' | 'search';
@@ -74,6 +75,8 @@ const TASK_PANEL = 420;
 const SIGNAL_PANEL = 288;
 /** The canvas never gets narrower than this because of a docked panel. */
 const MIN_CANVAS = 600;
+/** With the left panel open too, the canvas may narrow further before the right panel overlays. */
+const MIN_CANVAS_BOTH = 480;
 
 function parseHash(): { view: View; taskId: string | null; leadId: string | null; feedbackId: string | null; lens: { lens: Lens; changes?: Partial<RegistryQuery> } | null } {
   const [, first = '', second = ''] = location.hash.split('?')[0]!.split('/');
@@ -339,30 +342,36 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const selected = taskId ? taskById(state, taskId) : undefined;
   const contextAllowed = selected && (!focused || selected.id === state.focus?.taskId || !!grant);
 
-  // Right zone geometry: dock only when the canvas keeps at least MIN_CANVAS.
-  const leftWidth = sidebar.isMobile ? 0 : 56 + (sidebar.open ? sidebar.width : 0);
+  // Left and right panels keep independent open state (core/layout.ts): opening one never closes the other.
+  // Short on room, the left panel narrows first; a right panel that still can't dock becomes a drawer.
+  const geometry = (rightOpen: boolean, rightWidth: number) => panelLayout({ viewport: width, mobile: sidebar.isMobile, leftOpen: sidebar.open, leftWidth: sidebar.width, leftMin: PANEL_MIN, rightOpen, rightWidth, minCanvas: MIN_CANVAS, minCanvasBoth: MIN_CANVAS_BOTH });
   // The deck shows team-wide counts, so Home needs the same access as Company Work.
   const deckAllowed = SIGNAL_VIEWS.includes(view) && !focused && me.role !== 'reviewer' && (view !== 'home' || company);
   const signalsWanted = !selected && deckAllowed
     && (contextPref === 'open' || (contextPref === 'auto' && hasSignals(quest, notifications)));
-  const signalsFit = !sidebar.isMobile && width - leftWidth - SIGNAL_PANEL >= MIN_CANVAS;
+  const signalsFit = geometry(true, SIGNAL_PANEL).right === 'docked';
   const showSignals = signalsWanted && signalsFit;
-  const showDeckDrawer = deckDrawer && !selected && deckAllowed && !signalsFit;
+  // A deck opened from the seam stays open: where it can't dock on desktop it shows as a drawer.
+  const showDeckDrawer = !selected && deckAllowed && !signalsFit && (deckDrawer || (contextPref === 'open' && !sidebar.isMobile));
   /** Home's Calendar and Insights buttons: open the deck on that section, docked or as a drawer. */
   function openDeck(section: DeckSection) {
     setDeckSection(section);
     if (signalsFit) setContextPref('open'); else setDeckDrawer(true);
   }
-  const taskDocked = !!selected && !!contextAllowed && !sidebar.isMobile && width - leftWidth - TASK_PANEL >= MIN_CANVAS;
+  const taskLayout = geometry(!!selected && !!contextAllowed, TASK_PANEL);
+  const taskDocked = taskLayout.right === 'docked';
   const contextOffset = taskDocked ? TASK_PANEL : showSignals ? SIGNAL_PANEL : 0;
-  const signalSeam = !selected && deckAllowed && signalsFit;
+  const leftReserved = (selected && contextAllowed ? taskLayout : geometry(showSignals, SIGNAL_PANEL)).left;
+  const deckOpen = showSignals || showDeckDrawer;
+  const closeDeck = () => { setDeckDrawer(false); if (showSignals || contextPref === 'open') setContextPref('closed'); };
+  const signalSeam = !selected && deckAllowed && !sidebar.isMobile;
 
   return (
     <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'}`}
-      style={{ ...sidebar.shellStyle, ['--context-offset' as string]: `${contextOffset}px` }}
+      style={{ ...sidebar.shellStyle, ...(sidebar.isMobile ? {} : { ['--panel-offset' as string]: `${leftReserved}px` }), ['--context-offset' as string]: `${contextOffset}px` }}
       data-sidebar={sidebar.isMobile ? undefined : sidebar.open ? 'open' : 'closed'} data-context={contextOffset ? 'open' : 'closed'} data-resizing={sidebar.resizing || undefined}>
       <Sidebar
-        control={sidebar}
+        control={leftReserved && leftReserved !== sidebar.width ? { ...sidebar, width: leftReserved } : sidebar}
         notifications={notifications}
         unreadTotal={inboxUnread}
         awareness={<Awareness quest={quest} control={sidebar} inbox={inbox} attention={awareAttention}
@@ -446,17 +455,17 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         <div className="locked-note" role="alert">“{selected.title}” is outside your Critical Focus. Request access to {SECTION_LABELS['company-work']} first. <button className="btn btn-ghost btn-sm" onClick={closeTask}>Close</button></div>
       )}
       {(showSignals || showDeckDrawer) && <>
-        {showDeckDrawer && <button className="scrim" aria-label="Close instrument deck" onClick={() => setDeckDrawer(false)} />}
+        {showDeckDrawer && <button className="scrim" aria-label="Close instrument deck" onClick={closeDeck} />}
         <Signals quest={quest} notifications={notifications} company={company} section={deckSection} onSection={setDeckSection} docked={showSignals}
           onOpenNotification={note => { setDeckDrawer(false); openNotification(note); }} onOpenTask={id => { setDeckDrawer(false); openTask(id); }}
-          onClose={() => { if (showDeckDrawer) setDeckDrawer(false); else setContextPref('closed'); }}
+          onClose={closeDeck}
           onRegistry={(lens, changes) => { setDeckDrawer(false); openRegistry(lens, changes); }}
           onLens={(lens, filter) => { setDeckDrawer(false); openRegistry(lens, { scope: 'company', ...(filter === 'blocked' ? { status: 'blocked' } : filter === 'unowned' ? { owner: 'none' } : {}) }); }} />
       </>}
       {signalSeam && (
-        <button type="button" className={`seam-toggle is-right ${showSignals ? '' : 'is-tab'}`} onClick={() => setContextPref(showSignals ? 'closed' : 'open')} aria-expanded={showSignals}
-          aria-label={showSignals ? 'Collapse instrument deck' : `Show instrument deck${notifications.length ? `, ${notifications.length} need you` : ''}`} title={showSignals ? 'Collapse instrument deck' : 'Show instrument deck'}>
-          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={showSignals ? 'M10 7l5 5-5 5' : 'M14 7l-5 5 5 5'} /></svg>
+        <button type="button" className={`seam-toggle is-right ${showSignals ? '' : 'is-tab'}`} onClick={() => (deckOpen ? closeDeck() : setContextPref('open'))} aria-expanded={deckOpen}
+          aria-label={deckOpen ? 'Collapse instrument deck' : `Show instrument deck${notifications.length ? `, ${notifications.length} need you` : ''}`} title={deckOpen ? 'Collapse instrument deck' : 'Show instrument deck'}>
+          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={deckOpen ? 'M10 7l5 5-5 5' : 'M14 7l-5 5 5 5'} /></svg>
           {!showSignals && <span className="seam-tab-label">Deck</span>}
           {!showSignals && notifications.length > 0 && <span className="seam-tab-count">{notifications.length > 9 ? '9+' : notifications.length}</span>}
         </button>

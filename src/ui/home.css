@@ -40,7 +40,7 @@
 
 /* Top strip: Comments & mentions, then the four plate metrics. */
 .hd-top { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(0, 2fr); gap: 16px; align-items: stretch; }
-.hd-panel { display: grid; align-content: start; gap: 10px; min-width: 0; padding: 16px 18px; border: 1px solid var(--hair); border-radius: 16px; background: var(--card); box-shadow: var(--shadow); scroll-margin: 90px; }
+.hd-panel { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 10px; min-width: 0; padding: 16px 18px; border: 1px solid var(--hair); border-radius: 16px; background: var(--card); box-shadow: var(--shadow); scroll-margin: 90px; }
 .hd-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .hd-head > div { min-width: 0; }
 .hd-head h2 { font: 800 16px/1.15 var(--display); letter-spacing: -.02em; }
@@ -74,7 +74,7 @@
 
 /* Middle and bottom rows. */
 .hd-row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
-.hd-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.hd-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin: 0; padding: 0; list-style: none; }
 .hd-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--hair); border-left: 3px solid var(--accent); border-radius: 11px; background: var(--card); transition: box-shadow .15s; }
 .hd-row:hover { box-shadow: var(--shadow-lift); }
 .hd-row.is-risk { border-left-color: var(--stop); }
