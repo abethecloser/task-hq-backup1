@@ -1,0 +1,96 @@
+<!doctype html>
+<!-- Task-HQ app shell for prototyping. Built from the real class names in src/app/App.tsx and
+     src/app/Sidebar.tsx. Put the new page inside <section class="content"> where it says NEW PAGE.
+     Keep data-look="studio" on <html>; without it the Studio colors don't apply. -->
+<html lang="en" data-look="studio">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task-HQ · Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="task-hq-studio.css">
+</head>
+<body>
+<!-- Sidebar open: --panel-offset equals the panel width. Collapsed: set it to 0px and the panel's data-state to "collapsed".
+     Context zone open: set --context-offset to 420px (task) or 288px (signals) and uncomment the <aside class="context"> below. -->
+<div class="shell is-demo" data-sidebar="open" data-context="closed" style="--panel-offset: 248px; --context-offset: 0px;">
+
+  <!-- Zone 1a: Instrument Rail, 56px, always visible -->
+  <aside class="rail" aria-label="Instrument Rail">
+    <div class="sidebar-brand"><a class="brand" href="#"><img class="brand-mark" src="brand-mark.png" width="30" height="30" alt=""></a></div>
+    <nav class="nav" aria-label="Task-HQ sections">
+      <button type="button" class="nav-item is-active" aria-label="My Work"><span class="nav-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M4 6h10M4 12h7M4 18h10M17 9l3 3-3 3"/></svg></span></button>
+      <button type="button" class="nav-item" aria-label="All Tasks"><span class="nav-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v2H4z"/></svg><i class="nav-pip"></i></span></button>
+      <button type="button" class="nav-item" aria-label="Search"><span class="nav-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M16 16l5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0"/></svg></span></button>
+      <button type="button" class="nav-item" aria-label="Inbox"><span class="nav-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z"/></svg><span class="rail-unread">3</span></span></button>
+      <button type="button" class="nav-item" aria-label="Needs Attention"><span class="nav-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M12 4 21 20H3zM12 10v4M12 17v.5"/></svg></span></button>
+      <button type="button" class="nav-item" aria-label="Executive Desk"><span class="nav-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M4 20V9l8-5 8 5v11M9 20v-6h6v6"/></svg></span></button>
+      <button type="button" class="nav-item" aria-label="People &amp; Roles"><span class="nav-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6"/></svg></span></button>
+    </nav>
+    <button type="button" class="nav-create" aria-label="New task"><span class="nav-icon">+</span></button>
+  </aside>
+
+  <!-- Zone 1b: Workspace panel, 248px, collapsible -->
+  <aside id="quest-sidebar" class="workspace-panel" data-state="open" style="width: 248px;" aria-label="Workspace sidebar">
+    <div class="panel-head"><span class="panel-title">Task-<b>HQ</b></span></div>
+    <div class="panel-scroll">
+      <nav class="panel-nav" aria-label="Task-HQ sections">
+        <button type="button" class="nav-create panel-create">+ New task</button>
+        <button type="button" class="is-active"><span>My Work</span><span class="panel-count">6</span></button>
+        <button type="button"><span>All Tasks</span><span class="panel-count is-hot">24</span></button>
+        <button type="button"><span>Search</span></button>
+        <button type="button"><span>Inbox</span><span class="panel-count is-hot">3</span></button>
+        <button type="button"><span>Estimates &amp; Proposals</span><span class="panel-count">2</span></button>
+        <button type="button"><span>Needs Attention</span><span class="panel-count">4</span></button>
+        <button type="button"><span>First Response</span></button>
+        <button type="button"><span>Executive Desk</span><span class="panel-count">1</span></button>
+        <button type="button"><span>Company Work</span><span class="panel-count">9</span></button>
+        <button type="button"><span>Relationship Vault</span></button>
+        <button type="button"><span>People &amp; Roles</span><span class="panel-count">12</span></button>
+        <button type="button"><span>Activity</span></button>
+        <button type="button"><span>Policy &amp; data</span></button>
+      </nav>
+    </div>
+    <div class="panel-foot"><span class="mode-chip"><span class="mode-dot"></span>Local · demo</span><p><b>Task-HQ Demo</b> · synthetic people and data.</p></div>
+  </aside>
+
+  <button type="button" class="seam-toggle is-left" aria-label="Collapse sidebar"><svg class="icon" viewBox="0 0 24 24"><path d="M14 7l-5 5 5 5"/></svg></button>
+
+  <!-- Zone 2: Canvas -->
+  <main class="main">
+    <header class="topbar">
+      <span class="topbar-title">New Page</span>
+      <span class="workspace-chip">Quest Roofing</span>
+      <span class="demo-flag">Demo · synthetic</span>
+      <div class="topbar-right"><span class="avatar avatar-md">AV</span></div>
+    </header>
+
+    <!-- For a wide view, add a modifier class whose max-width is 1320px (see .content.view-all-tasks in the CSS). -->
+    <section class="content view-new-page">
+      <div class="view">
+        <header class="view-head">
+          <div>
+            <p class="eyebrow">Section · Saturday, October 18</p>
+            <h1>Page title</h1>
+            <p class="lede">One sentence that says what this page answers and who it's for.</p>
+          </div>
+          <button type="button" class="btn btn-primary">Primary action</button>
+        </header>
+
+        <!-- ===== NEW PAGE CONTENT GOES HERE ===== -->
+
+      </div>
+    </section>
+  </main>
+
+  <!-- Zone 3 (optional): Context. Uncomment it and set --context-offset on .shell to match.
+  <aside class="context context-task is-docked" aria-label="Task context">
+    <div class="context-head"><span class="context-label">Context</span><span class="pill pill-working">Working</span></div>
+    <div class="context-body">…</div>
+  </aside>
+  -->
+</div>
+</body>
+</html>

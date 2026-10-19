@@ -75,5 +75,7 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
     async setActor() { /* the signed-in account is the actor */ },
     subscribeActor() { return () => undefined; },
     async outboxCount() { return 0; },
+    // The deployed dispatch (v3) predates task types, tags and times; flip with the next dispatch deploy.
+    supports: { taskTaxonomy: false },
   };
 }

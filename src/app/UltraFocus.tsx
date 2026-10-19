@@ -1,3 +1,4 @@
+import { Select } from '../ui/Select.tsx';
 import { useState } from 'react';
 import type { AccessGrant } from '../core/contract.ts';
 import { SECTION_LABELS } from '../core/contract.ts';
@@ -73,7 +74,8 @@ export function FocusControl({ quest, onOpen }: { quest: Quest; onOpen: (id: str
   const candidates = state.tasks.filter(task => task.status !== 'done' && task.owner);
 
   return (
-    <section className="focus-control">
+    <details className="focus-control compact-focus" open={focus || open.length ? true : undefined}>
+      <summary>Ultra Priority · {focus ? "Active critical focus" : "Available for critical work"}{open.length ? ` · ${open.length} access requests` : ""}</summary>
       <div className="fc-head">
         <span className="kicker">ULTRA PRIORITY</span>
         {focus ? <strong><Avatar state={state} id={focus.employee} size="sm" /> {nameOf(state, focus.employee)} is in Critical Focus on “{taskById(state, focus.taskId)?.title}” · {duration(now - focus.since)}</strong> : <strong>No one is in Critical Focus.</strong>}
@@ -82,11 +84,11 @@ export function FocusControl({ quest, onOpen }: { quest: Quest; onOpen: (id: str
       </div>
       {!focus && canActivate && (
         <div className="inline-form">
-          <select value={pick} onChange={event => setPick(event.target.value)} aria-label="Task to make Ultra Priority">
+          <Select value={pick} onChange={event => setPick(event.target.value)} aria-label="Task to make Ultra Priority">
             <option value="">Choose a truly critical task…</option>
             {candidates.map(task => <option key={task.id} value={task.id}>{task.title} — {firstName(state, task.owner)}</option>)}
-          </select>
-          <button type="button" className="btn btn-ultra" disabled={!pick} onClick={() => void dispatch({ type: 'ultra/activate', taskId: pick })}>{pick ? `Make this ${firstName(state, taskById(state, pick)?.owner ?? '')}’s only priority` : 'Only priority'}</button>
+          </Select>
+          <button type="button" className="btn btn-ultra btn-sm" disabled={!pick} onClick={() => void dispatch({ type: 'ultra/activate', taskId: pick })}>Activate critical focus</button>
         </div>
       )}
       {open.map(grant => (
@@ -107,6 +109,6 @@ export function FocusControl({ quest, onOpen }: { quest: Quest; onOpen: (id: str
       ))}
       <p className="boundary">{quest.backend.kind === 'live' ? LIVE_ENFORCEMENT_NOTE : ENFORCEMENT_NOTE} Policy: {state.policy.ultraScope === 'manager-context' ? 'only the activating manager decides requests' : 'any approver decides requests'} (change in Policy & data).</p>
       <FocusHistory quest={quest} />
-    </section>
+    </details>
   );
 }

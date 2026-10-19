@@ -14,6 +14,10 @@ export interface LiveAccount {
   onSignOut: () => void;
   onLeaveWorkspace: () => void;
   canSwitch: boolean;
+  searchOrgs?: { id: string; name: string }[];
+  onOpenWorkspace?: (id: string, hash: string) => void;
+  /** Organizations this account administers (owner/admin); for choosing affiliation when staging people. */
+  adminOrgs: { id: string; name: string }[];
 }
 
 export const LiveContext = createContext<LiveAccount | null>(null);

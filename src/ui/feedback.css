@@ -1,0 +1,46 @@
+/* One sensory vocabulary. Persistent status comes from source records, never animation. */
+.feedback-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px; padding: 7px 28px; border-bottom: 1px solid var(--hair); background: var(--card); color: var(--ink-2); }
+.feedback-result { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.feedback-result > div { display: grid; gap: 2px; min-width: 0; }
+.feedback-result strong { color: var(--ink); font-size: 11.5px; font-weight: 750; }
+.feedback-symbol { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--hair-2); border-radius: 6px; color: var(--accent-ink); font-size: 17px; font-weight: 800; }
+.feedback-detail { overflow: hidden; max-width: 68ch; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.feedback-controls { display: flex; align-items: center; gap: 8px; flex: none; }
+.feedback-controls details { position: relative; font-size: 11px; }
+.feedback-controls summary { cursor: pointer; padding: 6px; }
+.feedback-preferences { position: absolute; z-index: 80; right: 0; top: 100%; display: grid; gap: 12px; width: 250px; padding: 16px; border: 1px solid var(--hair-2); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow-lift); }
+.feedback-preferences label { display: flex; align-items: center; gap: 8px; }
+.feedback-preferences input { min-height: 16px !important; }
+.feedback-preferences small { color: var(--muted); line-height: 1.5; }
+.record-cue, .aware-feedback { color: var(--accent-ink); font-size: 11px; font-weight: 750; }
+[data-feedback-phase="processing"] { cursor: progress; }
+.feedback-bar[data-feedback-phase="processing"] .feedback-symbol { animation: feedback-process .9s linear infinite; }
+[data-feedback-phase="denied"], [data-feedback-phase="failed"] { --feedback-edge: var(--danger); }
+.feedback-bar:is([data-feedback-phase="denied"], [data-feedback-phase="failed"]) { border-bottom: 2px solid var(--danger); }
+.feedback-bar:is([data-feedback-phase="denied"], [data-feedback-phase="failed"]) .feedback-symbol { border-color: var(--danger); color: var(--danger); }
+[data-feedback-record][data-feedback-motion="activate"] { animation: feedback-activate .6s ease-out; }
+[data-feedback-record][data-feedback-motion="complete"] { animation: feedback-complete .5s ease-out; }
+[data-feedback-record][data-feedback-motion="transfer"] { animation: feedback-transfer .45s ease-out; }
+[data-feedback-record][data-feedback-motion="reverse"] { animation: feedback-reverse .45s ease-out; }
+[data-feedback-record][data-feedback-motion="interrupt"] { border-left: 3px solid var(--feedback-edge, var(--danger)); animation: feedback-interrupt .22s ease-out; }
+.feedback-bar[data-feedback-motion="transfer"] .feedback-symbol { animation: feedback-transfer .45s ease-out; }
+.feedback-bar[data-feedback-motion="complete"] .feedback-symbol { animation: feedback-complete .5s ease-out; }
+.feedback-bar[data-feedback-motion="activate"] .feedback-symbol { box-shadow: 0 0 0 2px rgb(198 75 9 / 16%); animation: feedback-activate .6s ease-out; }
+.feedback-bar[data-feedback-motion="reverse"] .feedback-symbol { animation: feedback-reverse .45s ease-out; }
+.feedback-bar[data-feedback-motion="interrupt"] .feedback-symbol { animation: feedback-interrupt .22s ease-out; }
+@keyframes feedback-activate { from { box-shadow: 0 0 0 3px rgb(198 75 9 / 35%), 0 0 25px rgb(198 75 9 / 16%); } to { box-shadow: 0 0 0 0 transparent; } }
+@keyframes feedback-complete { 0% { transform: scale(.985); } 50% { transform: scale(1.005); } 100% { transform: scale(1); } }
+@keyframes feedback-transfer { from { transform: translateX(-7px); opacity: .65; } to { transform: translateX(0); opacity: 1; } }
+@keyframes feedback-reverse { from { transform: translateX(5px); } to { transform: translateX(0); } }
+@keyframes feedback-interrupt { 0%,100% { transform: translateX(0); } 35% { transform: translateX(-3px); } 70% { transform: translateX(2px); } }
+@keyframes feedback-process { to { transform: rotate(360deg); } }
+.feedback-demo { display: grid; gap: 14px; padding: 18px; }
+.feedback-demo-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.feedback-demo-records { display: grid; gap: 8px; }
+.feedback-demo-records > div { padding: 10px 12px; border: 1px solid var(--hair); background: var(--card); border-radius: 8px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.feedback-demo-records strong { margin-right: auto; }
+@media (max-width: 600px) { .feedback-bar { padding: 6px 12px; } .feedback-detail { max-width: 32ch; } .feedback-controls { gap: 3px; } }
+@media (prefers-reduced-motion: reduce) {
+  [data-feedback], [data-feedback] .feedback-symbol { animation: none !important; transition: none !important; }
+  .feedback-bar[data-feedback-phase="processing"] .feedback-symbol { font-weight: 900; }
+}

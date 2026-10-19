@@ -2,8 +2,11 @@
 // Authorization here is enforced for every Quest surface on this device, but the
 // acting person is self-selected in the demo, so this is NOT secure server-side
 // authorization. See READINESS.md.
+import { feedbackSignature } from './feedback.ts';
+import { indexReferenceChanges } from './reference-persistence.ts';
+import { validateAliases, tagKey, validTag, canonicalTag, referenceScope } from './references.ts';
 import type {
-  AccessGrant, Action, ApplyContext, ApplyResult, EventKind, Lead, Policy, QuestEvent, QuestState, Role, Section, Task, UltraFocus,
+  AccessGrant, Action, ApplyContext, ApplyResult, EventEffect, EventKind, Lead, Policy, QuestEvent, QuestState, Role, Section, Task, UltraFocus,
 } from './contract.ts';
 import { APP_VERSION, FEEDBACK_CATEGORY_LABELS, FEEDBACK_STATUS_LABELS, OPERATIONAL_ROLES, SECTION_LABELS } from './contract.ts';
 import { blankLead, blankTask, seedState } from './seed.ts';
@@ -30,10 +33,13 @@ interface Draft {
   s: QuestState;
   before: { tasks: Record<string, Task | null>; leads: Record<string, Lead | null>; focus?: { value: UltraFocus | null }; grants?: AccessGrant[] };
   extraEvents: QuestEvent[];
+  effects: EventEffect[];
+  referenceDrafts?: Action['referenceDrafts'];
+  action?: Action;
 }
 
 function begin(state: QuestState): Draft {
-  return { base: state, s: { ...state, tasks: [...state.tasks], leads: [...state.leads], grants: [...state.grants] }, before: { tasks: {}, leads: {} }, extraEvents: [] };
+  return { base: state, s: { ...state, tasks: [...state.tasks], leads: [...state.leads], grants: [...state.grants] }, before: { tasks: {}, leads: {} }, extraEvents: [], effects: [] };
 }
 
 function putTask(d: Draft, task: Task) {
@@ -80,13 +86,16 @@ export function fingerprint(value: unknown) {
 }
 
 function commit(d: Draft, ctx: ApplyContext, newId: () => string, options: CommitOptions): ApplyResult {
+  d.s = indexReferenceChanges(d.base, d.s, ctx.actor, d.referenceDrafts);
   const stamps: Record<string, string> = {};
   for (const id of Object.keys(d.before.tasks)) { const task = d.s.tasks.find(item => item.id === id); if (task) stamps[id] = fingerprint(task); }
   for (const id of Object.keys(d.before.leads)) { const lead = d.s.leads.find(item => item.id === id); if (lead) stamps[id] = fingerprint(lead); }
   const event: QuestEvent = {
     id: newId(), at: ctx.now, actor: ctx.actor, kind: options.kind, text: options.text,
+    ...(d.action ? { feedback: feedbackSignature(d.action, d.base, d.s), actionType: d.action.type } : {}),
     ...(options.taskId ? { taskId: options.taskId } : {}),
     ...(options.leadId ? { leadId: options.leadId } : {}),
+    ...(d.effects.length ? { effects: d.effects } : {}),
     ...(options.undoable ? {
       undo: {
         tasks: d.before.tasks, leads: d.before.leads, stamps,
@@ -95,14 +104,16 @@ function commit(d: Draft, ctx: ApplyContext, newId: () => string, options: Commi
       },
     } : {}),
   };
+  const indexedEventState = indexReferenceChanges(d.s, { ...d.s, events: [event] }, ctx.actor, d.referenceDrafts);
+  const indexedEvent = indexedEventState.events[0]!;
   const state: QuestState = {
-    ...d.s,
-    events: [event, ...d.extraEvents, ...d.s.events].slice(0, MAX_EVENTS),
+    ...indexedEventState,
+    events: [indexedEvent, ...d.extraEvents, ...d.s.events].slice(0, MAX_EVENTS),
     rev: d.base.rev + 1,
     updatedAt: ctx.now,
     writer: ctx.writer ?? d.base.writer,
   };
-  return { ok: true, state, event, message: options.message ?? options.text };
+  return { ok: true, state, event: indexedEvent, message: options.message ?? options.text };
 }
 
 function fail(state: QuestState, error: string): ApplyResult {
@@ -152,15 +163,24 @@ function completeTask(d: Draft, task: Task, ctx: ApplyContext): string[] {
   putTask(d, touch(task, ctx.now, { status: 'done', completedAt: ctx.now, blocker: null, ultra: false }));
   for (const item of d.s.tasks) {
     if (!item.dependsOn.includes(task.id) || item.status === 'done') continue;
-    if (blockingDeps(d.s, item).length > 0) continue;
+    const still = blockingDeps(d.s, item);
+    if (still.length > 0) {
+      d.effects.push({ rule: 'dependency-unlock', outcome: 'skipped', taskId: item.id, reason: `still waiting on “${still[0]!.title}”` });
+      continue;
+    }
     const owner = item.owner || task.nextOwner;
     putTask(d, touch(item, ctx.now, { owner }));
+    d.effects.push({ rule: 'dependency-unlock', outcome: 'executed', taskId: item.id, ...(owner ? { owner } : { reason: 'unlocked with no owner' }) });
     notes.push(`“${item.title}” is unlocked for ${nameOf(d.s, owner, 'nobody yet — assign an owner')}`);
   }
-  if (notes.length === 0 && task.nextOwner) notes.push(`handed off to ${nameOf(d.s, task.nextOwner)}`);
+  if (notes.length === 0 && task.nextOwner) {
+    notes.push(`handed off to ${nameOf(d.s, task.nextOwner)}`);
+    d.effects.push({ rule: 'handoff', outcome: 'executed', taskId: task.id, owner: task.nextOwner });
+  }
   if (d.s.focus?.taskId === task.id) {
     endFocus(d, ctx);
     notes.push('Critical Focus released');
+    d.effects.push({ rule: 'focus-release', outcome: 'executed', taskId: task.id });
   }
   return notes;
 }
@@ -188,6 +208,37 @@ function wouldCycle(state: QuestState, taskId: string, deps: string[]) {
 }
 
 /** Someone who may hold operational work. Reviewers never can. */
+const TAG = /^[a-z0-9][a-z0-9-]{0,29}$/;
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Validates type/tags/time against the organization's taxonomy. A string is the refusal. */
+function classify(state: QuestState, t: { type?: string; tags?: string[]; dueTime?: string; due?: string }): { type: string | undefined; tags: string[] | undefined; dueTime: string | undefined } | string {
+  const type = t.type || undefined;
+  if (type && !state.taxonomy?.types.some(item => item.id === type)) return 'That task type isn’t configured for this workspace.';
+  const tags = t.tags?.length ? [...new Set(t.tags.map(tag => canonicalTag(tag, referenceScope(state, state.people[0]?.id ?? '')) ?? tagKey(tag)))] : undefined;
+  if (tags && (tags.length > 8 || !tags.every(validTag))) return 'Tags are up to 8 short words: letters, digits and dashes.';
+  const dueTime = t.dueTime || undefined;
+  if (dueTime && !TIME.test(dueTime)) return 'Times look like 09:30.';
+  if (dueTime && !t.due) return 'Pick a due date before a time.';
+  return { type, tags, dueTime };
+}
+
+function cleanTaxonomy(input: QuestState['taxonomy']): NonNullable<QuestState['taxonomy']> | string {
+  if (!input || !Array.isArray(input.types) || !Array.isArray(input.tags)) return 'Malformed task types and tags.';
+  if (input.types.length > 30 || input.tags.length > 100) return 'Keep it to 30 types and 100 tags.';
+  const types = input.types.map(item => ({ id: String(item.id).trim().toLowerCase(), label: String(item.label).trim().slice(0, 40), keywords: [...new Set((item.keywords ?? []).map(word => String(word).trim().toLowerCase()).filter(Boolean))].slice(0, 12) }));
+  if (types.some(item => !TAG.test(item.id) || !item.label)) return 'Each type needs a short id and a label.';
+  if (new Set(types.map(item => item.id)).size !== types.length) return 'Type ids must be unique.';
+  const tags = [...new Set(input.tags.map(tag => String(tag).trim().toLowerCase().replace(/^#/, '')))];
+  if (!tags.every(validTag)) return 'Tags are short words: letters, digits and dashes.';
+  const rawAliasError = validateAliases({ types, tags, tagAliases: input.tagAliases });
+  if (rawAliasError) return rawAliasError;
+  const tagAliases = Object.fromEntries(Object.entries(input.tagAliases ?? {}).map(([a, t]) => [tagKey(a), tagKey(t)]));
+  const invalid = validateAliases({ types, tags, tagAliases });
+  if (invalid) return invalid;
+  return { types, tags, ...(Object.keys(tagAliases).length ? { tagAliases } : {}) };
+}
+
 function validPerson(state: QuestState, id: string | undefined) {
   if (id === undefined || id === '') return true;
   const found = person(state, id);
@@ -218,11 +269,20 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
   if (gate) return fail(input, gate);
 
   const d = begin(state);
+  d.action = action;
+  d.referenceDrafts = Array.isArray(action.referenceDrafts) ? action.referenceDrafts : [];
   const policy = state.policy;
   const isManager = me.role === 'manager';
   const managerish = me.role === 'manager' || me.role === 'coordinator';
 
   switch (action.type) {
+    case 'task/comment': {
+      const task = taskById(state, action.id);
+      if (!task) return fail(input, 'That task no longer exists.');
+      const note = clip(action.note, 2000);
+      if (!note) return fail(input, 'Write a comment first.');
+      return commit(d, ctx, newId, { kind: 'task', taskId: task.id, text: `${me.name} commented: ${note}`, message: 'Comment saved. No external notification sent.' });
+    }
     case 'task/create': {
       const title = action.task.title?.trim() ?? '';
       if (!title) return fail(input, 'Give the task a name.');
@@ -230,7 +290,9 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       const t = action.task;
       if (![t.owner, t.nextOwner, t.decisionOwner, t.approver].every(id => validPerson(state, id))) return fail(input, 'One of the chosen people is not in this workspace.');
       if ((t.dependsOn ?? []).some(id => !taskById(state, id))) return fail(input, 'A chosen dependency no longer exists.');
-      const task = blankTask(newId(), { ...t, title }, actor, now);
+      const shape = classify(state, t);
+      if (typeof shape === 'string') return fail(input, shape);
+      const task = blankTask(newId(), { ...t, ...shape, title }, actor, now);
       putTask(d, task);
       const ownerText = task.owner === actor ? 'themself' : nameOf(state, task.owner, 'nobody yet');
       return commit(d, ctx, newId, { kind: 'task', taskId: task.id, undoable: true, text: `${me.name} created “${title}” for ${ownerText}.`, message: `Task created${task.owner ? ` and assigned to ${nameOf(state, task.owner)}` : ' — it needs an owner'}.` });
@@ -243,6 +305,11 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       if (changes.title !== undefined && !changes.title.trim()) return fail(input, 'A task needs a name.');
       if (task.ultra && !isManager && (changes.owner !== undefined || changes.due !== undefined || changes.priority !== undefined)) return fail(input, 'Only a manager can change owner, due date or priority on an Ultra Priority task.');
       if (![changes.owner, changes.nextOwner, changes.decisionOwner, changes.approver].every(id => validPerson(state, id))) return fail(input, 'That person is not in this workspace.');
+      if ('type' in changes || 'tags' in changes || 'dueTime' in changes) {
+        const shape = classify(state, { type: changes.type ?? task.type, tags: changes.tags ?? task.tags, dueTime: changes.dueTime ?? task.dueTime, due: changes.due ?? task.due });
+        if (typeof shape === 'string') return fail(input, shape);
+        Object.assign(changes, { type: shape.type, tags: shape.tags, dueTime: shape.dueTime });
+      }
       if (changes.dependsOn) {
         if (changes.dependsOn.some(id => !taskById(state, id))) return fail(input, 'A chosen dependency no longer exists.');
         if (wouldCycle(state, task.id, changes.dependsOn)) return fail(input, 'That dependency would make the tasks wait on each other forever.');
@@ -420,6 +487,30 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       return commit(d, ctx, newId, { kind: 'lead', leadId: lead.id, text: `New simulated lead: ${lead.name} — ${lead.need}. Response target ${policy.leadResponseMinutes} min.`, message: `New lead: ${lead.name}. The response clock is running.` });
     }
 
+    case 'roles/label': {
+      if (!isManager) return fail(input, 'Only a manager can configure work labels.');
+      const label = clip(action.label, 80);
+      if (!label || (action.personId && !person(state, action.personId))) return fail(input, 'Choose a label and a workspace member.');
+      d.s.workRoles = [...new Set([...(state.workRoles ?? []), label])].slice(-100);
+      if (action.personId) d.s.workLabels = { ...state.workLabels, [action.personId]: label };
+      return commit(d, ctx, newId, { kind: 'policy', text: `${me.name} saved work label “${label}”. Permissions unchanged.`, message: 'Work label saved; permissions unchanged.' });
+    }
+    case 'lead/tags': {
+      const lead = leadById(state, action.id);
+      if (!lead) return fail(input, 'That relationship no longer exists.');
+      if (lead.assignee !== actor && !managerish) return fail(input, 'Only the owner or a manager/coordinator can edit relationship tags.');
+      if (!Array.isArray(action.tags) || action.tags.length > 8 || !action.tags.every(tag => typeof tag === 'string' && validTag(tag))) return fail(input, 'Use up to 8 tags with letters, digits and dashes.');
+      putLead(d, { ...lead, relationshipTags: [...new Set(action.tags.map(t => canonicalTag(t, referenceScope(state, actor)) ?? tagKey(t)))], updatedAt: now });
+      return commit(d, ctx, newId, { kind: 'lead', leadId: lead.id, text: `${me.name} updated relationship tags for ${lead.name}.`, message: 'Relationship tags saved.' });
+    }
+    case 'lead/claim': {
+      const lead = leadById(state, action.id);
+      if (!lead) return fail(input, 'That lead no longer exists.');
+      if (lead.stage === 'won' || lead.stage === 'lost') return fail(input, 'Closed inquiries cannot be claimed.');
+      if (lead.assignee) return fail(input, 'This lead has already been claimed. Refresh the queue.');
+      putLead(d, { ...lead, assignee: actor, assignedAt: now, updatedAt: now });
+      return commit(d, ctx, newId, { kind: 'lead', leadId: lead.id, text: `${me.name} claimed ${lead.name}.`, message: 'Lead claimed. Log a real contact attempt next.' });
+    }
     case 'lead/assign': {
       const lead = leadById(state, action.id);
       if (!lead) return fail(input, 'That lead no longer exists.');
@@ -519,6 +610,21 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       putTask(d, task);
       putLead(d, { ...lead, stage: 'escalated', escalatedTo: to, updatedAt: now });
       return commit(d, ctx, newId, { kind: 'lead', leadId: lead.id, taskId: task.id, undoable: true, text: `${me.name} escalated ${lead.name} to ${nameOf(state, to)}: “${note}”.`, message: `Escalated to ${nameOf(state, to)}.` });
+    }
+
+    case 'taxonomy/register-tags': {
+      if (!Array.isArray(action.tags) || action.tags.length > 30 || !action.tags.every(t => typeof t === 'string' && validTag(tagKey(t)))) return fail(input, 'Use short tag names with letters, digits and dashes.');
+      const tags = [...new Set([...(state.taxonomy?.tags ?? []), ...action.tags.map(tagKey)])];
+      if (tags.length > 100) return fail(input, 'Keep it to 100 organization tags.');
+      d.s.taxonomy = { types: state.taxonomy?.types ?? [], ...state.taxonomy, tags };
+      return commit(d, ctx, newId, { kind: 'policy', text: `${me.name} registered organization tags.`, message: 'Tags saved. No notifications sent.' });
+    }
+    case 'taxonomy/update': {
+      if (!isManager) return fail(input, 'Only a manager can change task types and tags.');
+      const next = cleanTaxonomy(action.taxonomy);
+      if (typeof next === 'string') return fail(input, next);
+      d.s.taxonomy = next;
+      return commit(d, ctx, newId, { kind: 'policy', text: `${me.name} updated task types and tags (${next.types.length} types, ${next.tags.length} tags).`, message: 'Task types and tags saved.' });
     }
 
     case 'policy/update': {

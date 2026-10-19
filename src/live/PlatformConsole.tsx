@@ -1,3 +1,4 @@
+import { Select } from '../ui/Select.tsx';
 // Platform Super Admin console. Platform admins manage Task-HQ itself: they can list
 // and create organizations and invite first owners, but see no tenant data unless an
 // owner grants time-limited support access. All calls are audited on the server.
@@ -110,7 +111,7 @@ export function PlatformConsole({ client, context, onOpen, onSignOut, onRefresh 
         <form className="console-form" onSubmit={event => void create(event)}>
           <label>Name<input required minLength={2} maxLength={80} value={name} onChange={event => { setName(event.target.value); setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)); }} /></label>
           <label>Address<input required pattern="[a-z0-9][a-z0-9-]{1,38}[a-z0-9]" value={slug} onChange={event => setSlug(event.target.value)} /></label>
-          <label>Preset<select value={preset} onChange={event => setPreset(event.target.value)}><option value="general">General</option><option value="roofing">Roofing</option></select></label>
+          <label>Preset<Select value={preset} onChange={event => setPreset(event.target.value)}><option value="general">General</option><option value="roofing">Roofing</option></Select></label>
           <button className="btn btn-primary" disabled={busy}>Create organization</button>
         </form>
       </section>

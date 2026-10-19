@@ -1,3 +1,5 @@
+import { Select } from '../ui/Select.tsx';
+import { ReferenceInput, ReferenceTextarea, ReferencedText } from '../ui/ReferenceEditor.tsx';
 // Collaborative review layer: launcher, review drawer, Feedback inbox, invitation
 // drafts and the reviewer welcome. All changes go through the Quest engine
 // (feedback/* and invite/* actions); captures go to the private media store.
@@ -158,7 +160,7 @@ export function ReviewLayer({ quest, screen, itemId, onItem, onNavigate, openReq
                     <form className="form review-form" onSubmit={submit}>
                       <div className="seg" role="group" aria-label="Category">{CATEGORIES.map(value => <button key={value} type="button" aria-pressed={category === value} onClick={() => setCategory(value)}>{FEEDBACK_CATEGORY_LABELS[value]}</button>)}</div>
                       <label className="field"><span>Short title</span><input required maxLength={120} value={title} onChange={event => setTitle(event.target.value)} placeholder="e.g. Handoff animation is too fast" /></label>
-                      <label className="field"><span>Details (optional)</span><textarea rows={4} maxLength={4000} value={body} onChange={event => setBody(event.target.value)} placeholder="What did you expect? What happened?" /></label>
+                      <label className="field"><span>Details (optional)</span><ReferenceTextarea rows={4} maxLength={4000} value={body} onChange={event => setBody(event.target.value)} placeholder="What did you expect? What happened?" /></label>
                       <div className="capture-row">
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => void screenshot()}>Capture screenshot</button>
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConsent(true)}>Record screen…</button>
@@ -304,7 +306,7 @@ export function FeedbackThread({ quest, item, onNavigate }: { quest: Quest; item
         {item.replies.map(entry => <li key={entry.id}><Avatar state={state} id={entry.by} size="sm" /><div><b>{nameOf(state, entry.by)}</b> <time>{clock(entry.at)}</time><p>{entry.body}</p></div></li>)}
       </ol>
       <form className="mini-form" onSubmit={async event => { event.preventDefault(); const result = await dispatch({ type: 'feedback/reply', id: item.id, body: reply }); if (result.ok) setReply(''); }}>
-        <input value={reply} onChange={event => setReply(event.target.value)} maxLength={2000} placeholder="Reply or clarify…" aria-label="Reply" />
+        <ReferenceInput value={reply} onChange={event => setReply(event.target.value)} maxLength={2000} placeholder="Reply or clarify…" aria-label="Reply" />
         <button className="btn btn-ghost btn-sm" disabled={!reply.trim()}>Reply</button>
       </form>
       <div className="thread-actions">
@@ -356,8 +358,8 @@ export function FeedbackInbox({ quest, onOpen }: { quest: Quest; onOpen: (id: st
         <div><p className="eyebrow">Collaborative review · {quest.backend.kind === 'live' ? 'shared with your workspace' : 'stored on this device'}</p><h1>Feedback</h1><p className="lede">Comments, captures and decisions from reviewers and the team. Open one to reply, open the exact screen it’s about, resolve it, or turn it into a development task.</p></div>
       </header>
       <div className="filters">
-        <select value={status} onChange={event => setStatus(event.target.value as typeof status)} aria-label="Status"><option value="all">All statuses</option>{STATUSES.map(value => <option key={value} value={value}>{FEEDBACK_STATUS_LABELS[value]}</option>)}</select>
-        <select value={category} onChange={event => setCategory(event.target.value as typeof category)} aria-label="Category"><option value="all">All categories</option>{CATEGORIES.map(value => <option key={value} value={value}>{FEEDBACK_CATEGORY_LABELS[value]}</option>)}</select>
+        <Select value={status} onChange={event => setStatus(event.target.value as typeof status)} aria-label="Status"><option value="all">All statuses</option>{STATUSES.map(value => <option key={value} value={value}>{FEEDBACK_STATUS_LABELS[value]}</option>)}</Select>
+        <Select value={category} onChange={event => setCategory(event.target.value as typeof category)} aria-label="Category"><option value="all">All categories</option>{CATEGORIES.map(value => <option key={value} value={value}>{FEEDBACK_CATEGORY_LABELS[value]}</option>)}</Select>
         <label className="check-row"><input type="checkbox" checked={mineOnly} onChange={event => setMineOnly(event.target.checked)} /> Only mine</label>
         <span className="filters-count">{items.length} item{items.length === 1 ? '' : 's'}</span>
       </div>

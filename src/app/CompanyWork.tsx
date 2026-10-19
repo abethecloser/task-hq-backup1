@@ -1,3 +1,4 @@
+import { Select } from '../ui/Select.tsx';
 import { useState } from 'react';
 import type { TaskStatus } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
@@ -29,20 +30,20 @@ export function CompanyWork({ quest, onOpen }: { quest: Quest; onOpen: (id: stri
         </div>
       </header>
       <div className="filters" role="group" aria-label="Filters">
-        <select value={status} onChange={event => setStatus(event.target.value as typeof status)} aria-label="Status">
+        <Select value={status} onChange={event => setStatus(event.target.value as typeof status)} aria-label="Status">
           <option value="open">All open</option>
           {(Object.keys(STATUS_LABELS) as TaskStatus[]).map(key => <option key={key} value={key}>{STATUS_LABELS[key]}</option>)}
           <option value="all">Everything</option>
-        </select>
-        <select value={project} onChange={event => setProject(event.target.value)} aria-label="Project">
+        </Select>
+        <Select value={project} onChange={event => setProject(event.target.value)} aria-label="Project">
           <option value="">All projects</option>
           {state.projects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
-        <select value={who} onChange={event => setWho(event.target.value)} aria-label="Person">
+        </Select>
+        <Select value={who} onChange={event => setWho(event.target.value)} aria-label="Person">
           <option value="">Anyone involved</option>
           <option value="none">No owner</option>
           {state.people.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
+        </Select>
         <span className="filters-count">{tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}</span>
       </div>
       {byProject.length === 0 ? <Empty title="No tasks match these filters" /> : byProject.map(group => (

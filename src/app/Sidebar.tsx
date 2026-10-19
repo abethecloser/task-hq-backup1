@@ -1,12 +1,14 @@
 // Persistent workspace sidebar: a 56px Instrument Rail that is always visible, plus
-// a resizable secondary panel beside it. On desktop the panel reflows the main
-// content (the shell reserves its width) and never covers it. On mobile the panel
-// is a dismissible drawer. Open state, width and read notifications are saved per
-// person in localStorage; they are presentation preferences, not backend records.
+// a resizable pullout beside it. On desktop the pullout reflows the main content (the
+// shell reserves its width) and never covers it. On mobile it is a dismissible drawer.
+// The rail navigates; the pullout is live awareness (Inbox · Attention · Activity — see
+// Awareness.tsx). On mobile the rail is hidden, so the drawer also carries navigation.
+// Open state, width, tab, read items and snoozes are saved per person in localStorage;
+// they are presentation preferences on this device, not backend records.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, PointerEvent, ReactNode } from 'react';
-import { NOTIFICATION_LABELS } from './notifications.ts';
-import type { Notification, NotificationSection } from './notifications.ts';
+import type { Snooze } from '../core/awareness.ts';
+import type { Notification } from './notifications.ts';
 
 const MOBILE_QUERY = '(max-width: 760px)';
 export const PANEL_MIN = 232;
@@ -15,11 +17,13 @@ export const PANEL_DEFAULT = 288;
 const READ_LIMIT = 300;
 const storageKey = (actor: string) => `quest.sidebar.v1.${actor}`;
 
-interface Prefs { open: boolean; width: number; read: string[] }
+export type AwarenessTab = 'inbox' | 'attention' | 'activity';
+const TABS: AwarenessTab[] = ['inbox', 'attention', 'activity'];
+interface Prefs { open: boolean; width: number; read: string[]; tab: AwarenessTab; snoozes: Snooze[] }
 const clampWidth = (value: number) => Math.min(PANEL_MAX, Math.max(PANEL_MIN, Math.round(value)));
 
 function loadPrefs(actor: string): Prefs {
-  const fallback: Prefs = { open: false, width: PANEL_DEFAULT, read: [] };
+  const fallback: Prefs = { open: false, width: PANEL_DEFAULT, read: [], tab: 'inbox', snoozes: [] };
   try {
     const raw = JSON.parse(localStorage.getItem(storageKey(actor)) ?? 'null');
     if (!raw || typeof raw !== 'object') return fallback;
@@ -27,6 +31,8 @@ function loadPrefs(actor: string): Prefs {
       open: raw.open === true,
       width: typeof raw.width === 'number' ? clampWidth(raw.width) : PANEL_DEFAULT,
       read: Array.isArray(raw.read) ? raw.read.filter((id: unknown): id is string => typeof id === 'string') : [],
+      tab: TABS.includes(raw.tab) ? raw.tab : 'inbox',
+      snoozes: Array.isArray(raw.snoozes) ? raw.snoozes.filter((item: unknown): item is Snooze => !!item && typeof (item as Snooze).id === 'string' && typeof (item as Snooze).until === 'number').slice(-100) : [],
     };
   } catch { return fallback; }
 }
@@ -72,6 +78,15 @@ export function useSidebar(actor: string) {
     resizing,
     mobileOpen,
     read: new Set(prefs.read),
+    tab: prefs.tab,
+    snoozes: prefs.snoozes,
+    setTab(tab: AwarenessTab) { update(current => ({ ...current, tab })); },
+    /** Opens the pullout on a tab (the rail bell opens Inbox). */
+    showTab(tab: AwarenessTab) {
+      if (isMobile) setMobileOpen(true);
+      update(current => ({ ...current, tab, open: isMobile ? current.open : true }));
+    },
+    snooze(id: string, until: number) { update(current => ({ ...current, snoozes: [...current.snoozes.filter(item => item.id !== id && item.until > Date.now()), { id, until }] })); },
     /** Closes the mobile drawer. The desktop panel stays as the person left it. */
     collapse,
     toggle() { if (isMobile) setMobileOpen(open => !open); else update(current => ({ ...current, open: !current.open })); },
@@ -110,45 +125,28 @@ export interface SidebarItem {
   info?: string;
 }
 
-type PanelSection = NotificationSection | 'all-tasks' | 'company-work';
-const PANEL_SECTIONS: { id: PanelSection; label: string }[] = [
-  { id: 'my-work', label: 'My Work' },
-  { id: 'all-tasks', label: 'All Tasks' },
-  { id: 'needs-attention', label: 'Needs Attention' },
-  { id: 'leads', label: 'Speed to Lead' },
-  { id: 'executive', label: 'Executive Desk' },
-  { id: 'company-work', label: 'Company Work' },
-];
-const NOTES_SHOWN = 4;
-
 function unreadIn(notes: Notification[], read: Set<string>, section?: string) {
   return notes.filter(note => (!section || note.section === section) && !read.has(note.id)).length;
 }
 
-function Badge({ count, label }: { count: number; label: string }) {
-  if (!count) return null;
-  return <span className="unread-badge" role="img" aria-label={`${count} unread in ${label}`}>{count > 99 ? '99+' : count}</span>;
-}
-
-export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, executive, executiveInfo, onOpenNotification }: {
+export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, awareness, unreadTotal }: {
   control: SidebarControl;
   items: SidebarItem[];
   brand: ReactNode;
   onSelect: (id: string) => void;
   create: { enabled: boolean; onCreate: () => void };
   footer: ReactNode;
+  /** Task notifications, for per-section unread pips on the rail. */
   notifications: Notification[];
-  /** Whether this person has an Executive Desk (decision authority). */
-  executive: boolean;
-  executiveInfo: string;
-  onOpenNotification: (note: Notification) => void;
+  /** The pullout body: Inbox · Attention · Activity. */
+  awareness: ReactNode;
+  /** Unread across the whole inbox (notifications and messages), for the bell. */
+  unreadTotal: number;
 }) {
   const { read, isMobile } = control;
   const panel = useRef<HTMLElement>(null);
-  const notesHeading = useRef<HTMLHeadingElement>(null);
   const dragging = useRef(false);
-  const [showAll, setShowAll] = useState<Record<string, boolean>>({});
-  const totalUnread = unreadIn(notifications, read);
+  const totalUnread = unreadTotal;
   const panelHidden = isMobile ? !control.mobileOpen : !control.open;
   // Rail labels: shown instantly on hover or keyboard focus, beside the icon. Rendered
   // outside the rail (position: fixed) so its scroll container never clips them.
@@ -170,18 +168,8 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
     if (isMobile && control.mobileOpen) panel.current?.querySelector<HTMLElement>('.panel-close')?.focus();
   }, [isMobile, control.mobileOpen]);
 
-  const itemById = new Map(items.map(item => [item.id, item]));
-  const moreItems = items.filter(item => !PANEL_SECTIONS.some(section => section.id === item.id));
-
-  function openNote(note: Notification) {
-    control.markRead([note.id]);
-    onOpenNotification(note);
-    control.afterNavigate();
-  }
-
   function focusNotifications() {
-    control.show();
-    requestAnimationFrame(() => notesHeading.current?.focus());
+    control.showTab('inbox');
   }
 
   function onResizeKey(event: KeyboardEvent) {
@@ -214,38 +202,6 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
     control.setResizing(false);
     control.setWidth(control.width);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-  }
-
-  function renderNotes(section: PanelSection) {
-    const notes = notifications.filter(note => note.section === section);
-    if (!notes.length) return null;
-    const expandedList = showAll[section] || notes.length <= NOTES_SHOWN;
-    const shown = expandedList ? notes : notes.slice(0, NOTES_SHOWN);
-    return (
-      <ul className="note-list">
-        {shown.map(note => {
-          const unread = !read.has(note.id);
-          return (
-            <li key={note.id}>
-              <button type="button" className={`note-item sev-${note.severity} ${unread ? 'is-unread' : ''}`} onClick={() => openNote(note)}>
-                <span className="note-kind">
-                  <i className="note-dot" aria-hidden="true" />
-                  {NOTIFICATION_LABELS[note.kind]}
-                  <em className={unread ? 'note-state is-new' : 'note-state'}>{unread ? 'Unread' : 'Open'}</em>
-                </span>
-                <span className="note-title">{note.title}</span>
-                <span className="note-detail">{note.detail}</span>
-              </button>
-            </li>
-          );
-        })}
-        {notes.length > NOTES_SHOWN && (
-          <li><button type="button" className="note-more" aria-expanded={expandedList} onClick={() => setShowAll(current => ({ ...current, [section]: !expandedList }))}>
-            {expandedList ? 'Show fewer' : `Show ${notes.length - NOTES_SHOWN} more`}
-          </button></li>
-        )}
-      </ul>
-    );
   }
 
   return (
@@ -284,7 +240,7 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
         </button>
         <div className="sidebar-foot">
           <button type="button" className="nav-item rail-bell" onClick={focusNotifications}
-            aria-label={`Notifications${totalUnread ? `, ${totalUnread} unread` : ''}`} {...hintFor('Notifications', totalUnread ? `${totalUnread} unread` : 'All read')}>
+            aria-label={`Awareness${totalUnread ? `, ${totalUnread} unread` : ''}`} {...hintFor('Inbox · Attention · Activity', totalUnread ? `${totalUnread} unread` : 'What changed and what needs you')}>
             <span className="nav-icon">
               <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4" /></svg>
               {totalUnread > 0 && <span className="rail-unread" aria-hidden="true">{totalUnread > 9 ? '9+' : totalUnread}</span>}
@@ -309,56 +265,21 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
         </div>
 
         <div className="panel-scroll">
-          <section className="panel-notes" aria-labelledby="quest-notes-title">
-            <div className="panel-notes-head">
-              <h2 id="quest-notes-title" ref={notesHeading} tabIndex={-1}>Notifications</h2>
-              <button type="button" className="link" disabled={!totalUnread} onClick={() => control.markRead(notifications.map(note => note.id))}>Mark all read</button>
-            </div>
-            <p className="panel-summary" aria-live="polite"><b>{totalUnread}</b> unread · <b>{notifications.length}</b> unresolved</p>
-            {!notifications.length && <p className="panel-empty">Nothing is waiting on you.</p>}
-          </section>
-
           {isMobile && (
-            <button type="button" className="nav-create panel-create" disabled={!create.enabled} onClick={() => { create.onCreate(); control.afterNavigate(); }}>
-              <span aria-hidden="true">+</span> New task
-            </button>
-          )}
-
-          {PANEL_SECTIONS.map(section => {
-            if (section.id === 'executive' && !executive) return null;
-            const item = itemById.get(section.id);
-            if (section.id !== 'executive' && !item) return null;
-            const unread = unreadIn(notifications, read, section.id);
-            const head = (
-              <>
-                <span className="panel-section-name">{section.label}</span>
-                <Badge count={unread} label={section.label} />
-                {item?.count !== undefined && !item.locked && <span className={`panel-count ${item.hot ? 'is-hot' : ''}`}>{item.count}</span>}
-              </>
-            );
-            return (
-              <section key={section.id} className="panel-section" aria-label={section.label}>
-                {item
-                  ? <button type="button" className={`panel-section-head ${item.active ? 'is-active' : ''}`} disabled={item.locked} aria-current={item.active ? 'page' : undefined}
-                      onClick={() => { onSelect(item.id); control.afterNavigate(); }}>{head}</button>
-                  : <div className="panel-section-head is-static">{head}</div>}
-                <p className="panel-info">{item ? (item.locked ? 'Locked during Critical Focus.' : item.info) : executiveInfo}</p>
-                {renderNotes(section.id)}
-              </section>
-            );
-          })}
-
-          {moreItems.length > 0 && (
-            <nav className="panel-more" aria-label="More">
-              {moreItems.map(item => (
+            <nav className="panel-nav" aria-label="Task-HQ sections">
+              <button type="button" className="nav-create panel-create" disabled={!create.enabled} onClick={() => { create.onCreate(); control.afterNavigate(); }}>
+                <span aria-hidden="true">+</span> New task
+              </button>
+              {items.map(item => (
                 <button key={item.id} type="button" className={item.active ? 'is-active' : ''} disabled={item.locked} aria-current={item.active ? 'page' : undefined}
                   onClick={() => { onSelect(item.id); control.afterNavigate(); }}>
                   {item.icon}<span>{item.label}</span>
-                  {item.count ? <span className="panel-count">{item.count}</span> : null}
+                  {item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`}>{item.count}</span> : null}
                 </button>
               ))}
             </nav>
           )}
+          {awareness}
         </div>
 
         <div className="panel-foot">{footer}</div>

@@ -1,3 +1,5 @@
+import { Select } from '../ui/Select.tsx';
+import { ReferenceInput, ReferenceTextarea, ReferencedText } from '../ui/ReferenceEditor.tsx';
 // Contextual Instrument Deck: renders a validated DeckSpec using only the
 // registered instruments below. Business changes always go preview → confirm →
 // engine; deck settings (P-level, interval, personal focus) stay on this device.
@@ -175,7 +177,7 @@ function IntentStrip({ quest, context, prefs, onIntent }: { quest: Quest; contex
     <form className="intent" onSubmit={submit}>
       <label htmlFor="intent-input">What do you want to move forward?</label>
       <div className="intent-row">
-        <input id="intent-input" value={text} onChange={event => setText(event.target.value)} placeholder={context.kind === 'lead' ? '“Who owns this lead?” · “Set 15 minutes” · “Record a contact attempt”' : '“What should happen next?” · “Start this task” · “Show what this unlocks”'} autoComplete="off" maxLength={120} />
+        <ReferenceInput id="intent-input" value={text} onChange={event => setText(event.target.value)} placeholder={context.kind === 'lead' ? '“Who owns this lead?” · “Set 15 minutes” · “Record a contact attempt”' : '“What should happen next?” · “Start this task” · “Show what this unlocks”'} autoComplete="off" maxLength={120} />
         <button className="btn btn-dark" disabled={!text.trim()}>Go</button>
       </div>
       {result?.kind === 'query' && <p className="intent-answer" role="status">{result.answer}</p>}
@@ -202,7 +204,7 @@ function PreviewCard({ quest, pending, onConfirm, onCancel }: { quest: Quest; pe
         <div className="preview-inputs">
           {pending.offer.inputs.map((input, index) => (
             <label key={input.name} className="field"><span>{input.label}</span>
-              {input.kind === 'choice' && <select autoFocus={index === 0} value={values[input.name] ?? ''} onChange={event => setValues({ ...values, [input.name]: event.target.value })}>{input.options?.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>}
+              {input.kind === 'choice' && <Select autoFocus={index === 0} value={values[input.name] ?? ''} onChange={event => setValues({ ...values, [input.name]: event.target.value })}>{input.options?.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select>}
               {input.kind === 'text' && <input autoFocus={index === 0} value={values[input.name] ?? ''} placeholder={input.placeholder} maxLength={300} onChange={event => setValues({ ...values, [input.name]: event.target.value })} />}
               {input.kind === 'date' && <input type="date" value={values[input.name] ?? ''} onChange={event => setValues({ ...values, [input.name]: event.target.value })} />}
               {input.kind === 'person' && <PersonSelect state={state} label={input.label} value={values[input.name] ?? ''} emptyLabel={input.required ? 'Choose…' : 'The team'} onChange={id => setValues({ ...values, [input.name]: id })} />}
@@ -355,8 +357,8 @@ function AccessPanel({ quest, context, onRequest }: { quest: Quest; context: Dec
   if (!f.request) return <p className="instrument-note">No access requests are allowed right now.</p>;
   return (
     <form className="access-mini" onSubmit={event => { event.preventDefault(); if (note.trim()) onRequest(f.request!, { section, note }); }}>
-      <select value={section} onChange={event => setSection(event.target.value as Section)} aria-label="Access to">{(Object.keys(SECTION_LABELS) as Section[]).map(id => <option key={id} value={id}>{SECTION_LABELS[id]}</option>)}</select>
-      <input value={note} onChange={event => setNote(event.target.value)} placeholder="Why you need it" maxLength={200} aria-label="Reason" />
+      <Select value={section} onChange={event => setSection(event.target.value as Section)} aria-label="Access to">{(Object.keys(SECTION_LABELS) as Section[]).map(id => <option key={id} value={id}>{SECTION_LABELS[id]}</option>)}</Select>
+      <ReferenceInput value={note} onChange={event => setNote(event.target.value)} placeholder="Why you need it" maxLength={200} aria-label="Reason" />
       <button className="btn btn-ghost btn-sm" disabled={!note.trim()}>Preview request</button>
       <p className="instrument-note">Duration comes from the policy ({duration(f.grantSeconds * 1000)}); only an approver decides.</p>
     </form>

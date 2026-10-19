@@ -2,7 +2,7 @@
 // validates anything loaded from storage. Old keys are never deleted.
 import { DEFAULT_POLICY, SCHEMA_VERSION } from './contract.ts';
 import type { AccessGrant, QuestState, Section, Task, TaskStatus } from './contract.ts';
-import { DEMO_PEOPLE, PRODUCT_PROJECT, REVIEWER_PERSONA, seedState } from './seed.ts';
+import { DEMO_PEOPLE, DEMO_TAXONOMY, PRODUCT_PROJECT, REVIEWER_PERSONA, seedState } from './seed.ts';
 import { QUEST_ROOFING_WORKSPACE } from './workspace.ts';
 
 /** Earlier names of the product-feedback project; kept so stored data is recognized and renamed. */
@@ -83,5 +83,7 @@ export function normalize(state: QuestState): QuestState {
     : [...state.projects, PRODUCT_PROJECT];
   // Data saved before workspaces existed belongs to the first customer workspace.
   const workspace = state.workspace && state.workspace.id ? state.workspace : { ...QUEST_ROOFING_WORKSPACE };
-  return { ...state, people, projects, workspace, feedback: Array.isArray(state.feedback) ? state.feedback : [], invites: Array.isArray(state.invites) ? state.invites : [], policy: { ...DEFAULT_POLICY, ...state.policy } };
+  return { ...state, people, projects, workspace, feedback: Array.isArray(state.feedback) ? state.feedback : [], invites: Array.isArray(state.invites) ? state.invites : [], policy: { ...DEFAULT_POLICY, ...state.policy },
+    // Demo workspaces saved before task types existed get the synthetic demo taxonomy; real ones configure their own.
+    ...(!state.taxonomy && (workspace.plan ?? 'local-demo') === 'local-demo' ? { taxonomy: DEMO_TAXONOMY } : {}) };
 }

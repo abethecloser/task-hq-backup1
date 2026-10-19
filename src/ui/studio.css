@@ -1,0 +1,83 @@
+/* Shared Studio primitives. Geometry/theme-specific component styling stays in Nexus
+   and Brutalist. These tokens deliberately use equal RGB channels on every surface. */
+:root[data-look="studio"] {
+  --bg: #fff; --panel: #fff; --card: #fff; --canvas: #fff;
+  --rail-bg: #fff; --sidebar-bg: #fff; --context-bg: #fff;
+  --surface-2: #f7f7f7; --surface-3: #efefef; --sunk: var(--surface-2);
+  --ink: #111; --ink-2: #333; --muted: #595959; --faint: #6b6b6b;
+  --line: #e3e3e3; --line-2: #bdbdbd; --hair: #e5e5e5; --hair-2: #c9c9c9;
+  --accent: #c64b09; --accent-ink: #a73805; --accent-line: #cf612d; --accent-pale: #fafafa;
+  --info: #333; --info-pale: #f5f5f5; --done-pale: #f3f3f3; --warn-pale: #fafafa;
+  --act: var(--accent); --act-ink: var(--accent-ink); --act-soft: #fafafa;
+  --graphite-soft: #f2f2f2; --attn-soft: #fafafa; --ok-soft: #f7f7f7;
+  --shadow: 0 1px 2px rgb(0 0 0 / 4%), 0 5px 18px rgb(0 0 0 / 5%);
+  --shadow-lift: 0 2px 5px rgb(0 0 0 / 6%), 0 14px 32px rgb(0 0 0 / 9%);
+  --shadow-lg: 0 3px 10px rgb(0 0 0 / 8%), 0 30px 80px rgb(0 0 0 / 16%);
+  --active-depth: 0 0 0 1px var(--accent-line), 0 6px 28px rgb(198 75 9 / 9%);
+  --focus-depth: 0 0 0 3px rgb(198 75 9 / 22%);
+  --field-height: 38px; --field-radius: 8px; --form-gap: 16px; --field-gap: 7px;
+  --control-padding: 12px; --control-height: 36px;
+}
+:root[data-look="studio"] :is(input, select, textarea) { color: var(--ink); background: var(--card); border-color: var(--line-2); border-radius: var(--field-radius); min-height: var(--field-height); font-size: 13px; }
+:root[data-look="studio"] :is(input, select) { padding-inline: 11px; }
+:root[data-look="studio"] textarea { padding: 10px 11px; line-height: 1.5; }
+:root[data-look="studio"] :is(input, textarea)::placeholder { color: #6b6b6b; opacity: 1; }
+:root[data-look="studio"] :is(input, select, textarea):hover:not(:disabled):not(:read-only) { border-color: #858585; }
+:root[data-look="studio"] :is(input, select, textarea):focus { border-color: var(--accent); box-shadow: var(--focus-depth); outline: 1px solid var(--accent); outline-offset: 0; }
+:root[data-look="studio"] :is(input, select, textarea):disabled { color: #666; background: var(--surface-3); border-color: #d2d2d2; opacity: 1; cursor: not-allowed; }
+:root[data-look="studio"] [aria-invalid="true"] { border-color: var(--danger); outline-color: var(--danger); }
+:root[data-look="studio"] :focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 3px; }
+:root[data-look="studio"] :is(.btn, .chip) { min-height: var(--control-height); padding-inline: var(--control-padding); }
+:root[data-look="studio"] .btn-sm { min-height: 34px; font-size: 12.5px; }
+:root[data-look="studio"] :is(.btn, .chip):active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 2px 3px rgb(0 0 0 / 13%); }
+:root[data-look="studio"] .btn:disabled { opacity: 1; color: #686868; background: var(--surface-3); border-color: #ccc; box-shadow: none; }
+:root[data-look="studio"] .topbar { background: rgb(255 255 255 / 96%); }
+:root[data-look="studio"] :is(.panel, .record-card, .modal, .context, .inbox-nav) { background: var(--card); }
+:root[data-look="studio"] .modal { border: 1px solid var(--hair-2); box-shadow: var(--shadow-lg), 0 0 54px rgb(198 75 9 / 7%); }
+:root[data-look="studio"] .form { gap: var(--form-gap); padding: 20px 24px; }
+:root[data-look="studio"] .field { gap: var(--field-gap); min-width: 0; }
+:root[data-look="studio"] .field > :is(input, select, textarea) { width: 100%; min-width: 0; }
+:root[data-look="studio"] .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--form-gap); align-items: start; }
+:root[data-look="studio"] .form-actions { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 10px; padding-top: 16px; border-top: 1px solid var(--hair); }
+:root[data-look="studio"] .create-composer { border-bottom: 1px solid var(--hair); }
+:root[data-look="studio"] .people-table { overflow-x: auto; }
+:root[data-look="studio"] .people-row { padding: 14px 8px; gap: 14px; }
+:root[data-look="studio"] .people-row.is-head { background: var(--surface-2); color: var(--muted); padding-block: 10px; }
+:root[data-look="studio"] .person-cell small { white-space: normal; overflow-wrap: anywhere; }
+:root[data-look="studio"] .msg-composer { padding: 18px; margin: 12px 0; border: 1px solid var(--accent-line); border-left: 4px solid var(--accent); border-radius: var(--radius); box-shadow: var(--active-depth); background: var(--card); gap: 12px; }
+:root[data-look="studio"] .thread-post { padding: 12px; gap: 12px; border-color: var(--hair-2); box-shadow: var(--shadow-lift); }
+:root[data-look="studio"] .thread-post:focus-within { border-color: var(--accent); box-shadow: var(--active-depth); }
+:root[data-look="studio"] .thread-post textarea { flex: 1 1 240px; min-height: 42px; padding: 10px; border: 1px solid var(--line-2); }
+:root[data-look="studio"] .thread-post .btn { align-self: flex-end; }
+:root[data-look="studio"] .inbox-item.k-mention.is-unread { background: var(--card); box-shadow: inset 3px 0 var(--accent), var(--shadow); }
+:root[data-look="studio"] :is(.lens, .inbox-nav-item).is-active { background: var(--card); color: var(--accent-ink); box-shadow: inset 0 -2px var(--accent); }
+:root[data-look="studio"] .search-target { outline: 2px solid var(--accent); outline-offset: 5px; }
+@media (max-width: 600px) {
+  :root[data-look="studio"] .form { padding: 16px; }
+  :root[data-look="studio"] .form-grid { grid-template-columns: 1fr; }
+  :root[data-look="studio"] .modal { max-height: calc(100dvh - 24px); }
+  :root[data-look="studio"] .msg-composer { padding: 12px; }
+}
+:root[data-look="studio"] input:is([type="checkbox"], [type="radio"]) { width: 16px; height: 16px; min-height: 0; padding: 0; accent-color: var(--accent); box-shadow: none; }
+/* Reference and search components consume the same tokens in either look. */
+.reference-popover { overflow: auto; padding: 5px; border: 1px solid var(--hair-2); border-radius: var(--radius); background: var(--card, #fff); box-shadow: var(--shadow-lift); color: var(--ink); }
+.reference-popover ul { list-style: none; margin: 0; padding: 0; }
+.reference-popover button { display: grid; gap: 3px; width: 100%; min-height: 48px; border: 0; border-radius: 6px; padding: 8px 10px; text-align: left; background: var(--card, #fff); color: var(--ink); }
+.reference-popover button.is-active { background: var(--sunk); box-shadow: inset 3px 0 var(--accent); }
+.reference-popover small { color: var(--muted); font-size: 11px; }
+.reference-link { color: var(--accent-ink); font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+.search-controls { display: grid; gap: 14px; padding: 18px; }
+.search-controls > input { width: 100%; }
+.search-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.search-filters label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; flex: 1 1 200px; }
+.search-group { margin: 22px 0; }
+.search-group h2 { font-size: 17px; margin-bottom: 12px; }
+.search-group h2 small { color: var(--muted); font-size: 12px; }
+.search-group ul { list-style: none; padding: 0; display: grid; gap: 8px; }
+.search-result { display: grid; gap: 6px; width: 100%; padding: 14px 16px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--card); color: var(--ink-2); text-align: left; overflow-wrap: anywhere; box-shadow: var(--shadow); }
+.search-result:hover { border-color: var(--accent-line); box-shadow: var(--shadow-lift); }
+.search-result strong { color: var(--ink); }
+.search-result-meta { font-size: 11px; color: var(--muted); }
+.search-result mark { background: transparent; color: var(--accent-ink); font-weight: 800; box-shadow: inset 0 -2px var(--accent-line); }
+.task-comment-form { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--hair); }
+.task-comment-form .btn { justify-self: start; }

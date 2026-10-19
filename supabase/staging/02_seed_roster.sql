@@ -71,7 +71,7 @@ where v.verdict = 'STAGE' and v.reports_to_key is null and c.org_id = v.org_id a
 insert into public.staged_assignments (org_id, contact_id, title, next_action, due, priority, notes)
 select c.org_id, c.id, btrim(p.title), coalesce(p.next_action, ''), p.due, coalesce(p.priority, 'normal'), coalesce(p.notes, '')
 from _planned p join public.organizations o on o.slug = p.org_slug join public.staged_contacts c on c.org_id = o.id and c.staging_key = p.staging_key
-on conflict (org_id, contact_id, title) do update set next_action = excluded.next_action, due = excluded.due, priority = excluded.priority, notes = excluded.notes, updated_at = now();
+on conflict (org_id, contact_id, title) where status = 'planned' do update set next_action = excluded.next_action, due = excluded.due, priority = excluded.priority, notes = excluded.notes, updated_at = now();
 
 -- ── What would be stored ───────────────────────────────────────────────────
 select o.name as organization, c.staging_key, c.full_name, c.email, c.provisional_role, c.provisional_work_role,

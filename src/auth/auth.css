@@ -176,6 +176,9 @@
 @media (max-width: 860px) {
   .auth-page { padding: 16px; }
   .auth-card { grid-template-columns: 1fr; grid-template-rows: 150px auto; height: auto; min-height: calc(100vh - 32px); }
+  /* A single-panel card (invitations, workspace access) has no ember band: one natural-height row,
+     so its content is never squeezed into the 150px band row and hidden behind an inner scrollbar. */
+  .auth-card.is-single { grid-template-rows: auto; min-height: 0; }
   .auth-pitch { display: none; }
   .auth-chip { top: 20px; }
   .auth-chip-brand { left: 20px; }

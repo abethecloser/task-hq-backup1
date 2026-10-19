@@ -1,3 +1,4 @@
+import { Select } from './ui/Select.tsx';
 import { useEffect, useRef, useState } from 'react';
 import type { DragEvent, FormEvent } from 'react';
 
@@ -240,10 +241,10 @@ export default function AgentWorkspace() {
                 <button className="forward-button" onClick={() => decide(job, true)}>Approve ✓</button>
               </div>
               <div className="aw-redirect">
-                <select aria-label="Redirect to" value={redirectTo[job.id] ?? ''} onChange={event => setRedirectTo(current => ({ ...current, [job.id]: event.target.value as AgentId }))}>
+                <Select aria-label="Redirect to" value={redirectTo[job.id] ?? ''} onChange={event => setRedirectTo(current => ({ ...current, [job.id]: event.target.value as AgentId }))}>
                   <option value="">Redirect to…</option>
                   {agents.filter(agent => agent.id !== job.agent).map(agent => <option key={agent.id} value={agent.id} disabled={!!liveJob(agent.id)}>{agent.name}{liveJob(agent.id) ? ' (busy)' : ''}</option>)}
-                </select>
+                </Select>
                 <input value={redirectNote[job.id] ?? ''} maxLength={120} placeholder="What should change?" onChange={event => setRedirectNote(current => ({ ...current, [job.id]: event.target.value }))} />
                 <button className="cancel-button" disabled={!redirectTo[job.id]} onClick={() => decide(job, false)}>Redirect →</button>
               </div>

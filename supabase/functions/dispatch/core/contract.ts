@@ -5,6 +5,8 @@
 // Core files use erasable TypeScript only (no enums/namespaces) so Node can
 // run them directly for tests: `node --test src/core/*.test.ts`.
 
+import type { FeedbackSignature } from './feedback.ts';
+import type { ReferenceDocument, ReferenceFields } from './references.ts';
 import type { PresetId, Workspace } from './workspace.ts';
 
 export const SCHEMA_VERSION = 2;
@@ -38,6 +40,7 @@ export interface Blocker {
 }
 
 export interface Task {
+  references?: ReferenceFields;
   id: string;
   title: string;
   description: string;
@@ -65,6 +68,12 @@ export interface Task {
   /** Speed-to-lead follow-up tasks point back to their lead. */
   leadId: string;
   ultra: boolean;
+  /** Organization-configured task type id (taxonomy.types), or absent. */
+  type?: string;
+  /** Lowercase tags, e.g. ['permits']. */
+  tags?: string[];
+  /** Local time on the due date, 'HH:MM'. Only with a due date. */
+  dueTime?: string;
   createdBy: string;
   createdAt: number;
   updatedAt: number;
@@ -81,11 +90,13 @@ export interface ContactAttempt {
   channel: ContactChannel;
   outcome: ContactOutcome;
   note: string;
+  references?: ReferenceFields;
 }
 
 export type LeadStage = 'new' | 'contacted' | 'qualified' | 'follow-up' | 'blocked' | 'won' | 'escalated' | 'lost';
 
 export interface Lead {
+  references?: ReferenceFields;
   id: string;
   name: string;
   source: string;
@@ -103,6 +114,7 @@ export interface Lead {
   followUpTaskId: string;
   handoffTaskId: string;
   escalatedTo: string;
+  relationshipTags?: string[];
   email?: string;
   intake?: { version: 1; sourceId: string; externalId: string; channel: 'website' | 'ai_receptionist' | 'business_email' | 'manual'; sourceUrl: string };
   /** False only for accepted server intake. */
@@ -176,6 +188,9 @@ export interface UndoSnapshot {
 }
 
 export interface QuestEvent {
+  feedback?: FeedbackSignature;
+  actionType?: string;
+  references?: ReferenceFields;
   id: string;
   at: number;
   actor: string;
@@ -185,6 +200,21 @@ export interface QuestEvent {
   leadId?: string;
   undo?: UndoSnapshot;
   undone?: boolean;
+  /** Automatic consequences of this change, each with its own outcome (absent on older events). */
+  effects?: EventEffect[];
+}
+
+/**
+ * One automatic consequence of an event: which rule ran, on what, and what happened.
+ * 'executed' changed something; 'skipped' means the rule applied but did not act, with why.
+ */
+export interface EventEffect {
+  rule: 'dependency-unlock' | 'handoff' | 'focus-release';
+  outcome: 'executed' | 'skipped';
+  taskId: string;
+  /** Who now owns or receives the work, when the effect assigned someone. */
+  owner?: string;
+  reason?: string;
 }
 
 // ── Collaborative review ───────────────────────────────────────────────────
@@ -218,9 +248,10 @@ export interface FeedbackAttachment {
   createdAt: number;
 }
 
-export interface FeedbackReply { id: string; by: string; at: number; body: string }
+export interface FeedbackReply { id: string; by: string; at: number; body: string; references?: ReferenceFields }
 
 export interface FeedbackItem {
+  references?: ReferenceFields;
   id: string;
   category: FeedbackCategory;
   status: FeedbackStatus;
@@ -269,6 +300,10 @@ export interface QuestState {
   workspace: Workspace;
   feedback: FeedbackItem[];
   invites: ReviewerInvite[];
+  /** Task types and tags this organization uses. Absent = none configured. */
+  taxonomy?: Taxonomy;
+  workRoles?: string[];
+  workLabels?: Record<string, string>;
 }
 
 export interface NewTask {
@@ -286,11 +321,18 @@ export interface NewTask {
   nextAction?: string;
   dependsOn?: string[];
   leadId?: string;
+  type?: string;
+  tags?: string[];
+  dueTime?: string;
 }
 
 export type EditableTaskFields = Pick<Task,
   'title' | 'description' | 'projectId' | 'owner' | 'nextOwner' | 'decisionOwner' | 'approver'
-  | 'waitingOn' | 'watchers' | 'priority' | 'due' | 'nextAction' | 'dependsOn'>;
+  | 'waitingOn' | 'watchers' | 'priority' | 'due' | 'nextAction' | 'dependsOn' | 'type' | 'tags' | 'dueTime'>;
+
+/** An organization's own task types and known tags. Words map to a type only if configured here. */
+export interface TaskType { id: string; label: string; keywords: string[] }
+export interface Taxonomy { types: TaskType[]; tags: string[]; tagAliases?: Record<string, string> }
 
 export interface SimulatedLeadInput {
   name: string;
@@ -300,8 +342,10 @@ export interface SimulatedLeadInput {
   need: string;
 }
 
-export type Action =
+export type Action = ActionBody & { referenceDrafts?: ReferenceDocument[] };
+export type ActionBody =
   | { type: 'task/create'; task: NewTask }
+  | { type: 'task/comment'; id: string; note: string }
   | { type: 'task/update'; id: string; changes: Partial<EditableTaskFields> }
   /** Move Work Forward: the single "next step" for a task. */
   | { type: 'task/advance'; id: string }
@@ -318,6 +362,9 @@ export type Action =
   | { type: 'grant/return'; id: string }
   | { type: 'grant/revoke'; id: string }
   | { type: 'lead/receive'; lead: SimulatedLeadInput }
+  | { type: 'roles/label'; personId?: string; label: string }
+  | { type: 'lead/tags'; id: string; tags: string[] }
+  | { type: 'lead/claim'; id: string }
   | { type: 'lead/assign'; id: string; to: string }
   | { type: 'lead/attempt'; id: string; channel: ContactChannel; outcome: ContactOutcome; note?: string }
   | { type: 'lead/qualify'; id: string; note?: string }
@@ -326,6 +373,8 @@ export type Action =
   | { type: 'lead/advance'; id: string; to?: string; note?: string }
   | { type: 'lead/escalate'; id: string; note: string }
   | { type: 'policy/update'; changes: Partial<Policy> }
+  | { type: 'taxonomy/register-tags'; tags: string[] }
+  | { type: 'taxonomy/update'; taxonomy: Taxonomy }
   | { type: 'undo'; eventId: string }
   | { type: 'feedback/create'; item: { category: FeedbackCategory; title: string; body: string; context: Partial<FeedbackContext> } }
   | { type: 'feedback/reply'; id: string; body: string }

@@ -108,6 +108,55 @@ begin
   -- The owner's membership is untouched throughout.
   if exists (select 1 from public.memberships where org_id = x and user_id = a and role = 'owner' and work_role = 'manager') then ok := ok + 1; else bad := bad + 1; notes := notes || 'owner membership changed; '; end if;
 
+  -- ── People & Roles functions (Add person, plan work, remove, bulk prepare) ──
+  declare p1 uuid; p2 uuid; plan uuid; users1 int; members1 int; invites1 int;
+  begin
+    select count(*) into users1 from auth.users; select count(*) into members1 from public.memberships; select count(*) into invites1 from public.invitations;
+    execute 'set local role authenticated';
+    perform set_config('request.jwt.claims', json_build_object('sub', a, 'role', 'authenticated')::text, true);
+    p1 := public.save_staged_contact(x, null, 'Pia Planner', 'PIA@example.test', null, 'Coordinator', 'member', 'coordinator', null, a, 'Runs schedules');
+    p2 := public.save_staged_contact(x, null, 'Quinn Crew', 'quinn@example.test', null, null, 'member', 'field', p1, null, '');
+    if (select e->>'state' from jsonb_array_elements(public.org_staging_overview(x)) e where e->>'id' = p1::text) = 'not-invited' then ok := ok + 1; else bad := bad + 1; notes := notes || 'added person not Not invited; '; end if;
+    if (select e->>'email' from jsonb_array_elements(public.org_staging_overview(x)) e where e->>'id' = p1::text) = 'pia@example.test' then ok := ok + 1; else bad := bad + 1; notes := notes || 'email not normalized; '; end if;
+    begin perform public.save_staged_contact(x, null, 'Pia Again', 'pia@example.test', null, null, 'member', 'field', null, null, ''); bad := bad + 1; notes := notes || 'duplicate staged email; '; exception when others then ok := ok + 1; end;
+    begin perform public.save_staged_contact(x, null, 'Owner Again', 'TS-A@example.test', null, null, 'member', 'field', null, null, ''); bad := bad + 1; notes := notes || 'staged an active member; '; exception when others then ok := ok + 1; end;
+    begin perform public.save_staged_contact(x, null, 'Own', null, null, null, 'owner', 'manager', null, null, ''); bad := bad + 1; notes := notes || 'staged an owner; '; exception when others then ok := ok + 1; end;
+    begin perform public.save_staged_contact(x, null, 'Cross', null, null, null, 'member', 'field', cy, null, ''); bad := bad + 1; notes := notes || 'reports to other-org contact; '; exception when others then ok := ok + 1; end;
+    begin perform public.save_staged_contact(x, null, 'Cross2', null, null, null, 'member', 'field', null, d, ''); bad := bad + 1; notes := notes || 'reports to other-org member; '; exception when others then ok := ok + 1; end;
+    begin perform public.save_staged_contact(x, p1, 'Pia Planner', 'pia@example.test', null, null, 'member', 'coordinator', p2, null, ''); bad := bad + 1; notes := notes || 'reporting loop allowed; '; exception when others then ok := ok + 1; end;
+    begin perform public.save_staged_contact(y, null, 'Into Y', null, null, null, 'member', 'field', null, null, ''); bad := bad + 1; notes := notes || 'A added into Y; '; exception when others then ok := ok + 1; end;
+    perform public.save_staged_contact(x, p2, 'Quinn Crew', 'quinn@example.test', '555-0101', 'Crew lead', 'supervisor', 'coordinator', p1, null, 'promoted');
+    if (select e->>'provisional_role' from jsonb_array_elements(public.org_staging_overview(x)) e where e->>'id' = p2::text) = 'supervisor' then ok := ok + 1; else bad := bad + 1; notes := notes || 'edit not saved; '; end if;
+    plan := public.save_staged_assignment(p2, null, 'Tarp the north slope', 'Load tarps', '2026-10-24', 'high', '');
+    perform public.save_staged_assignment(p2, plan, 'Tarp the north slope', 'Load tarps and sandbags', '2026-10-25', 'high', '');
+    begin perform public.save_staged_assignment(p2, null, 'Tarp the north slope', '', null, 'normal', ''); bad := bad + 1; notes := notes || 'duplicate plan; '; exception when others then ok := ok + 1; end;
+    if (select jsonb_array_length(e->'planned') from jsonb_array_elements(public.org_staging_overview(x)) e where e->>'id' = p2::text) = 1 then ok := ok + 1; else bad := bad + 1; notes := notes || 'plan count wrong; '; end if;
+    begin perform public.mark_staged_assignment_converted(plan, 't-1'); bad := bad + 1; notes := notes || 'converted before active; '; exception when others then ok := ok + 1; end;
+    -- Bulk prepare is all-or-nothing: p2 is unconfirmed, so nothing is recorded.
+    perform public.confirm_staged_affiliation(p1, true);
+    begin perform public.invite_staged_contacts(array[p1, p2], 14); bad := bad + 1; notes := notes || 'bulk with unconfirmed succeeded; '; exception when others then ok := ok + 1; end;
+    if (select count(*) from public.invitations where email in ('pia@example.test', 'quinn@example.test')) = 0 then ok := ok + 1; else bad := bad + 1; notes := notes || 'partial bulk invitations; '; end if;
+    perform public.remove_staged_assignment(plan);
+    perform public.remove_staged_contact(p1);
+    if not exists (select 1 from jsonb_array_elements(public.org_staging_overview(x)) e where e->>'id' = p1::text) then ok := ok + 1; else bad := bad + 1; notes := notes || 'removed person still listed; '; end if;
+    if (select e->>'reports_to_contact' from jsonb_array_elements(public.org_staging_overview(x)) e where e->>'id' = p2::text) is null then ok := ok + 1; else bad := bad + 1; notes := notes || 'dangling reports_to; '; end if;
+    -- Re-adding the removed person's email is allowed (archived rows don't block).
+    perform public.save_staged_contact(x, null, 'Pia Planner', 'pia@example.test', null, null, 'member', 'coordinator', null, null, '');
+    ok := ok + 1;
+    -- Non-admins and other orgs can't manage the staged directory.
+    perform set_config('request.jwt.claims', json_build_object('sub', b, 'role', 'authenticated')::text, true);
+    begin perform public.save_staged_contact(x, null, 'By member', null, null, null, 'member', 'field', null, null, ''); bad := bad + 1; notes := notes || 'member added person; '; exception when others then ok := ok + 1; end;
+    begin perform public.save_staged_assignment(p2, null, 'By member', '', null, 'normal', ''); bad := bad + 1; notes := notes || 'member planned work; '; exception when others then ok := ok + 1; end;
+    begin perform public.remove_staged_contact(p2); bad := bad + 1; notes := notes || 'member removed person; '; exception when others then ok := ok + 1; end;
+    perform set_config('request.jwt.claims', json_build_object('sub', d, 'role', 'authenticated')::text, true);
+    begin perform public.save_staged_contact(x, p2, 'Hijack', null, null, null, 'member', 'field', null, null, ''); bad := bad + 1; notes := notes || 'Y owner edited X person; '; exception when others then ok := ok + 1; end;
+    begin perform public.remove_staged_contact(p2); bad := bad + 1; notes := notes || 'Y owner removed X person; '; exception when others then ok := ok + 1; end;
+    if not exists (select 1 from jsonb_array_elements(public.org_staging_overview(y)) e where e->>'id' = p2::text) then ok := ok + 1; else bad := bad + 1; notes := notes || 'X person in Y directory; '; end if;
+    execute 'reset role';
+    if (select count(*) from auth.users) = users1 and (select count(*) from public.memberships) = members1 and (select count(*) from public.invitations) = invites1
+      then ok := ok + 1; else bad := bad + 1; notes := notes || 'People & Roles staging created identity/membership/invitation; '; end if;
+  end;
+
   raise exception 'RESULT pass=% fail=% | %', ok, bad, coalesce(nullif(notes, ''), 'all checks passed');
 end;
 $test$;

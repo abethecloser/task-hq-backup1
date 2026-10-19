@@ -1,49 +1,81 @@
-// All Tasks: the operational center. One registry, five lenses, dense table or
+import { Select } from '../ui/Select.tsx';
+import { feedbackAttributes } from '../ui/Feedback.tsx';
+// All Tasks: the operational center. One registry, a scope switch (My work / Company)
+// and five lenses (All tasks, Urgent, Today, Overdue, Watching), dense table or
 // status board. Selecting a row opens it in the right-hand context panel; the
 // row's own control moves the work forward without leaving the list.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
-import { BOARD_ORDER, DEFAULT_QUERY, LENS_HINTS, LENS_LABELS, SORT_LABELS, boardColumns, lensCounts, queryTasks, rowFlags } from '../core/registry.ts';
-import type { Lens, RegistryQuery, SortKey, StatusFilter } from '../core/registry.ts';
+import { BOARD_ORDER, DEFAULT_QUERY, LEGACY_LENSES, LENSES, LENS_HINTS, LENS_LABELS, SORT_LABELS, boardColumns, queryTasks, rowFlags } from '../core/registry.ts';
+import type { Lens, RegistryQuery, Scope, SortKey, StatusFilter } from '../core/registry.ts';
 import { firstName, projectName } from '../core/selectors.ts';
 import { localDate, shortDate } from '../core/time.ts';
 import { Avatar, Empty, MoveForward, StatusPill } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
+import { Composer } from './Composer.tsx';
+import { JobPicker } from './JobPicker.tsx';
+import { ActiveFilters, FILTER_DEFAULTS, FilterSection, activeFilterCount, filterFields, sameFilters } from './RegistryFilters.tsx';
+import type { DraftEdit, FilterFields } from './RegistryFilters.tsx';
 
 type Layout = 'table' | 'board';
-const LENSES: Lens[] = ['all', 'mine', 'team', 'attention', 'completed'];
+const EMPTY: Record<Lens, string> = { all: 'No tasks here yet', urgent: 'Nothing urgent', today: 'Nothing due today', overdue: 'Nothing is overdue', watching: 'You aren’t watching anything' };
+export const LENS_ICONS: Record<Lens, string> = {
+  all: 'M4 6h2M4 12h2M4 18h2M10 6h10M10 12h10M10 18h10',
+  urgent: 'M13 3 5 14h6l-1 7 8-11h-6z',
+  today: 'M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3 0-6 1-9z',
+  overdue: 'M12 4 21 20H3zM12 10v4M12 17v.5',
+  watching: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+};
 const prefKey = (tenant: string, actor: string) => `quest.registry.v1.${tenant}.${actor}`;
 
 function loadPrefs(key: string): { query: RegistryQuery; layout: Layout } {
   try {
     const raw = JSON.parse(localStorage.getItem(key) ?? 'null');
-    if (raw && typeof raw === 'object') return { query: { ...DEFAULT_QUERY, ...raw.query, search: '' }, layout: raw.layout === 'board' ? 'board' : 'table' };
+    if (raw && typeof raw === 'object') {
+      const query = { ...DEFAULT_QUERY, ...raw.query, ...LEGACY_LENSES[raw.query?.lens], search: '' };
+      return { query: LENSES.includes(query.lens) ? query : { ...query, lens: 'all' }, layout: raw.layout === 'board' ? 'board' : 'table' };
+    }
   } catch { /* preferences are optional */ }
   return { query: DEFAULT_QUERY, layout: 'table' };
 }
 
-/** A jump into the registry from elsewhere (sidebar, signals): lens plus filters, applied once per nonce. */
-export interface RegistryPreset { lens: Lens; changes?: Partial<RegistryQuery>; nonce: number }
+/** Owned by the shell so leaving the registry keeps the current search and filters. */
+export function useRegistryPrefs(tenant: string, actor: string) {
+  const key = prefKey(tenant, actor);
+  const [stored, setStored] = useState(() => ({ key, prefs: loadPrefs(key) }));
+  const prefs = stored.key === key ? stored.prefs : loadPrefs(key);
+  if (stored.key !== key) setStored({ key, prefs });
+  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(prefs)); } catch { /* this page only */ } }, [key, prefs]);
+  const setPrefs = (update: (current: typeof prefs) => typeof prefs) => {
+    setStored(current => ({ key, prefs: update(current.key === key ? current.prefs : loadPrefs(key)) }));
+  };
+  return { prefs, setPrefs };
+}
 
-export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, preset, onPresetApplied }: {
+/** A jump into the registry from elsewhere: lens plus filters, applied once per nonce. Scope is kept unless the changes set it.
+ *  `keep` (the top-bar view tabs) changes only the lens and leaves every filter, job and search as they are. */
+export interface RegistryPreset { lens: Lens; changes?: Partial<RegistryQuery>; keep?: boolean; nonce: number }
+
+export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, preset, onPresetApplied, registry }: {
   quest: Quest; selectedId: string | null; onSelect: (id: string) => void; onCreate: () => void; canCreate: boolean;
   preset?: RegistryPreset | null; onPresetApplied?: () => void;
+  registry: ReturnType<typeof useRegistryPrefs>;
 }) {
   const { state, actor, now } = quest;
-  const key = prefKey(state.workspace.tenantId, actor);
-  const [prefs, setPrefs] = useState(() => loadPrefs(key));
+  const { prefs, setPrefs } = registry;
   const query = prefs.query;
   const search = useRef<HTMLInputElement>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  useEffect(() => { setPrefs(loadPrefs(key)); }, [key]);
   useEffect(() => {
     if (!preset) return;
-    setPrefs(current => ({ ...current, query: { ...DEFAULT_QUERY, sort: current.query.sort, lens: preset.lens, status: preset.lens === 'completed' ? 'done' : 'open', ...preset.changes } }));
+    setPrefs(current => ({ ...current, query: preset.keep
+      ? { ...current.query, lens: preset.lens }
+      : { ...DEFAULT_QUERY, sort: current.query.sort, scope: current.query.scope, lens: preset.lens, ...preset.changes } }));
+    if (!preset.keep) setPendingDraft(null); // a jump from elsewhere replaces any unapplied choices
     onPresetApplied?.(); // applied once: returning to All Tasks later keeps the person's own filters
   }, [preset, onPresetApplied]);
-  useEffect(() => { try { localStorage.setItem(key, JSON.stringify(prefs)); } catch { /* this page only */ } }, [key, prefs]);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === '/' && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement)) { event.preventDefault(); search.current?.focus(); }
@@ -53,12 +85,22 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
   }, []);
 
   const set = (changes: Partial<RegistryQuery>) => setPrefs(current => ({ ...current, query: { ...current.query, ...changes } }));
+  const pickScope = (scope: Scope) => set({ scope });
+  const activeFilters = activeFilterCount(query, { includeJob: false });
+  // Filter choices are a draft until Apply; null means "same as what's applied". Kept while collapsed.
+  const [pendingDraft, setPendingDraft] = useState<FilterFields | null>(null);
+  const draft = pendingDraft ?? filterFields(query);
+  const pending = !!pendingDraft && !sameFilters(pendingDraft, filterFields(query));
+  const editDraft = (edit: DraftEdit) => setPendingDraft(current => {
+    const base = current ?? filterFields(query);
+    return { ...base, ...(typeof edit === 'function' ? edit(base) : edit) };
+  });
+  const applyDraft = () => { set(draft); setPendingDraft(null); };
+  const removeFilter = (changes: Partial<FilterFields>) => { set(changes); setPendingDraft(current => current && { ...current, ...changes }); };
   const minute = Math.floor(now / 60000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const counts = useMemo(() => lensCounts(state, actor, minute * 60000), [state, actor, minute]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const tasks = useMemo(() => queryTasks(state, actor, minute * 60000, query), [state, actor, minute, query]);
-  const filtered = query.search || query.owner || query.project || query.due !== 'any' || query.priority !== 'any' || (query.lens !== 'completed' && query.status !== 'open');
+  const filtered = !!query.search || !!query.company || activeFilterCount(query) > 0;
   const live = quest.backend.kind === 'live';
 
   return (
@@ -66,66 +108,58 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
       <header className="view-head">
         <div>
           <p className="eyebrow">{live ? `${state.workspace.name} · task registry` : 'Task-HQ Demo · synthetic records'}</p>
-          <h1>{LENS_LABELS[query.lens]}</h1>
-          <p className="lede">{LENS_HINTS[query.lens]}</p>
+          <div className="view-title-row">
+            <h1>{query.lens === 'all' ? 'All Tasks' : LENS_LABELS[query.lens]}</h1>
+            <div className="scope-seg" role="group" aria-label="Whose tasks">
+              <button type="button" aria-pressed={query.scope === 'mine'} onClick={() => pickScope('mine')}>
+                <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 21a7.5 7.5 0 0 1 15 0" /></svg>My work
+              </button>
+              <button type="button" aria-pressed={query.scope === 'company'} onClick={() => pickScope('company')}>
+                <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" /></svg>Company
+              </button>
+            </div>
+          </div>
+          <p className="lede">{query.lens === 'watching' ? LENS_HINTS.watching : `${query.scope === 'mine' ? 'Your work' : 'The whole company'} · ${LENS_HINTS[query.lens]}`}</p>
         </div>
-        <button type="button" className="btn btn-primary" disabled={!canCreate} onClick={onCreate} title={canCreate ? 'New task (N)' : 'Not available right now'}>New task</button>
       </header>
 
-      <nav className="lens-bar" aria-label="Task lenses">
-        {LENSES.map(lens => (
-          <button key={lens} type="button" className={`lens ${query.lens === lens ? 'is-active' : ''}`} aria-pressed={query.lens === lens}
-            onClick={() => set({ lens, status: lens === 'completed' ? 'done' : query.status === 'done' ? 'open' : query.status })}>
-            {LENS_LABELS[lens]}<span className={lens === 'attention' && counts.attention ? 'is-hot' : ''}>{counts[lens]}</span>
-          </button>
-        ))}
-      </nav>
+      {canCreate && <Composer quest={quest} variant="registry" />}
 
-      <div className="registry-tools" role="group" aria-label="Search, filter and sort" data-open={filtersOpen || undefined}>
-        <label className="search-field">
+      <div className="registry-controls">
+      <div className="registry-tools" role="group" aria-label="Search, filter and sort">
+        <JobPicker state={state} actor={actor} scope={query.scope} project={query.project} company={query.company}
+          onChange={({ project, company }) => { set({ company }); removeFilter({ project }); }} />
+        <label className="search-field registry-search">
           <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4" /></svg>
           <input ref={search} type="search" value={query.search} placeholder="Search tasks, people, projects…  ( / )" aria-label="Search tasks" onChange={event => set({ search: event.target.value })} />
         </label>
-        <button type="button" className="btn btn-ghost btn-sm filters-toggle" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(open => !open)}>{filtersOpen ? 'Hide filters' : filtered ? 'Filters · on' : 'Filters'}</button>
-        {query.lens !== 'completed' && (
-          <select value={query.status} onChange={event => set({ status: event.target.value as StatusFilter })} aria-label="Status">
-            <option value="open">Open</option>
-            {BOARD_ORDER.map(status => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
-            <option value="any">Any status</option>
-          </select>
-        )}
-        <select value={query.owner} onChange={event => set({ owner: event.target.value })} aria-label="Owner">
-          <option value="">Any owner</option>
-          <option value="none">No owner</option>
-          {state.people.filter(item => item.role !== 'reviewer').map(item => <option key={item.id} value={item.id}>{item.id === actor ? `${item.name} (you)` : item.name}</option>)}
-        </select>
-        <select value={query.project} onChange={event => set({ project: event.target.value })} aria-label="Project">
-          <option value="">Any project</option>
-          <option value="none">No project</option>
-          {state.projects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
-        <select value={query.due} onChange={event => set({ due: event.target.value as RegistryQuery['due'] })} aria-label="Due">
-          <option value="any">Any due date</option><option value="overdue">Overdue</option><option value="today">Due today</option><option value="week">Next 7 days</option><option value="none">No due date</option>
-        </select>
-        <select value={query.priority} onChange={event => set({ priority: event.target.value as RegistryQuery['priority'] })} aria-label="Priority">
-          <option value="any">Any priority</option><option value="ultra">Ultra Priority</option><option value="high">High</option><option value="normal">Normal</option>
-        </select>
-        <select value={query.sort} onChange={event => set({ sort: event.target.value as SortKey })} aria-label="Sort">
+        <button type="button" className="btn btn-primary registry-add" disabled={!canCreate} onClick={onCreate} aria-label="New task" title={canCreate ? 'New task (N)' : 'Not available right now'}>
+          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+        </button>
+        <button type="button" className={`btn filters-button ${activeFilters ? 'is-on' : ''}`} aria-controls="registry-filters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(open => !open)}>
+          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4" /></svg>
+          Filters{pending && <span className="filters-pending-dot" title="Changes not applied yet" />}{activeFilters > 0 && <span className="filters-badge" aria-label={`${activeFilters} active`}>{activeFilters}</span>}
+        </button>
+        <Select value={query.sort} onChange={event => set({ sort: event.target.value as SortKey })} aria-label="Sort">
           {(Object.keys(SORT_LABELS) as SortKey[]).map(sort => <option key={sort} value={sort}>Sort: {SORT_LABELS[sort]}</option>)}
-        </select>
+        </Select>
         <span className="registry-meta">
           <span className="filters-count">{tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}</span>
-          {filtered && <button type="button" className="link" onClick={() => set({ ...DEFAULT_QUERY, lens: query.lens, sort: query.sort, status: query.lens === 'completed' ? 'done' : 'open' })}>Clear filters</button>}
+          {filtered && <button type="button" className="link" onClick={() => { set({ ...DEFAULT_QUERY, scope: query.scope, lens: query.lens, sort: query.sort }); setPendingDraft(null); }}>Clear filters</button>}
           <span className="segmented" role="group" aria-label="Layout">
             <button type="button" aria-pressed={prefs.layout === 'table'} className={prefs.layout === 'table' ? 'is-on' : ''} onClick={() => setPrefs(current => ({ ...current, layout: 'table' }))}>List</button>
             <button type="button" aria-pressed={prefs.layout === 'board'} className={prefs.layout === 'board' ? 'is-on' : ''} onClick={() => setPrefs(current => ({ ...current, layout: 'board' }))}>Board</button>
           </span>
         </span>
       </div>
+      <FilterSection id="registry-filters" open={filtersOpen} state={state} actor={actor} draft={draft} pending={pending}
+        onDraft={editDraft} onApply={applyDraft} onClearAll={() => editDraft(FILTER_DEFAULTS)} />
+      {!filtersOpen && <ActiveFilters state={state} actor={actor} query={query} onRemove={removeFilter} />}
+      </div>
 
       {tasks.length === 0
-        ? <Empty title={filtered ? 'No tasks match these filters' : query.lens === 'attention' ? 'Nothing needs attention' : query.lens === 'completed' ? 'Nothing completed yet' : 'No tasks here yet'}>
-            {!filtered && query.lens !== 'completed' && canCreate ? 'Create the first one with New task (N).' : undefined}
+        ? <Empty title={filtered ? 'No tasks match these filters' : EMPTY[query.lens]}>
+            {!filtered && query.lens === 'all' && canCreate ? 'Create the first one with New task (N).' : undefined}
           </Empty>
         : prefs.layout === 'board'
           ? <Board quest={quest} tasks={tasks} selectedId={selectedId} onSelect={onSelect} />
@@ -139,6 +173,8 @@ function Flags({ quest, task }: { quest: Quest; task: Task }) {
   return (
     <>
       {task.ultra && <span className="tag tag-ultra">Ultra</span>}
+      {task.type && <span className="tag tag-type">{quest.state.taxonomy?.types.find(item => item.id === task.type)?.label ?? task.type}</span>}
+      {(task.tags ?? []).map(tag => <span key={tag} className="tag tag-tag">#{tag}</span>)}
       {flags.overdue && <span className="tag tag-overdue">Overdue</span>}
       {flags.blocked && <span className="tag tag-overdue">Blocked</span>}
       {flags.waiting && <span className="tag tag-wait">Waiting</span>}
@@ -160,7 +196,7 @@ function Table({ quest, tasks, selectedId, onSelect }: { quest: Quest; tasks: Ta
         const flags = rowFlags(state, task, now);
         return (
           <div key={task.id} role="row" style={{ ['--i' as string]: Math.min(index, 12) }}
-            className={`registry-row status-${task.status} ${task.id === selectedId ? 'is-selected' : ''} ${flags.overdue || flags.blocked ? 'is-alert' : ''}`}
+            {...feedbackAttributes(quest.feedback?.record(task.id))} data-feedback-record={task.id} className={`registry-row status-${task.status} ${task.id === selectedId ? 'is-selected' : ''} ${flags.overdue || flags.blocked ? 'is-alert' : ''}`}
             onClick={() => onSelect(task.id)}>
             <span role="cell" className="cell-task">
               <span className={`state-dot dot-${task.status}`} aria-hidden="true" />
@@ -172,7 +208,7 @@ function Table({ quest, tasks, selectedId, onSelect }: { quest: Quest; tasks: Ta
             </span>
             <span role="cell" className="cell-owner"><Avatar state={state} id={task.owner} size="sm" /><span>{task.owner ? firstName(state, task.owner) : <em>Unassigned</em>}</span></span>
             <span role="cell"><StatusPill task={task} /></span>
-            <span role="cell" className={flags.overdue ? 'text-danger' : ''}>{task.due ? shortDate(task.due, today) : '—'}</span>
+            <span role="cell" className={flags.overdue ? 'text-danger' : ''}>{task.due ? shortDate(task.due, today) : '—'}{task.dueTime && <small className="cell-time"> {task.dueTime}</small>}</span>
             <span role="cell" className="cell-project">{projectName(state, task.projectId) || '—'}</span>
             <span role="cell" className="cell-act">{task.status !== 'done' && <MoveForward quest={quest} task={task} compact />}</span>
           </div>

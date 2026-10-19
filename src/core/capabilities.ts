@@ -71,7 +71,7 @@ export const CAPABILITIES: Record<CapabilityId, Capability> = {
     inputs: [{ name: 'section', kind: 'choice', label: 'Access to', required: true, options: (Object.keys(SECTION_LABELS) as Section[]).map(value => ({ value, label: SECTION_LABELS[value] })) }, NOTE('Why (linked to this task)', 'What you need', true)],
     build: (_s, v) => ({ type: 'grant/request', section: (v.section ?? 'company-work') as Section, reason: v.note ?? '' }),
   },
-  'lead.take': { modalities: ['click', 'keyboard'], inputs: [], build: (s, _v, actor) => (s.leadId ? { type: 'lead/assign', id: s.leadId, to: actor } : null) },
+  'lead.take': { modalities: ['click', 'keyboard'], inputs: [], build: (s, _v, actor) => (s.leadId ? { type: 'lead/claim', id: s.leadId } : null) },
   'lead.assign': { modalities: ['click'], inputs: [{ name: 'person', kind: 'person', label: 'Assign to', required: true }], build: (s, v) => (s.leadId && v.person ? { type: 'lead/assign', id: s.leadId, to: v.person } : null) },
   'lead.attempt': {
     modalities: ['click', 'keyboard', 'text'],

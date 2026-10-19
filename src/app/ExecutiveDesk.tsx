@@ -8,6 +8,8 @@ import type { Action } from '../core/contract.ts';
 import { actionFor } from '../core/capabilities.ts';
 import type { Values } from '../core/capabilities.ts';
 import { dailySignal, decisionDesk, executiveBrief } from '../core/executive.ts';
+import { operationalMeasures } from '../core/metrics.ts';
+import type { Measure } from '../core/metrics.ts';
 import type { BriefItem, Decision, DecisionOption } from '../core/executive.ts';
 import { firstName, isOpen, nameOf } from '../core/selectors.ts';
 import { duration } from '../core/time.ts';
@@ -34,6 +36,7 @@ export function ExecutiveDesk({ quest, onOpenTask, onOpenLead }: { quest: Quest;
   const desk = useMemo(() => decisionDesk(state, minute * 60000, actor), [state, actor, minute]);
   const brief = useMemo(() => executiveBrief(state, minute * 60000, actor, { since }), [state, actor, minute, since]);
   const signal = useMemo(() => dailySignal(state, minute * 60000), [state, minute]);
+  const measures = useMemo(() => operationalMeasures(state, minute * 60000, actor), [state, minute, actor]);
   /* eslint-enable react-hooks/exhaustive-deps */
   const moving = state.tasks.filter(task => isOpen(task) && task.owner && task.owner !== actor);
   const delegated = moving.filter(task => task.createdBy === actor);
@@ -117,6 +120,12 @@ export function ExecutiveDesk({ quest, onOpenTask, onOpenLead }: { quest: Quest;
         <ul className="sig-sources is-inline">{signal.sources.map(source => <li key={source.id} title={source.note}><i className={`sig-dot ${source.status === 'connected' ? 'is-live' : ''}`} aria-hidden="true" />{source.label}<small>{source.status === 'connected' ? (live ? 'live records' : 'synthetic') : 'not connected'}</small></li>)}</ul>
         <p className="muted">Only Task-HQ records are read. Calls, email, calendar and customer interactions are not connected, so nothing is shown for them rather than guessed.</p>
       </section>
+
+      <section className="exec-section" aria-labelledby="measures-title">
+        <h2 id="measures-title" className="section-label">Operational measures</h2>
+        <div className="measure-grid">{measures.measures.map(item => <MeasureCell key={item.key} item={item} />)}</div>
+        <p className="muted">From Task-HQ’s own records{measures.since ? ` since ${new Date(measures.since).toLocaleDateString()}` : ''}{measures.partial ? ' (partial: only the most recent 400 changes are kept)' : ''}. No baselines or savings are estimated; each figure shows how many records it’s based on.</p>
+      </section>
     </div>
   );
 }
@@ -172,6 +181,18 @@ function DecisionCard({ quest, decision, index, onOpenSource }: { quest: Quest; 
           <button type="button" className="btn btn-dark btn-sm" disabled={busy} onClick={() => void perform(chosen.action ?? (chosen.offer ? actionFor(chosen.offer, {}, actor) : null))}>{busy ? 'Saving…' : 'Confirm'}</button>
         </div>
       )}
+    </article>
+  );
+}
+
+const UNIT: Record<Measure['unit'], string> = { minutes: 'min', hours: 'h', count: '', percent: '%', 'per-task': 'per task' };
+function MeasureCell({ item }: { item: Measure }) {
+  return (
+    <article className={`measure ${item.value === null ? 'is-empty' : ''}`}>
+      <small>{item.label}</small>
+      <b>{item.value === null ? '—' : item.value}{item.value !== null && UNIT[item.unit] && <em>{UNIT[item.unit]}</em>}</b>
+      <span>{item.note}</span>
+      <i>n = {item.sample}</i>
     </article>
   );
 }

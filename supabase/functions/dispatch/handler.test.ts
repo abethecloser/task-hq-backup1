@@ -11,7 +11,7 @@ function dependencies(role='owner',workRole='manager') {
   const state=emptyState(org,members,now);
   const calls:unknown[]=[];
   const replies:Record<string,unknown[]>={memberships:[{data:{role,work_role:workRole},error:null},{data:[{...members[0],role,work_role:workRole}],error:null}],organizations:[{data:org,error:null}],profiles:[{data:[{id:actor,full_name:'Synthetic owner'}],error:null}],workspace_state:[{data:{state,rev:1},error:null}]};
-  const admin={from(table:string){calls.push(['from',table]);const result=replies[table]?.shift()??{data:null,error:null};const query={select(){return query;},eq(){return query;},in(){return query;},gte(){return query;},order(){return query;},limit(){return query;},maybeSingle(){return Promise.resolve(result);},single(){return Promise.resolve(result);},then(resolve:(x:unknown)=>void){return Promise.resolve(result).then(resolve);}};return query;},rpc:async(name:string,args:unknown)=>{calls.push(['rpc',name,args]);return {data:{ok:true,orgId:org.id,sourceRevision:1,opened:0,changed:0,resolved:0,complete:true},error:null};}};
+  const admin={from(table:string){calls.push(['from',table]);const result=replies[table]?.shift()??{data:null,error:null};const query={insert(value:unknown){calls.push(['insert',table,value]);return Promise.resolve({error:null});},select(){return query;},eq(){return query;},in(){return query;},gte(){return query;},order(){return query;},limit(){return query;},maybeSingle(){return Promise.resolve(result);},single(){return Promise.resolve(result);},then(resolve:(x:unknown)=>void){return Promise.resolve(result).then(resolve);}};return query;},rpc:async(name:string,args:unknown)=>{calls.push(['rpc',name,args]);return {data:{ok:true,orgId:org.id,sourceRevision:1,opened:0,changed:0,resolved:0,complete:true},error:null};}};
   return {state,calls,replies,deps:{getUser:async()=>({id:actor,email:'synthetic@example.test'}),getAdmin:()=>admin,now:()=>now}};
 }
 test('HTTP boundary rejects anonymous and cross-tenant requests before reading task state',async()=>{
@@ -61,4 +61,46 @@ test('durable intake events are bounded, scoped and omit contact envelopes',asyn
  const f=dependencies();f.replies.intake_events=[{data:[{id:'receipt',org_id:org.id,source_id:'synthetic.manual',external_id:'original',channel:'manual',source_url:'https://example.test/',lead_id:'lead',task_id:'task',accepted_at:'2026-10-17T17:00:00Z',event_kind:'intake.accepted',envelope:{contact:{email:'private-fixture@example.test'}}}],error:null}];
  const response=await handleDispatch(request('intake-events'),f.deps);assert.equal(response.status,200);const r=await response.json();
  assert.equal(r.events[0].orgId,org.id);assert.equal(r.events[0].channel,'manual');assert.equal('envelope'in r.events[0],false);assert.equal(f.calls.some(c=>(c as string[])[1]==='workspace_state'),false);
+});
+
+test('candidate HTTP claim uses server membership and cannot steal a previously claimed inquiry', async () => {
+  const f = dependencies('member', 'sales');
+  const lead = { id: 'synthetic-claim', name: 'Synthetic inquiry', source: 'fixture', phone: '', address: '', need: 'Estimate', arrivedAt: now, assignee: '', assignedAt: null, firstResponseAt: null, attempts: [], stage: 'new' as const, blocker: '', followUpTaskId: '', handoffTaskId: '', escalatedTo: '', simulated: true, updatedAt: now };
+  f.state.leads.push(lead);
+  let committed: unknown;
+  f.deps.getAdmin().rpc = async (name, args) => {
+    if (name === 'commit_workspace_action') { committed = args; return { data: { ok: true, rev: 2 }, error: null }; }
+    return { data: { ok: true, rev: 2 }, error: null };
+  };
+  const response = await handleDispatch(request('dispatch', { expectedRev: 1, actor: 'forged', action: { type: 'lead/claim', id: lead.id } }), f.deps);
+  assert.equal(response.status, 200);
+  const reply = await response.json();
+  assert.equal(reply.state.leads[0].assignee, actor);
+  assert.ok(committed);
+  const claimed = dependencies('member', 'sales');
+  claimed.state.leads.push({ ...lead, assignee: 'other-member' });
+  const refusal = await handleDispatch(request('dispatch', { expectedRev: 1, action: { type: 'lead/claim', id: lead.id } }), claimed.deps);
+  assert.equal(refusal.status, 422);
+  assert.equal(claimed.calls.some(c => (c as string[])[1] === 'commit_workspace_action'), false);
+});
+
+test('search is read-only, rechecks current membership and ignores forged stored people', async () => {
+  const f = dependencies();
+  f.state.tasks.push({ id: 'search-task', title: 'Synthetic #MapleAve inquiry', description: '', owner: '', nextOwner: '', decisionOwner: '', approver: '', waitingOn: '', watchers: [], status: 'ready', priority: 'normal', due: '', nextAction: '', dependsOn: [], blocker: null, leadId: '', ultra: false, createdBy: actor, createdAt: now, updatedAt: now, lastActivityAt: now, completedAt: null });
+  f.state.taxonomy = { types: [], tags: ['mapleave'] };
+  f.state.people.push({ id: 'forged-person', name: 'Hidden Forged Person', role: 'manager', title: 'Forged' });
+  const response = await handleDispatch(request('search', { query: { text: '#MAPLEAVE' } }), f.deps);
+  assert.equal(response.status, 200);
+  const reply = await response.json(); assert.equal(reply.results.length, 1); assert.equal(reply.results[0].target.id, 'search-task');
+  assert.equal(JSON.stringify(reply).includes('Hidden Forged Person'), false);
+  assert.equal(f.calls.some(c => (c as string[])[0] === 'rpc' || (c as string[])[0] === 'insert'), false);
+  const denied = dependencies(); denied.replies.memberships[0] = { data: null, error: null };
+  assert.equal((await handleDispatch(request('search', { query: { text: '#mapleave' } }), denied.deps)).status, 403);
+  assert.equal(denied.calls.some(c => (c as string[])[1] === 'workspace_state'), false);
+});
+test('search never bootstraps an absent workspace or queries another tenant', async () => {
+  const f = dependencies(); f.replies.workspace_state[0] = { data: null, error: null };
+  const r = await handleDispatch(request('search', { query: { text: 'fixture' } }), f.deps);
+  assert.equal(r.status, 200); assert.deepEqual((await r.json()).results, []);
+  assert.equal(f.calls.some(c => (c as string[])[0] === 'rpc'), false);
 });

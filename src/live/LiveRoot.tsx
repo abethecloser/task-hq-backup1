@@ -69,7 +69,7 @@ export function LiveRoot({ client, onSignOut, onDemo }: { client: SupabaseClient
   }
   if (membership) {
     return <LiveWorkspace key={membership.org_id} client={client} context={context} membership={membership} onSignOut={onSignOut}
-      onLeave={() => (context.is_platform_admin ? setConsole(true) : choose(null))} canLeave={context.memberships.length > 1 || context.is_platform_admin} />;
+      onLeave={() => (context.is_platform_admin ? setConsole(true) : choose(null))} canLeave={context.memberships.length > 1 || context.is_platform_admin} onChoose={choose} />;
   }
   if (context.memberships.length > 1) {
     return (
@@ -82,15 +82,18 @@ export function LiveRoot({ client, onSignOut, onDemo }: { client: SupabaseClient
   return <NoWorkspace client={client} context={context} onRefresh={refresh} onSignOut={onSignOut} onDemo={onDemo} />;
 }
 
-function LiveWorkspace({ client, context, membership, onSignOut, onLeave, canLeave }: {
-  client: SupabaseClient; context: MyContext; membership: MyContext['memberships'][number]; onSignOut: () => void; onLeave: () => void; canLeave: boolean;
+function LiveWorkspace({ client, context, membership, onSignOut, onLeave, canLeave, onChoose }: {
+  client: SupabaseClient; context: MyContext; membership: MyContext['memberships'][number]; onSignOut: () => void; onLeave: () => void; canLeave: boolean; onChoose: (id: string) => void;
 }) {
   const org = useMemo(() => ({ id: membership.org_id, slug: membership.slug, name: membership.name }), [membership.org_id, membership.slug, membership.name]);
   const backend = useMemo(() => createLiveBackend(client, SUPABASE_URL, PUBLISHABLE_KEY, org, context.user_id), [client, org, context.user_id]);
   const account: LiveAccount = useMemo(() => ({
     client, userId: context.user_id, email: context.email, org, role: membership.role, isPlatformAdmin: context.is_platform_admin,
     onSignOut, onLeaveWorkspace: canLeave ? onLeave : () => undefined, canSwitch: canLeave,
-  }), [client, context, org, membership.role, onSignOut, onLeave, canLeave]);
+    searchOrgs: context.memberships.map(m => ({ id: m.org_id, name: m.name })),
+    onOpenWorkspace: (id, hash) => { if (context.memberships.some(m => m.org_id === id)) { history.replaceState(null, '', hash); onChoose(id); } },
+    adminOrgs: context.memberships.filter(item => item.role === 'owner' || item.role === 'admin').map(item => ({ id: item.org_id, name: item.name })),
+  }), [client, context, org, membership.role, onSignOut, onLeave, canLeave, onChoose]);
   useEffect(() => { document.title = `${org.name} — ${PRODUCT.name}`; }, [org.name]);
   return <LiveContext.Provider value={account}><App backend={backend} /></LiveContext.Provider>;
 }
@@ -105,12 +108,18 @@ function Invitations({ client, context, onAccepted, onSkip, onSignOut }: { clien
     if (rpcError) { setError(errorText(rpcError)); return; }
     await onAccepted(data as string);
   };
+  // One invitation (the usual case) reads as a single decision: who invited you, as what, one button.
+  const only = context.invitations.length === 1 ? context.invitations[0]! : null;
   return (
-    <Card title="You’ve been invited" subtitle={`Signed in as ${context.email}. Accepting adds this account to the workspace.`}>
+    <Card title={only ? `Join ${only.org_name}` : 'You’ve been invited'}
+      subtitle={only
+        ? `${only.invited_by || 'A workspace owner'} invited ${context.email} as ${ROLE_LABELS[only.role]}. Joining adds this account to the workspace.`
+        : `Signed in as ${context.email}. Accepting adds this account to the workspace.`}>
       {context.invitations.map(item => (
         <div key={item.id} className="auth-invite">
-          <p><b>{item.org_name}</b> · {ROLE_LABELS[item.role]}<br /><small>From {item.invited_by || 'a workspace owner'} · expires {new Date(item.expires_at).toLocaleDateString()}</small></p>
-          <button type="button" className="auth-primary" disabled={!!busy} onClick={() => void accept(item.id)}>{busy === item.id ? 'Joining…' : `Join ${item.org_name}`}</button>
+          {!only && <p><b>{item.org_name}</b> · {ROLE_LABELS[item.role]}<br /><small>From {item.invited_by || 'a workspace owner'} · expires {new Date(item.expires_at).toLocaleDateString()}</small></p>}
+          <button type="button" className="auth-primary" autoFocus={!!only} disabled={!!busy} onClick={() => void accept(item.id)}>{busy === item.id ? 'Joining…' : `Join ${item.org_name}`}</button>
+          {only && <p><small>Expires {new Date(item.expires_at).toLocaleDateString()}</small></p>}
         </div>
       ))}
       {error && <p className="auth-notice is-error" role="alert">{error}</p>}

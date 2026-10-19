@@ -36,6 +36,27 @@ Production checks so far were read-only:
   - RLS is enabled with owner/admin read policies as a second layer.
 - **Abraham**: a roster row with an active member's email is skipped ("already an active member"). The owner's membership is checked unchanged by the seed's invariant, and by the test.
 
+## People & Roles workflow (owners and admins)
+
+- **+ Add person** (`save_staged_contact`)
+  - Fields: name, email, phone, title, organization, planned organization role and work role, planned "reports to" (an active member or another staged person), and notes.
+  - **Save & add another** keeps the form open so the team can be entered in one sitting.
+  - Saving creates no account, membership, invitation or message, and never prepares an invitation.
+  - Duplicates are refused: an active member's email, an email already in the directory, an owner role, a reporting line to another organization, or a reporting loop.
+  - "Another company — not set up in Task-HQ yet" saves nothing and never falls back to the current organization.
+- **Edit** the same fields. Changing the email is refused while an invitation for the old email is open.
+- **Confirm** affiliation (`confirm_staged_affiliation`).
+- **Remove…** (`remove_staged_contact`) works only for people who never became active and have no open invitation. Their planned work is dropped and reporting lines to them are cleared.
+- **Plan work** (`save_staged_assignment` / `remove_staged_assignment`)
+  - Labeled "Planned — not assigned".
+  - Planned work never appears in owner pickers, My Work or notifications.
+  - Once the person is active, **Assign as task… → Create task** makes one real task through the normal task engine. `mark_staged_assignment_converted` then records it. Nothing converts automatically.
+- **Invitations**
+  - Select people who are ready (affiliation confirmed and email present), then **Review invitations**.
+  - The review shows exactly who, what email, which organization and which roles.
+  - Tick "I've checked…", then **Prepare** (`invite_staged_contacts`, all or nothing, at most 50). It records the invitations and shows the messages for you to send.
+  - **Send invitations** is shown as *not available*: Task-HQ has no email delivery.
+
 ## Where staged people appear
 
 People & Roles → Directory, for owners and admins only. Each staged person is a striped row with:
@@ -89,4 +110,10 @@ Run in PGlite (in-memory Postgres 17) with a **stubbed** Supabase layer: roles, 
   - two committed runs left the same 2 rows;
   - accounts, memberships and invitations were unchanged;
   - the default dry run left nothing.
-- **UI**: rendered with a stubbed client. Staged rows show as above; without the migration, the section stays hidden and no error appears.
+- **UI against real SQL**: the People & Roles screen was driven in Chrome against a local server running this migration in PGlite, with synthetic records only:
+  - **Add and edit:** Add person → Save & add another → second person reporting to the first → edit a planned role → plan work (add, edit, remove) → reload → everything persisted.
+  - **Refusals:** duplicates of an active member and of a staged email, and a company that isn't set up, were each refused with a clear message.
+  - **Permissions:** a member sees no staging and is refused server-side; another organization's owner sees only their own people.
+  - **Counts:** accounts and memberships stayed at 3/3 throughout. Invitations stayed at 0 until the explicit Review → Prepare step, which made exactly 2.
+  - **Without the migration**, Add person is disabled with an explanation.
+- `team_staging.sql` now has **54 passed, 0 failed** with the People & Roles functions.

@@ -9,6 +9,9 @@ import { isExtensionContext } from './adapter/store.ts';
 import { PRODUCT } from './core/workspace.ts';
 import './ui/quest.css';
 import './ui/nexus.css';
+import './ui/studio.css';
+import './ui/feedback.css';
+import './ui/home.css';
 import './ui/brutalist.css';
 import { applyLook } from './ui/look.ts';
 
@@ -42,7 +45,7 @@ function Root() {
 
   function enterDemo() {
     try { localStorage.setItem(MODE_KEY, 'demo'); } catch { /* demo for this tab only */ }
-    history.replaceState(null, '', '#/my-work');
+    history.replaceState(null, '', '#/home');
     setMode('demo');
   }
   function exitDemo() {

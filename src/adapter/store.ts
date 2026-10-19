@@ -52,6 +52,8 @@ export interface QuestBackend {
   setActor(id: string): Promise<void>;
   subscribeActor(listener: (id: string) => void): () => void;
   outboxCount(): Promise<number>;
+  /** Engine features the backend can persist. Absent = everything in this build. */
+  supports?: { taskTaxonomy: boolean };
 }
 
 // ── Shared, serialized read-modify-write ───────────────────────────────────

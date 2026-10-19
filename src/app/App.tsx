@@ -10,63 +10,79 @@ import type { Section } from '../core/contract.ts';
 import { SECTION_LABELS } from '../core/contract.ts';
 import { decisionDesk } from '../core/executive.ts';
 import type { Lens, RegistryQuery } from '../core/registry.ts';
-import { lensCounts } from '../core/registry.ts';
+import { LEGACY_LENSES, LENSES, LENS_LABELS, lensCounts, queryTasks } from '../core/registry.ts';
+import { canCreateTask } from '../core/permissions.ts';
 import { insights, insightsFor } from '../core/rules.ts';
 import { activeGrant, activeLeads, canEnter, inFocus, leadBucket, myTasks, person, taskById } from '../core/selectors.ts';
 import AgentWorkspace from '../AgentWorkspace.tsx';
-import { LookSwitch, ModeChip, BrandMark, ToastBar, WorkingAs } from '../ui/components.tsx';
+import { LookSwitch, ModeChip, BrandMark, ToastBar } from '../ui/components.tsx';
 import { useQuest } from '../ui/useQuest.ts';
 import type { Quest } from '../ui/useQuest.ts';
-import { AllTasks } from './AllTasks.tsx';
+import { AllTasks, useRegistryPrefs } from './AllTasks.tsx';
 import type { RegistryPreset } from './AllTasks.tsx';
 import { CompanyWork } from './CompanyWork.tsx';
 import { Signals, TaskContext, hasSignals } from './ContextPanel.tsx';
+import type { DeckSection } from './ContextPanel.tsx';
 import { CreateTask } from './CreateTask.tsx';
 import { ExecutiveDesk } from './ExecutiveDesk.tsx';
 import { Activity, Settings } from './Settings.tsx';
-import { MyWork } from './MyWork.tsx';
+import { Home } from './Home.tsx';
+import { AskTasks } from './AskTasks.tsx';
+import { TopBar } from './TopBar.tsx';
 import { NeedsAttention } from './NeedsAttention.tsx';
 import { People } from './People.tsx';
+import { FeedbackProvider, FeedbackBar } from '../ui/Feedback.tsx';
+import { Search } from './Search.tsx';
+import type { SearchResult } from '../core/reference-index.ts';
+import { ReferenceProvider } from '../ui/ReferenceEditor.tsx';
+import { referenceScope } from '../core/references.ts';
+import { Relationships } from './Relationships.tsx';
 import { SpeedToLead } from './SpeedToLead.tsx';
 import { CriticalFocus, GrantBar } from './UltraFocus.tsx';
 import { FeedbackInbox, ReviewLayer, ReviewerWelcome } from './Review.tsx';
 import { ROLE_LABELS, useLive } from './LiveContext.tsx';
 import type { QuestBackend } from '../adapter/store.ts';
-import { presetFor } from '../core/workspace.ts';
 import { Sidebar, useSidebar } from './Sidebar.tsx';
+import { Awareness } from './Awareness.tsx';
+import { attentionFor } from '../core/awareness.ts';
+import { Inbox, inboxFor } from './Inbox.tsx';
+import type { InboxData } from './Inbox.tsx';
+import { demoMessaging } from '../adapter/messaging.ts';
+import { demoTools } from '../adapter/tools.ts';
+import { Tools } from './Tools.tsx';
+import { CompanySignals } from './CompanySignals.tsx';
 import { notificationsFor } from './notifications.ts';
 import type { Notification } from './notifications.ts';
 
-export type View = 'my-work' | 'all-tasks' | 'company-work' | 'needs-attention' | 'leads' | 'executive' | 'people' | 'feedback' | 'activity' | 'settings' | 'agents';
+export type View = 'home' | 'reports' | 'all-tasks' | 'inbox' | 'tools' | 'company-work' | 'needs-attention' | 'leads' | 'executive' | 'people' | 'feedback' | 'activity' | 'settings' | 'agents' | 'relationships' | 'search';
 
 // All Tasks shows company-wide work, so Critical Focus gates it exactly like Company Work.
 const VIEW_SECTION: Record<View, Section | 'my-work' | 'never'> = {
-  'my-work': 'my-work', 'all-tasks': 'company-work', 'company-work': 'company-work', 'needs-attention': 'needs-attention', leads: 'leads', feedback: 'my-work',
+  home: 'my-work', reports: 'never', search: 'never', relationships: 'leads', 'all-tasks': 'company-work', inbox: 'never', tools: 'never', 'company-work': 'company-work', 'needs-attention': 'needs-attention', leads: 'leads', feedback: 'my-work',
   executive: 'never', people: 'never', activity: 'never', settings: 'never', agents: 'never',
 };
 
 const VIEW_LABELS: Record<View, string> = {
-  'my-work': 'My Work', 'all-tasks': 'All Tasks', 'company-work': 'Company Work', 'needs-attention': 'Needs Attention', leads: 'Speed to Lead',
-  executive: 'Executive Desk', people: 'People & Roles', feedback: 'Feedback', activity: 'Activity', settings: 'Policy & data', agents: 'Agent pilot',
+  home: 'Home', reports: 'Reports', search: 'Search', relationships: 'Relationship Vault', 'all-tasks': 'All Tasks', inbox: 'Inbox', tools: 'Estimates & Proposals', 'company-work': 'Projects', 'needs-attention': 'Needs Attention', leads: 'First Response',
+  executive: 'Executive Desk', people: 'Team', feedback: 'Feedback', activity: 'Activity', settings: 'Policy & data', agents: 'Agent pilot',
 };
 
-/** Views where operational signals are useful beside the canvas. */
-const SIGNAL_VIEWS: View[] = ['my-work', 'all-tasks', 'company-work', 'needs-attention'];
+/** Views where the Instrument Deck (signals, calendar, insights) is useful beside the canvas. */
+const SIGNAL_VIEWS: View[] = ['home', 'all-tasks', 'company-work', 'needs-attention'];
 const TASK_PANEL = 420;
 const SIGNAL_PANEL = 288;
 /** The canvas never gets narrower than this because of a docked panel. */
 const MIN_CANVAS = 600;
-const LENSES: Lens[] = ['all', 'mine', 'team', 'attention', 'completed'];
 
-function parseHash(): { view: View; taskId: string | null; leadId: string | null; feedbackId: string | null; lens: Lens | null } {
-  const [, first = '', second = ''] = location.hash.split('/');
+function parseHash(): { view: View; taskId: string | null; leadId: string | null; feedbackId: string | null; lens: { lens: Lens; changes?: Partial<RegistryQuery> } | null } {
+  const [, first = '', second = ''] = location.hash.split('?')[0]!.split('/');
   if (first === 'task' && second) return { view: 'all-tasks', taskId: decodeURIComponent(second), leadId: null, feedbackId: null, lens: null };
   const views = Object.keys(VIEW_LABELS) as View[];
   return {
-    view: views.includes(first as View) ? first as View : 'my-work', taskId: null,
+    view: views.includes(first as View) ? first as View : 'home', taskId: null,
     leadId: first === 'leads' && second ? decodeURIComponent(second) : null,
     feedbackId: first === 'feedback' && second ? decodeURIComponent(second) : null,
-    lens: first === 'all-tasks' && LENSES.includes(second as Lens) ? second as Lens : null,
+    lens: first !== 'all-tasks' ? null : LENSES.includes(second as Lens) ? { lens: second as Lens } : LEGACY_LENSES[second] ? { lens: LEGACY_LENSES[second]!.lens ?? 'all', changes: LEGACY_LENSES[second] } : null,
   };
 }
 
@@ -82,6 +98,16 @@ function useViewportWidth() {
 
 /** 'auto' shows signals only when there is something to say; the person can pin it open or closed. */
 type ContextPref = 'auto' | 'open' | 'closed';
+/** Which Instrument Deck section is showing; a per-viewer convenience on this device. */
+function useDeckSection(actor: string): [DeckSection, (next: DeckSection) => void] {
+  const key = `quest.deck-section.v1.${actor}`;
+  const read = (): DeckSection => { try { const value = localStorage.getItem(key); return value === 'calendar' || value === 'insights' ? value : 'signals'; } catch { return 'signals'; } };
+  const [section, setSection] = useState<DeckSection>(read);
+  const [owner, setOwner] = useState(actor);
+  if (owner !== actor) { setOwner(actor); setSection(read()); }
+  return [section, next => { setSection(next); try { localStorage.setItem(key, next); } catch { /* this page only */ } }];
+}
+
 function useContextPref(actor: string): [ContextPref, (next: ContextPref) => void] {
   const key = `quest.context.v1.${actor}`;
   const read = (): ContextPref => { try { const value = localStorage.getItem(key); return value === 'open' || value === 'closed' ? value : 'auto'; } catch { return 'auto'; } };
@@ -95,7 +121,7 @@ export default function App({ onExitDemo, backend }: { onExitDemo?: () => void; 
   const quest = useQuest('app', backend);
   if (quest.loadError) return <LoadError message={quest.loadError} />;
   if (!quest.state || !quest.actor) return <div className="boot"><BrandMark size={42} /><span>Opening Task-HQ…</span></div>;
-  return <Shell quest={quest as Quest} onExitDemo={onExitDemo} />;
+  return <FeedbackProvider feedback={quest.feedback}><ReferenceProvider scope={referenceScope(quest.state, quest.actor)} drafts={quest.referenceDrafts}><Shell quest={quest as Quest} onExitDemo={onExitDemo} /></ReferenceProvider></FeedbackProvider>;
 }
 
 function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void }) {
@@ -106,14 +132,23 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const [taskId, setTaskId] = useState<string | null>(initial.taskId);
   const [leadId, setLeadId] = useState<string | null>(initial.leadId);
   const [creating, setCreating] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
+  // Which task view and scope All Tasks is showing, for the top-bar tabs.
+  const registry = useRegistryPrefs(state.workspace.tenantId, actor);
+  const registryView = registry.prefs.query;
+  const [searchNonce, setSearchNonce] = useState(0);
   const [feedbackId, setFeedbackId] = useState<string | null>(initial.feedbackId);
   const [reviewRequest, setReviewRequest] = useState(0);
-  const [preset, setPreset] = useState<RegistryPreset | null>(initial.lens ? { lens: initial.lens, nonce: 1 } : null);
+  // A plain view address (#/all-tasks/urgent) only picks the view; old addresses carry their filters.
+  const [preset, setPreset] = useState<RegistryPreset | null>(initial.lens ? { ...initial.lens, keep: !initial.lens.changes, nonce: 1 } : null);
   const clearPreset = useCallback(() => setPreset(null), []);
   const sidebar = useSidebar(actor);
   const collapseSidebar = sidebar.collapse;
   const width = useViewportWidth();
   const [contextPref, setContextPref] = useContextPref(actor);
+  const [deckSection, setDeckSection] = useDeckSection(actor);
+  /** The deck as a drawer, when it was asked for but can't dock beside the canvas. */
+  const [deckDrawer, setDeckDrawer] = useState(false);
 
   useEffect(() => {
     const onHash = () => {
@@ -122,7 +157,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       setTaskId(next.taskId);
       if (next.leadId) setLeadId(next.leadId);
       if (next.feedbackId) setFeedbackId(next.feedbackId);
-      if (next.lens) setPreset(current => ({ lens: next.lens!, nonce: (current?.nonce ?? 0) + 1 }));
+      if (next.view === 'all-tasks') setPreset(current => ({ ...(next.lens ?? { lens: 'all' as Lens }), keep: !next.lens?.changes, nonce: (current?.nonce ?? 0) + 1 }));
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
@@ -130,7 +165,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { setTaskId(null); setCreating(false); collapseSidebar(); }
+      if (event.key === 'Escape') { setTaskId(null); setCreating(false); setDeckDrawer(false); collapseSidebar(); }
       if (event.key === 'n' && !event.metaKey && !event.ctrlKey && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement)) { event.preventDefault(); setCreating(true); }
     };
     window.addEventListener('keydown', onKey);
@@ -145,6 +180,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     return canEnter(state, actor, section, now);
   };
   const me = person(state, actor)!;
+  // Team-wide panels and answers need the same access as Company Work.
+  const company = me.role !== 'reviewer' && allowed('company-work');
   // Re-derived when state changes or each minute, not on every one-second clock tick.
   const minute = Math.floor(now / 60000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,7 +189,28 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const decisions = useMemo(() => decisionDesk(state, minute * 60000, actor).length, [state, minute, actor]);
   const hasDesk = me.role === 'manager' || decisions > 0;
-  const view: View = allowed(requested) && (requested !== 'executive' || hasDesk) ? requested : 'my-work';
+  // One inbox per person: demo channels (this browser) + the task notifications above.
+  const messagingStore = useMemo(() => (live ? null : demoMessaging(state.people)), [live]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [messaging, setMessaging] = useState(() => messagingStore?.load() ?? null);
+  useEffect(() => messagingStore?.subscribe(setMessaging), [messagingStore]);
+  const inboxData: InboxData = useMemo(() => ({
+    messaging, store: messagingStore,
+    current: live ? { id: live.org.id, name: live.org.name } : { id: 'demo-roofing', name: messaging?.workspaces.find(item => item.id === 'demo-roofing')?.name ?? state.workspace.name },
+  }), [messaging, messagingStore, live, state.workspace.name]);
+  // Operational tools: demo store per workspace; no live backend yet.
+  const toolsStore = useMemo(() => (live ? null : demoTools(`demo-${state.workspace.tenantId}`, state.people)), [live, state.workspace.tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [tools, setTools] = useState(() => toolsStore?.load() ?? null);
+  useEffect(() => { setTools(toolsStore?.load() ?? null); return toolsStore?.subscribe(setTools); }, [toolsStore]);
+  const readKey = [...sidebar.read].join(',');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const inbox = useMemo(() => inboxFor(actor, inboxData, notifications, sidebar.read), [actor, inboxData, notifications, readKey]);
+  const inboxUnread = inbox.unread;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const mentions = useMemo(() => inbox.items.filter(item => item.kind === 'mention').map(item => ({ id: item.id, from: item.from, title: item.title, detail: item.detail, at: item.at, channelId: item.channelId, messageId: item.messageId, taskId: item.taskId })), [inbox]);
+  const snoozeKey = sidebar.snoozes.map(item => `${item.id}:${item.until}`).join(',');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const awareAttention = useMemo(() => attentionFor(state, minute * 60000, actor, sidebar.snoozes), [state, minute, actor, snoozeKey]);
+  const view: View = allowed(requested) && (requested !== 'executive' || hasDesk) ? requested : 'home';
 
   // When temporary access ends, close anything opened with it.
   useEffect(() => {
@@ -163,7 +221,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   function go(next: View) {
     setRequested(next);
     setTaskId(null);
-    history.replaceState(null, '', next === 'leads' && leadId ? `#/leads/${leadId}` : `#/${next}`);
+    history.pushState(null, '', next === 'leads' && leadId ? `#/leads/${leadId}` : `#/${next}`);
   }
   function openTask(id: string) {
     setTaskId(id);
@@ -183,17 +241,41 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     history.replaceState(null, '', `#/all-tasks/${lens}`);
   }
 
+  function openSearchResult(result: SearchResult) {
+    const t = result.target;
+    const hash = t.view === 'inbox' ? `#/inbox/${encodeURIComponent(t.channelId ?? '')}/${encodeURIComponent(t.messageId ?? '')}` : `#/${t.view}/${encodeURIComponent(t.id)}`;
+    if (live && result.workspaceId !== live.org.id) { live.onOpenWorkspace?.(result.workspaceId, hash); return; }
+    location.hash = hash;
+    if (t.view === 'task') openTask(t.id);
+    else if (t.view === 'leads') openLead(t.id);
+    else { setRequested((t.view === 'inbox' ? 'inbox' : t.view === 'feedback' ? 'feedback' : t.view === 'tools' ? 'tools' : 'activity')); if (t.view === 'feedback') setFeedbackId(t.id); }
+  }
+
+  function openSearch(text: string) {
+    setRequested('search'); setTaskId(null); setSearchNonce(value => value + 1);
+    history.replaceState(null, '', `#/search?q=${encodeURIComponent(text)}`);
+  }
+  // Top-bar task views: each opens All Tasks on that view and changes nothing else.
+  function openLens(lens: Lens) {
+    if (!allowed('all-tasks')) return;
+    setPreset(current => ({ lens, keep: true, nonce: (current?.nonce ?? 0) + 1 }));
+    setRequested('all-tasks'); setTaskId(null);
+    if (location.hash !== `#/all-tasks/${lens}`) history.pushState(null, '', `#/all-tasks/${lens}`);
+  }
+
   const mineCount = myTasks(state, actor, now).length;
   const attention = insights(state, now);
   const myAttention = insightsFor(state, now, actor).filter(item => item.severity !== 'normal').length;
   const leadAttention = activeLeads(state).filter(lead => leadBucket(state, lead, now) !== 'responded').length;
-  const canCreate = me.role !== 'reviewer' && (!focused || grant?.section === 'create-task');
+  const canCreate = canCreateTask(state, actor, now);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const counts = useMemo(() => lensCounts(state, actor, minute * 60000), [state, actor, minute]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const topCounts = useMemo(() => Object.fromEntries(LENSES.map(lens => [lens, queryTasks(state, actor, minute * 60000, { ...registryView, lens }).length])) as Record<Lens, number>, [state, actor, minute, registryView]);
   const openCompany = state.tasks.filter(task => task.status !== 'done');
   const info: Partial<Record<View, string>> = {
-    'my-work': mineCount ? `${mineCount} open ${mineCount === 1 ? 'task' : 'tasks'} on your plate.` : 'Nothing assigned right now.',
-    'all-tasks': `${counts.all} open · ${counts.team} with others · ${counts.attention} need attention.`,
+    home: mineCount ? `${mineCount} open ${mineCount === 1 ? 'task' : 'tasks'} on your plate.` : 'Nothing assigned right now.',
+    'all-tasks': `${counts.all} open · ${counts.urgent} urgent · ${counts.overdue} overdue.`,
     'company-work': `${openCompany.length} open across ${new Set(openCompany.map(task => task.owner).filter(Boolean)).size} people.`,
     'needs-attention': `${myAttention} for you · ${attention.length} workspace-wide.`,
     leads: leadAttention ? `${leadAttention} ${leadAttention === 1 ? 'lead needs' : 'leads need'} a response or next step.` : 'Every active lead has a next step.',
@@ -201,6 +283,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     activity: 'Who did what, and when.',
     feedback: `${state.feedback.filter(item => item.status !== 'resolved').length} open.`,
     settings: 'Policy, workspace and backups.',
+    tools: tools ? `${tools.estimates.length} estimates · ${tools.proposals.length} proposals · sample data.` : 'Not available in live workspaces yet.',
+    inbox: inboxUnread ? `${inboxUnread} unread across your workspaces.` : 'All caught up.',
     executive: decisions ? `${decisions} ${decisions === 1 ? 'decision needs' : 'decisions need'} your authority.` : 'No decisions are waiting on you.',
   };
   function openNotification(note: Notification) {
@@ -210,32 +294,47 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     go(noteView ?? 'needs-attention');
   }
 
-  const nav: { id: View; label: string; count?: number; hot?: boolean; icon: ReactNode }[] = [
-    { id: 'my-work', label: 'My Work', count: mineCount, icon: <Icon d="M4 6h10M4 12h7M4 18h10M17 9l3 3-3 3" /> },
-    { id: 'all-tasks', label: 'All Tasks', count: counts.all, hot: counts.attention > 0, icon: <Icon d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v2H4z" /> },
+  const navigation: { id: View; label: string; count?: number; hot?: boolean; icon: ReactNode }[] = [
+    { id: 'search', label: 'Search', icon: <Icon d="M16 16l5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /> },
+    { id: 'inbox', label: 'Inbox', count: inboxUnread, hot: inboxUnread > 0, icon: <Icon d="M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z" /> },
+    ...(me.role !== 'reviewer' ? [{ id: 'tools' as View, label: 'Estimates & Proposals', count: tools?.estimates.filter(item => item.status !== 'approved').length, icon: <Icon d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h5" /> }] : []),
     { id: 'needs-attention', label: 'Needs Attention', count: attention.length, hot: myAttention > 0, icon: <Icon d="M12 4 21 20H3zM12 10v4M12 17v.5" /> },
-    { id: 'leads', label: 'Speed to Lead', count: leadAttention, hot: leadAttention > 0, icon: <Icon d="M13 3 5 14h6l-1 7 8-11h-6z" /> },
+    { id: 'leads', label: 'First Response', count: leadAttention, hot: leadAttention > 0, icon: <Icon d="M13 3 5 14h6l-1 7 8-11h-6z" /> },
     ...(hasDesk ? [{ id: 'executive' as View, label: 'Executive Desk', count: decisions, hot: decisions > 0, icon: <Icon d="M4 20V9l8-5 8 5v11M9 20v-6h6v6" /> }] : []),
-    { id: 'company-work', label: 'Company Work', count: openCompany.length, icon: <Icon d="M3 8h18v12H3zM8 8V5h8v3M3 13h18" /> },
-    { id: 'people', label: 'People & Roles', count: state.people.length, icon: <Icon d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" /> },
+    { id: 'company-work', label: 'Projects', count: openCompany.length, icon: <Icon d="M3 8h18v12H3zM8 8V5h8v3M3 13h18" /> },
+    { id: 'relationships', label: 'Relationship Vault', icon: <Icon d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h4" /> },
+    { id: 'people', label: 'Team', count: state.people.length, icon: <Icon d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" /> },
+    { id: 'reports', label: 'Reports', icon: <Icon d="M4 20V10M10 20V4M16 20v-7M22 20H2" /> },
     { id: 'activity', label: 'Activity', icon: <Icon d="M4 12h4l3-7 3 14 3-7h3" /> },
     { id: 'feedback', label: 'Feedback', count: state.feedback.filter(item => item.status !== 'resolved').length, icon: <Icon d="M4 5h16v11H9l-5 4z" /> },
     { id: 'settings', label: 'Policy & data', icon: <Icon d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3" /> },
     ...(state.policy.agentPilot ? [{ id: 'agents' as View, label: 'Agent pilot', icon: <Icon d="M12 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM5 21a7 7 0 0 1 14 0" /> }] : []),
   ];
 
+  const primaryIds: View[] = ['company-work', 'people', 'reports'];
+  const primary = primaryIds.flatMap(id => navigation.filter(item => item.id === id));
+  const nav = navigation.filter(item => !primaryIds.includes(item.id));
+
   const selected = taskId ? taskById(state, taskId) : undefined;
   const contextAllowed = selected && (!focused || selected.id === state.focus?.taskId || !!grant);
 
   // Right zone geometry: dock only when the canvas keeps at least MIN_CANVAS.
   const leftWidth = sidebar.isMobile ? 0 : 56 + (sidebar.open ? sidebar.width : 0);
-  const signalsWanted = !selected && SIGNAL_VIEWS.includes(view) && !focused && me.role !== 'reviewer'
+  // The deck shows team-wide counts, so Home needs the same access as Company Work.
+  const deckAllowed = SIGNAL_VIEWS.includes(view) && !focused && me.role !== 'reviewer' && (view !== 'home' || company);
+  const signalsWanted = !selected && deckAllowed
     && (contextPref === 'open' || (contextPref === 'auto' && hasSignals(quest, notifications)));
   const signalsFit = !sidebar.isMobile && width - leftWidth - SIGNAL_PANEL >= MIN_CANVAS;
   const showSignals = signalsWanted && signalsFit;
+  const showDeckDrawer = deckDrawer && !selected && deckAllowed && !signalsFit;
+  /** Home's Calendar and Insights buttons: open the deck on that section, docked or as a drawer. */
+  function openDeck(section: DeckSection) {
+    setDeckSection(section);
+    if (signalsFit) setContextPref('open'); else setDeckDrawer(true);
+  }
   const taskDocked = !!selected && !!contextAllowed && !sidebar.isMobile && width - leftWidth - TASK_PANEL >= MIN_CANVAS;
   const contextOffset = taskDocked ? TASK_PANEL : showSignals ? SIGNAL_PANEL : 0;
-  const signalSeam = !selected && SIGNAL_VIEWS.includes(view) && signalsFit && !focused && me.role !== 'reviewer';
+  const signalSeam = !selected && deckAllowed && signalsFit;
 
   return (
     <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'}`}
@@ -244,10 +343,11 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       <Sidebar
         control={sidebar}
         notifications={notifications}
-        executive={hasDesk}
-        executiveInfo={info.executive ?? ''}
-        onOpenNotification={openNotification}
-        brand={<a className="brand" href="#/my-work" aria-label="Task-HQ — My Work" onClick={event => { event.preventDefault(); go('my-work'); sidebar.afterNavigate(); }}><BrandMark /></a>}
+        unreadTotal={inboxUnread}
+        awareness={<Awareness quest={quest} control={sidebar} inbox={inbox} attention={awareAttention}
+          onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
+          onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />}
+        brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
         items={nav.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, locked: !allowed(item.id), info: info[item.id] }))}
         onSelect={id => go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
@@ -263,26 +363,31 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       )}
 
       <main className="main">
-        <header className="topbar">
-          <button type="button" className="icon-btn menu-btn" aria-label="Open navigation" aria-controls="quest-sidebar" aria-expanded={sidebar.mobileOpen} onClick={sidebar.openMobile}><Icon d="M4 6h16M4 12h16M4 18h16" /></button>
-          <span className="topbar-title">{VIEW_LABELS[view]}</span>
-          <span className="workspace-chip" title={`${presetFor(state).label} workspace · tenant ${state.workspace.tenantId} · ${state.workspace.plan === 'local-demo' ? 'local demo' : state.workspace.plan}`}>{state.workspace.name}</span>
-          {!live && <span className="demo-flag" title="Synthetic people and data on this device. Not company work.">Demo · synthetic</span>}
-          <div className="topbar-right">
-            {focused && <span className="focus-chip">Critical Focus</span>}
-            {live ? <AccountChip /> : <><WorkingAs quest={quest} /><span className="me-role">{me.title}</span></>}
-          </div>
-        </header>
+        <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen}
+          tabs={[...LENSES.map(lens => ({ id: lens, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && registryView.lens === lens, allowed: allowed('all-tasks') })), ...primary.map(item => ({ id: item.id, label: item.label, count: item.count, hot: false, active: view === item.id, allowed: allowed(item.id) }))]}
+          onTab={id => { if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} onSearch={openSearch} onAsk={() => setAskOpen(open => !open)} onBell={() => sidebar.showTab('inbox')}
+          onMenu={sidebar.openMobile} menuOpen={sidebar.mobileOpen} />
 
-        {focused && grant && <GrantBar quest={quest} grant={grant} onReturn={() => { closeTask(); go('my-work'); }} />}
+        <FeedbackBar quest={quest}><CompanySignals quest={quest} onOpen={openTask} /></FeedbackBar>
+        {focused && grant && <GrantBar quest={quest} grant={grant} onReturn={() => { closeTask(); go('home'); }} />}
 
         <section className={`content view-${view}`}>
-          {focused && !grant && view === 'my-work'
+          {focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
-            : view === 'my-work' && me.role === 'reviewer' ? <ReviewerWelcome quest={quest} onOpenFeedback={() => setReviewRequest(value => value + 1)} go={next => go(next as View)} />
-            : view === 'my-work' ? <MyWork quest={quest} onOpen={openTask} onCreate={() => setCreating(true)} />
-            : view === 'all-tasks' ? <AllTasks quest={quest} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} />
+            : view === 'home' && me.role === 'reviewer' ? <ReviewerWelcome quest={quest} onOpenFeedback={() => setReviewRequest(value => value + 1)} go={next => go(next as View)} />
+            : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
+                unseen={{ count: inboxUnread, latest: inbox.items.find(item => !sidebar.read.has(item.id))?.title }} onUnseen={() => sidebar.showTab('inbox')}
+                mentions={mentions} read={sidebar.read}
+                onOpen={openTask} onOpenLead={openLead} onCreate={() => setCreating(true)}
+                onOpenMention={item => { sidebar.markRead([item.id]); location.hash = `#/inbox/${encodeURIComponent(item.channelId ?? '')}/${encodeURIComponent(item.messageId ?? '')}`; }}
+                onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} onActivity={() => go('activity')} />
+            : view === 'all-tasks' ? <AllTasks quest={quest} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} registry={registry} />
+            : view === 'reports' ? (hasDesk ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} /> : <Activity quest={quest} onOpen={openTask} />)
+            : view === 'search' ? <Search key={searchNonce} quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />
+            : view === 'inbox' ? <Inbox quest={quest} data={inboxData} notes={notifications} read={sidebar.read} markRead={sidebar.markRead} onOpenTask={openTask} onOpenLead={openLead} />
+            : view === 'tools' ? <Tools quest={quest} store={toolsStore} tools={tools} onOpenTask={openTask} />
             : view === 'executive' ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} />
+            : view === 'relationships' ? <Relationships quest={quest} onOpen={openTask} />
             : view === 'people' ? <People quest={quest} />
             : view === 'feedback' ? <FeedbackInbox quest={quest} onOpen={id => { setFeedbackId(id); history.replaceState(null, '', `#/feedback/${id}`); }} />
             : view === 'company-work' ? <CompanyWork quest={quest} onOpen={openTask} />
@@ -294,7 +399,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         </section>
 
         <nav className="tabbar" aria-label="Task-HQ sections">
-          {nav.slice(0, 4).map(item => (
+          {(['home', 'all-tasks', 'inbox', 'needs-attention', 'leads'] as View[]).map(id => nav.find(item => item.id === id)).filter(item => !!item).map(item => (
             <button key={item.id} type="button" className={view === item.id ? 'is-active' : ''} disabled={!allowed(item.id)} onClick={() => go(item.id)}>
               {item.icon}<span>{item.label.replace('Speed to Lead', 'Leads').replace('Needs Attention', 'Attention').replace('All Tasks', 'Tasks')}</span>
               {item.hot && allowed(item.id) && <i className="tab-dot" />}
@@ -310,14 +415,23 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       {selected && !contextAllowed && (
         <div className="locked-note" role="alert">“{selected.title}” is outside your Critical Focus. Request access to {SECTION_LABELS['company-work']} first. <button className="btn btn-ghost btn-sm" onClick={closeTask}>Close</button></div>
       )}
-      {showSignals && <Signals quest={quest} notifications={notifications} onOpenNotification={openNotification} onClose={() => setContextPref('closed')}
-        onLens={(lens, filter) => openRegistry(lens, filter === 'overdue' ? { due: 'overdue' } : filter === 'blocked' ? { status: 'blocked' } : filter === 'unowned' ? { owner: 'none' } : undefined)} />}
+      {(showSignals || showDeckDrawer) && <>
+        {showDeckDrawer && <button className="scrim" aria-label="Close instrument deck" onClick={() => setDeckDrawer(false)} />}
+        <Signals quest={quest} notifications={notifications} company={company} section={deckSection} onSection={setDeckSection} docked={showSignals}
+          onOpenNotification={note => { setDeckDrawer(false); openNotification(note); }} onOpenTask={id => { setDeckDrawer(false); openTask(id); }}
+          onClose={() => { if (showDeckDrawer) setDeckDrawer(false); else setContextPref('closed'); }}
+          onRegistry={(lens, changes) => { setDeckDrawer(false); openRegistry(lens, changes); }}
+          onLens={(lens, filter) => { setDeckDrawer(false); openRegistry(lens, { scope: 'company', ...(filter === 'blocked' ? { status: 'blocked' } : filter === 'unowned' ? { owner: 'none' } : {}) }); }} />
+      </>}
       {signalSeam && (
-        <button type="button" className="seam-toggle is-right" onClick={() => setContextPref(showSignals ? 'closed' : 'open')} aria-expanded={showSignals}
-          aria-label={showSignals ? 'Collapse signals' : 'Show operational signals'} title={showSignals ? 'Collapse signals' : 'Show operational signals'}>
+        <button type="button" className={`seam-toggle is-right ${showSignals ? '' : 'is-tab'}`} onClick={() => setContextPref(showSignals ? 'closed' : 'open')} aria-expanded={showSignals}
+          aria-label={showSignals ? 'Collapse instrument deck' : `Show instrument deck${notifications.length ? `, ${notifications.length} need you` : ''}`} title={showSignals ? 'Collapse instrument deck' : 'Show instrument deck'}>
           <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={showSignals ? 'M10 7l5 5-5 5' : 'M14 7l-5 5 5 5'} /></svg>
+          {!showSignals && <span className="seam-tab-label">Deck</span>}
+          {!showSignals && notifications.length > 0 && <span className="seam-tab-count">{notifications.length > 9 ? '9+' : notifications.length}</span>}
         </button>
       )}
+      {askOpen && !focused && <AskTasks quest={quest} company={company} onClose={() => setAskOpen(false)} />}
       {creating && canCreate && <CreateTask quest={quest} onClose={() => setCreating(false)} onCreated={id => { setCreating(false); openTask(id); }} />}
       <ReviewLayer quest={quest} openRequest={reviewRequest}
         screen={{ view: VIEW_LABELS[view], route: `#/${view}${view === 'leads' && leadId ? `/${leadId}` : ''}`, taskId: selected?.id ?? '', leadId: view === 'leads' && leadId ? leadId : '', deck: view === 'leads' && leadId ? 'lead' : selected ? 'task' : '' }}
@@ -328,24 +442,13 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           if (target.leadId) { openLead(target.leadId); return; }
           if (target.route) { location.hash = target.route; }
         }} />
-      <ToastBar toast={quest.toast} onUndo={eventId => void dispatch({ type: 'undo', eventId })} onDismiss={quest.dismissToast} />
+      <ToastBar toast={quest.feedback.cue?.text === quest.toast?.text ? null : quest.toast} onUndo={eventId => void dispatch({ type: 'undo', eventId })} onDismiss={quest.dismissToast} />
     </div>
   );
 }
 
 export function Icon({ d }: { d: string }) {
   return <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={d} /></svg>;
-}
-
-function AccountChip() {
-  const live = useLive()!;
-  return (
-    <span className="account-chip" title={`${live.email} · ${ROLE_LABELS[live.role]} of ${live.org.name}`}>
-      <b>{live.org.name}</b><small>{live.email} · {ROLE_LABELS[live.role]}</small>
-      {live.canSwitch && <button type="button" className="btn btn-ghost btn-sm" onClick={live.onLeaveWorkspace}>{live.isPlatformAdmin ? 'Platform console' : 'Switch workspace'}</button>}
-      <button type="button" className="btn btn-ghost btn-sm" onClick={live.onSignOut}>Sign out</button>
-    </span>
-  );
 }
 
 /** A failed load never leaves a dead end: retry, switch workspace (live), or sign out. */

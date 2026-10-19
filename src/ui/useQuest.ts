@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFeedback } from './useFeedback.ts';
+import { createReferenceDrafts } from '../core/references.ts';
+import { attachReferenceDrafts } from '../core/reference-persistence.ts';
 import type { Action, QuestState } from '../core/contract.ts';
 import { pickBackend } from '../adapter/store.ts';
 import type { QuestBackend } from '../adapter/store.ts';
@@ -15,9 +18,11 @@ const DEFAULT_ACTOR = 'alex';
 
 export function useQuest(writer: string, override?: QuestBackend) {
   const backend = useMemo(() => override ?? pickBackend(writer), [writer, override]);
+  const referenceDrafts = useMemo(() => createReferenceDrafts(), [backend]);
   const [state, setState] = useState<QuestState | null>(null);
   const [actor, setActorState] = useState('');
   const [now, setNow] = useState(Date.now);
+  const feedback = useFeedback(state, actor, now);
   const [toast, setToast] = useState<Toast | null>(null);
   const [loadError, setLoadError] = useState('');
   const toastId = useRef(0);
@@ -53,7 +58,14 @@ export function useQuest(writer: string, override?: QuestBackend) {
   }, []);
 
   const dispatch = useCallback(async (action: Action): Promise<DispatchResult> => {
-    const result = await backend.dispatch(action, actor);
+    const before = stateRef.current;
+    const cue = feedback.begin(action);
+    const timer = setTimeout(() => feedback.processing(cue), 120);
+    let result: DispatchResult;
+    try { result = await backend.dispatch(attachReferenceDrafts(action, referenceDrafts.documents()), actor); }
+    catch { result = { ok: false, state: before!, error: 'Persistence could not be confirmed. Reload before retrying.' }; }
+    clearTimeout(timer);
+    if (before) feedback.settle(cue, action, before, result);
     if (result.ok) {
       setState(result.state);
       say(result.message, 'ok', result.undoable && action.type !== 'undo' ? result.eventId ?? undefined : undefined);
@@ -61,9 +73,11 @@ export function useQuest(writer: string, override?: QuestBackend) {
       say(result.error, 'error');
     }
     return result;
-  }, [backend, actor, say]);
+  }, [backend, actor, say, referenceDrafts, feedback.begin, feedback.processing, feedback.settle]);
 
   const setActor = useCallback((id: string) => { setActorState(id); setToast(null); void backend.setActor(id); }, [backend]);
+
+  useEffect(() => { referenceDrafts.clear(); }, [actor, state?.workspace.tenantId, referenceDrafts]);
 
   const lastExpiry = useRef('');
   useEffect(() => {
@@ -81,7 +95,7 @@ export function useQuest(writer: string, override?: QuestBackend) {
     return () => clearTimeout(id);
   }, [toast]);
 
-  return { backend, state, actor, setActor, now, dispatch, toast, dismissToast: () => setToast(null), say, loadError };
+  return { backend, referenceDrafts, feedback, state, actor, setActor, now, dispatch, toast, dismissToast: () => setToast(null), say, loadError };
 }
 
 export type Quest = ReturnType<typeof useQuest> & { state: QuestState };

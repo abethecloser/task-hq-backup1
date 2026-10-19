@@ -1,65 +1,98 @@
-// All Tasks: one permission-scoped registry over state.tasks. Lenses (All, Mine,
-// Team, Needs Attention, Completed) are views of the same records, never copies,
-// so a change made anywhere appears in every lens at once.
+// All Tasks: one permission-scoped registry over state.tasks. Two independent choices
+// shape the list: the scope (My work or Company) says whose tasks, and the lens
+// (All tasks, Urgent, Today, Overdue, Watching) says which of them. Both are views of
+// the same records, never copies, so a change made anywhere appears everywhere at once.
+// Finished work is reached through the status filter (Done).
 import type { QuestState, Task, TaskStatus } from './contract.ts';
+import { companiesOf, workspaceCompanies } from './companies.ts';
+import type { CompanyId } from './companies.ts';
 import { insights } from './rules.ts';
 import { blockingDeps, compareTasks, isOpen, isOverdue, nameOf, projectName } from './selectors.ts';
 import { addDays, localDate } from './time.ts';
 
-export type Lens = 'all' | 'mine' | 'team' | 'attention' | 'completed';
-export const LENS_LABELS: Record<Lens, string> = { all: 'All Tasks', mine: 'My Tasks', team: 'Team Tasks', attention: 'Needs Attention', completed: 'Completed' };
+export type Scope = 'mine' | 'company';
+export const SCOPE_LABELS: Record<Scope, string> = { mine: 'My work', company: 'Company' };
+export type Lens = 'all' | 'urgent' | 'today' | 'overdue' | 'watching';
+export const LENSES: Lens[] = ['all', 'urgent', 'today', 'overdue', 'watching'];
+export const LENS_LABELS: Record<Lens, string> = { all: 'All tasks', urgent: 'Urgent', today: 'Today', overdue: 'Overdue', watching: 'Watching' };
 export const LENS_HINTS: Record<Lens, string> = {
-  all: 'Every open task in the workspace.',
-  mine: 'Work you own, plus approvals waiting on you.',
-  team: 'Work owned by someone else — what is moving without you.',
-  attention: 'Blocked, overdue, unowned or stalled work.',
-  completed: 'Finished work, most recent first.',
+  all: 'Every task, narrowed by the filters below.',
+  urgent: 'Ultra Priority and high-priority work.',
+  today: 'Due today.',
+  overdue: 'Past its due date and still open.',
+  watching: 'Work you follow but don’t own.',
+};
+/** Older saved filters and links used other lens names; map them onto scope + lens. */
+export const LEGACY_LENSES: Record<string, Partial<RegistryQuery>> = {
+  mine: { scope: 'mine', lens: 'all' }, team: { scope: 'company', lens: 'all' }, attention: { lens: 'all' }, completed: { lens: 'all', status: 'done' },
 };
 
 export type StatusFilter = TaskStatus | 'open' | 'any';
 export type DueFilter = 'any' | 'overdue' | 'today' | 'week' | 'none';
 export type PriorityFilter = 'any' | 'high' | 'normal' | 'ultra';
+/** Status, due and priority take one value or several; several match when any of them does. An empty list means any. */
+export type Multi<T> = T | T[];
+export const asList = <T>(value: Multi<T>): T[] => (Array.isArray(value) ? value : [value]);
 export type SortKey = 'urgency' | 'due' | 'updated' | 'title' | 'owner';
 export const SORT_LABELS: Record<SortKey, string> = { urgency: 'Urgency', due: 'Due date', updated: 'Recently updated', title: 'Name', owner: 'Owner' };
 
 export interface RegistryQuery {
+  scope: Scope;
   lens: Lens;
   search: string;
-  status: StatusFilter;
+  status: Multi<StatusFilter>;
   /** Person id, '' for any, 'none' for unowned. */
   owner: string;
   /** Project id, '' for any, 'none' for no project. */
   project: string;
-  due: DueFilter;
-  priority: PriorityFilter;
+  /** Company (Roofing, Drafting, Lumen), '' for any. Inferred from workspace, job, tags and type. */
+  company: CompanyId | '';
+  due: Multi<DueFilter>;
+  priority: Multi<PriorityFilter>;
   sort: SortKey;
 }
 
-export const DEFAULT_QUERY: RegistryQuery = { lens: 'all', search: '', status: 'open', owner: '', project: '', due: 'any', priority: 'any', sort: 'urgency' };
+export const DEFAULT_QUERY: RegistryQuery = { scope: 'company', lens: 'all', search: '', status: 'open', owner: '', project: '', company: '', due: 'any', priority: 'any', sort: 'urgency' };
 
 /** Task ids flagged by the shared attention rules (the same ones Needs Attention uses). */
 export function attentionIds(state: QuestState, now: number): Set<string> {
   return new Set(insights(state, now).map(item => item.taskId).filter((id): id is string => !!id));
 }
 
-export function inLens(state: QuestState, task: Task, actor: string, lens: Lens, flagged: Set<string>): boolean {
+/** My work: tasks you own, plus reviews waiting on your approval. Company: everything. */
+export function inScope(task: Task, actor: string, scope: Scope): boolean {
+  return scope === 'company' || task.owner === actor || (task.status === 'review' && task.approver === actor);
+}
+
+/** Watching is personal: it ignores the scope and lists work you watch without owning. */
+export function inLens(task: Task, actor: string, lens: Lens, now: number): boolean {
   switch (lens) {
     case 'all': return true;
-    case 'mine': return task.owner === actor || (task.status === 'review' && task.approver === actor);
-    case 'team': return !!task.owner && task.owner !== actor;
-    case 'attention': return isOpen(task) && flagged.has(task.id);
-    case 'completed': return task.status === 'done';
+    case 'urgent': return task.ultra || task.priority === 'high';
+    case 'today': return task.due === localDate(now);
+    case 'overdue': return isOverdue(task, now);
+    case 'watching': return task.watchers.includes(actor) && task.owner !== actor;
   }
 }
 
-function statusMatch(task: Task, status: StatusFilter, lens: Lens) {
-  if (lens === 'completed') return task.status === 'done';
-  if (status === 'any') return true;
-  if (status === 'open') return isOpen(task);
-  return task.status === status;
+const inView = (task: Task, actor: string, scope: Scope, lens: Lens, now: number) => (lens === 'watching' || inScope(task, actor, scope)) && inLens(task, actor, lens, now);
+
+function statusMatch(task: Task, status: Multi<StatusFilter>) {
+  const wanted = asList(status);
+  return !wanted.length || wanted.some(value => value === 'any' || (value === 'open' ? isOpen(task) : task.status === value));
 }
 
-function dueMatch(task: Task, due: DueFilter, now: number) {
+function priorityMatch(task: Task, priority: Multi<PriorityFilter>) {
+  const wanted = asList(priority);
+  return !wanted.length || wanted.some(value => value === 'any' || (value === 'ultra' ? task.ultra : task.priority === value));
+}
+
+function dueMatch(task: Task, due: Multi<DueFilter>, now: number) {
+  const wanted = asList(due);
+  return !wanted.length || wanted.some(value => dueIs(task, value, now));
+}
+
+function dueIs(task: Task, due: DueFilter, now: number) {
   const today = localDate(now);
   switch (due) {
     case 'any': return true;
@@ -77,13 +110,15 @@ export function matchesSearch(state: QuestState, task: Task, search: string) {
   const haystack = [
     task.title, task.nextAction, task.description, task.waitingOn, task.blocker?.note ?? '',
     nameOf(state, task.owner, ''), nameOf(state, task.approver, ''), nameOf(state, task.nextOwner, ''), projectName(state, task.projectId),
+    ...(task.tags ?? []).map(tag => `#${tag}`), task.type ? state.taxonomy?.types.find(item => item.id === task.type)?.label ?? task.type : '',
   ].join(' ').toLowerCase();
   return terms.every(term => haystack.includes(term));
 }
 
-function sorter(state: QuestState, now: number, sort: SortKey, lens: Lens) {
+function sorter(state: QuestState, now: number, sort: SortKey, status: Multi<StatusFilter>) {
   const urgency = compareTasks(now);
-  if (lens === 'completed' && sort === 'urgency') return (a: Task, b: Task) => (b.completedAt ?? 0) - (a.completedAt ?? 0);
+  const onlyDone = asList(status).length === 1 && asList(status)[0] === 'done';
+  if (onlyDone && sort === 'urgency') return (a: Task, b: Task) => (b.completedAt ?? 0) - (a.completedAt ?? 0);
   switch (sort) {
     case 'urgency': return (a: Task, b: Task) => Number(a.status === 'done') - Number(b.status === 'done') || urgency(a, b);
     case 'due': return (a: Task, b: Task) => (a.due || '9999-99-99').localeCompare(b.due || '9999-99-99') || urgency(a, b);
@@ -94,23 +129,23 @@ function sorter(state: QuestState, now: number, sort: SortKey, lens: Lens) {
 }
 
 export function queryTasks(state: QuestState, actor: string, now: number, query: RegistryQuery): Task[] {
-  const flagged = attentionIds(state, now);
+  const inWorkspace = workspaceCompanies(state);
   return state.tasks
-    .filter(task => inLens(state, task, actor, query.lens, flagged))
-    .filter(task => statusMatch(task, query.status, query.lens))
+    .filter(task => !query.company || companiesOf(state, task, inWorkspace).has(query.company))
+    .filter(task => inView(task, actor, query.scope, query.lens, now))
+    .filter(task => statusMatch(task, query.status))
     .filter(task => !query.owner || (query.owner === 'none' ? !task.owner : task.owner === query.owner))
     .filter(task => !query.project || (query.project === 'none' ? !task.projectId : task.projectId === query.project))
     .filter(task => dueMatch(task, query.due, now))
-    .filter(task => query.priority === 'any' || (query.priority === 'ultra' ? task.ultra : task.priority === query.priority))
+    .filter(task => priorityMatch(task, query.priority))
     .filter(task => matchesSearch(state, task, query.search))
-    .sort(sorter(state, now, query.sort, query.lens));
+    .sort(sorter(state, now, query.sort, query.status));
 }
 
-/** Open-work counts per lens (Completed counts finished work). */
-export function lensCounts(state: QuestState, actor: string, now: number): Record<Lens, number> {
-  const flagged = attentionIds(state, now);
-  const count = (lens: Lens) => state.tasks.filter(task => inLens(state, task, actor, lens, flagged) && (lens === 'completed' || isOpen(task))).length;
-  return { all: count('all'), mine: count('mine'), team: count('team'), attention: count('attention'), completed: count('completed') };
+/** Open-work counts per lens within the scope. */
+export function lensCounts(state: QuestState, actor: string, now: number, scope: Scope = 'company'): Record<Lens, number> {
+  const count = (lens: Lens) => state.tasks.filter(task => isOpen(task) && inView(task, actor, scope, lens, now)).length;
+  return { all: count('all'), urgent: count('urgent'), today: count('today'), overdue: count('overdue'), watching: count('watching') };
 }
 
 export const BOARD_ORDER: TaskStatus[] = ['ready', 'working', 'blocked', 'review', 'done'];

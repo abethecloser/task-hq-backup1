@@ -1,0 +1,4 @@
+{
+ "extends":"../../tsconfig.server.json",
+ "include":["../../supabase/functions/employee-activation/*.ts","../../supabase/functions/runtime.d.ts"]
+}

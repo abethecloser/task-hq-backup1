@@ -1,7 +1,7 @@
 // Copies the Task-HQ engine (src/core) into the dispatch Edge Function so the server
 // runs exactly the same rules as the app. Run before tests and before deploying.
 import { copyFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
-const FILES = ['contract.ts', 'engine.ts', 'seed.ts', 'selectors.ts', 'time.ts', 'workspace.ts', 'rules.ts', 'executive.ts', 'executive-commands.ts', 'capabilities.ts', 'intent.ts', 'deck.ts', 'instruments.ts', 'compose.ts'];
+const FILES = ['feedback.ts', 'reference-persistence.ts', 'references.ts', 'reference-index.ts', 'contract.ts', 'engine.ts', 'seed.ts', 'selectors.ts', 'time.ts', 'workspace.ts', 'rules.ts', 'executive.ts', 'executive-commands.ts', 'capabilities.ts', 'intent.ts', 'deck.ts', 'instruments.ts', 'compose.ts'];
 const target = new URL('../supabase/functions/dispatch/core/', import.meta.url);
 rmSync(target, { recursive: true, force: true });
 mkdirSync(target, { recursive: true });

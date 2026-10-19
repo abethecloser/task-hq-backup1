@@ -1,13 +1,19 @@
+import { Select } from './Select.tsx';
+import { useFeedbackRecord } from './Feedback.tsx';
+import { ReferenceInput } from './ReferenceEditor.tsx';
 // Components shared by the Quest app and the Quest extension popup.
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { QuestState, Task } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
 import type { Insight } from '../core/rules.ts';
+import { INSIGHT_LABELS } from '../core/rules.ts';
+import { apply } from '../core/engine.ts';
 import {
   blockingDeps, dependents, firstName, isOverdue, moveForwardPlan, nameOf, projectName,
 } from '../core/selectors.ts';
 import { localDate, shortDate } from '../core/time.ts';
+import { offersMoveForward } from '../core/permissions.ts';
 import type { Quest, Toast } from './useQuest.ts';
 import { Latch, toneForAction } from './Behavior.tsx';
 import { LOOK_LABELS, useLook } from './look.ts';
@@ -58,8 +64,9 @@ export function TaskTags({ state, task, now }: { state: QuestState; task: Task; 
  * The same control appears on the My Work hero, task rows, the drawer and the popup.
  */
 export function MoveForward({ quest, task, compact = false, onDone }: { quest: Quest; task: Task; compact?: boolean; onDone?: () => void }) {
-  const { state, actor, dispatch } = quest;
+  const { state, actor, dispatch, now } = quest;
   const plan = moveForwardPlan(state, task, actor);
+  const canAct = offersMoveForward(state, task, actor, now);
   const [pulse, setPulse] = useState(0);
   if (state.people.find(item => item.id === actor)?.role === 'reviewer') return null; // reviewers never move work
   async function go() {
@@ -71,13 +78,13 @@ export function MoveForward({ quest, task, compact = false, onDone }: { quest: Q
   const tone = toneForAction(plan.label);
   const successLabel = tone === 'complete' ? 'Done' : tone === 'assist' ? 'Resolved' : /approval/i.test(plan.label) ? 'Sent for approval' : /take it/i.test(plan.label) ? 'Yours' : 'Started';
   if (compact) {
-    return <Latch size="sm" stopPropagation label={plan.label} tone={tone} successLabel={successLabel} disabled={!plan.canAct} hint={plan.effect} onCommit={go} />;
+    return <Latch size="sm" stopPropagation label={plan.label} tone={tone} successLabel={successLabel} disabled={!canAct} hint={plan.effect} onCommit={go} />;
   }
   return (
     <div className="mwf" data-status={task.status}>
       <div className="mwf-step mwf-now"><small>NOW</small><strong>{plan.current}</strong></div>
       <div className="mwf-control" data-pulse={pulse}>
-        <Latch label={plan.label} tone={tone} successLabel={successLabel} disabled={!plan.canAct} hint={plan.effect} onCommit={go} />
+        <Latch label={plan.label} tone={tone} successLabel={successLabel} disabled={!canAct} hint={plan.effect} onCommit={go} />
       </div>
       <div className="mwf-step mwf-next">
         <small>NEXT</small>
@@ -91,10 +98,11 @@ export function MoveForward({ quest, task, compact = false, onDone }: { quest: Q
 
 export function TaskRow({ quest, task, onOpen, index, locked = false }: { quest: Quest; task: Task; onOpen: (id: string) => void; index?: number; locked?: boolean }) {
   const { state, now } = quest;
+  const feedback = useFeedbackRecord(task.id);
   const today = localDate(now);
   const unlocks = dependents(state, task);
   return (
-    <div className={`task-row status-${task.status} ${task.ultra ? 'is-ultra' : ''} ${locked ? 'is-locked' : ''}`} onClick={() => onOpen(task.id)}>
+    <div {...feedback} data-feedback-record={task.id} className={`task-row status-${task.status} ${task.ultra ? 'is-ultra' : ''} ${locked ? 'is-locked' : ''}`} onClick={() => onOpen(task.id)}>
       {index !== undefined && <span className="row-index">{String(index + 1).padStart(2, '0')}</span>}
       <span className={`state-dot dot-${task.status}`} aria-hidden="true" />
       <span className="row-main">
@@ -118,22 +126,34 @@ export function TaskRow({ quest, task, onOpen, index, locked = false }: { quest:
 }
 
 export function InsightCard({ quest, insight, onOpen }: { quest: Quest; insight: Insight; onOpen: (taskId: string) => void }) {
-  const { state, dispatch } = quest;
+  const { state, dispatch, actor, now } = quest;
+  const [next, setNext] = useState('');
   const tone = insight.severity === 'critical' || insight.severity === 'high' ? insight.severity : 'neutral';
+  // Offered only when the engine would accept it from the person looking (dry run).
+  const quick = insight.action && apply(state, insight.action.do, { actor, now, newId: () => 'dry-run' }).ok ? insight.action : undefined;
+  const capture = insight.kind === 'missing-next-action' && insight.taskId
+    && apply(state, { type: 'task/update', id: insight.taskId, changes: { nextAction: 'x' } }, { actor, now, newId: () => 'dry-run' }).ok;
   return (
     <RecordCard kind="signal" tone={tone} className={`insight sev-${insight.severity}`}>
-      <div className="insight-body">
+      <div className="insight-top">
+        <p className="insight-kind">{INSIGHT_LABELS[insight.kind]}</p>
         <strong className="insight-what">{insight.what}</strong>
-        <p><b>Why it matters</b> {insight.why}</p>
-        <p><b>What to do</b> {insight.next}</p>
+        <RecordMeta className="insight-who"><Avatar state={state} id={insight.who} size="sm" />{insight.who === actor ? 'You' : insight.who ? firstName(state, insight.who) : 'The team'} acts next</RecordMeta>
       </div>
-      <div className="insight-side">
-        <RecordMeta className="insight-who"><Avatar state={state} id={insight.who} size="sm" />{insight.who ? firstName(state, insight.who) : 'The team'} acts next</RecordMeta>
-        <div className="insight-actions">
-          {insight.action && <button type="button" className="btn btn-primary btn-sm" onClick={() => void dispatch(insight.action!.do)}>{insight.action.label}</button>}
-          {insight.taskId && <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpen(insight.taskId!)}>Open</button>}
-        </div>
+      <div className="insight-split">
+        <p><b>Why it matters</b>{insight.why}</p>
+        <p><b>What to do</b>{insight.next}</p>
       </div>
+      {capture
+        ? <form className="insight-capture" onSubmit={async event => { event.preventDefault(); if (next.trim()) { const res = await dispatch({ type: 'task/update', id: insight.taskId!, changes: { nextAction: next.trim() } }); if (res.ok) setNext(''); } }}>
+            <ReferenceInput value={next} maxLength={200} placeholder="The next physical step, in one line" aria-label="Next action" onChange={event => setNext(event.target.value)} />
+            <button type="submit" className="btn btn-dark btn-sm" disabled={!next.trim()}>Save next action</button>
+            {insight.taskId && <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpen(insight.taskId!)}>Open</button>}
+          </form>
+        : (quick || insight.taskId) && <div className="insight-actions">
+            {quick && <button type="button" className="btn btn-dark btn-sm" onClick={() => void dispatch(quick.do)}>{quick.label}</button>}
+            {insight.taskId && <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpen(insight.taskId!)}>Open</button>}
+          </div>}
     </RecordCard>
   );
 }
@@ -152,10 +172,10 @@ export function ToastBar({ toast, onUndo, onDismiss }: { toast: Toast | null; on
 /** Picker for operational roles (owner, approver, helper…). Reviewers are never offered. */
 export function PersonSelect({ state, value, onChange, label, allowEmpty = true, emptyLabel = 'Nobody', disabled = false }: { state: QuestState; value: string; onChange: (id: string) => void; label: string; allowEmpty?: boolean; emptyLabel?: string; disabled?: boolean }) {
   return (
-    <select aria-label={label} value={value} disabled={disabled} onChange={event => onChange(event.target.value)}>
+    <Select aria-label={label} value={value} disabled={disabled} onChange={event => onChange(event.target.value)}>
       {allowEmpty && <option value="">{emptyLabel}</option>}
       {state.people.filter(item => item.role !== 'reviewer').map(item => <option key={item.id} value={item.id}>{item.name} · {item.title}</option>)}
-    </select>
+    </Select>
   );
 }
 
@@ -164,9 +184,9 @@ export function WorkingAs({ quest, compact = false }: { quest: Quest; compact?: 
   return (
     <label className={`working-as ${compact ? 'is-compact' : ''}`}>
       <span>Working as</span>
-      <select value={actor} onChange={event => setActor(event.target.value)} aria-label="Working as (demo person)">
+      <Select value={actor} onChange={event => setActor(event.target.value)} aria-label="Working as (demo person)">
         {state.people.map(item => <option key={item.id} value={item.id}>{compact ? item.name : `${item.name} — ${item.title}`}</option>)}
-      </select>
+      </Select>
     </label>
   );
 }

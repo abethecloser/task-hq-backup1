@@ -1,3 +1,6 @@
+import { Select } from '../ui/Select.tsx';
+import { useFeedbackRecord } from '../ui/Feedback.tsx';
+import { ReferenceInput, ReferenceTextarea, ReferencedText } from '../ui/ReferenceEditor.tsx';
 // Renders a composed Situation. It knows how to draw each approved block and
 // how to collect inputs for capability offers; it decides nothing about what
 // is allowed (that comes from compose.ts, which dry-runs the engine).
@@ -131,9 +134,11 @@ export function SituationView({ quest, situation, onOpen, onPerformed, onContinu
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  const feedback = useFeedbackRecord(situation.taskId ?? situation.leadId);
   const s = frozen ?? situation;
   return (
-    <div className={`situation v-${variant} k-${s.kind} layout-${s.layout}`} key={s.key} data-kind={s.kind}>
+    <div {...feedback} data-feedback-record={s.taskId ?? s.leadId} className={`situation v-${variant} k-${s.kind} layout-${s.layout}`} key={s.key} data-kind={s.kind}>
+      {variant === 'drawer' && <p className="ctx-label situation-label">Next authorized action</p>}
       <header className="situation-head">
         <span className={`situation-kicker k-${s.kind}`}>{s.kind === 'critical-focus' && <span className="pulse" />}{s.kicker}</span>
         {s.taskId && variant !== 'drawer' && s.kind !== 'outcome' && <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpen(s.taskId!)}>Details</button>}
@@ -152,9 +157,9 @@ export function SituationView({ quest, situation, onOpen, onPerformed, onContinu
         <div className={`situation-actions ${s.blocks.includes('contact') ? 'is-contact' : ''}`}>
           {s.blocks.includes('contact') && s.actions.some(item => item.capability === 'lead.attempt') && (
             <label className="channel">Contacted by
-              <select value={channel} onChange={event => setChannel(event.target.value)} aria-label="Contact channel">
+              <Select value={channel} onChange={event => setChannel(event.target.value)} aria-label="Contact channel">
                 <option value="phone">Phone</option><option value="text">Text</option><option value="email">Email</option><option value="in-person">In person</option>
-              </select>
+              </Select>
             </label>
           )}
           {s.actions.map(item => (item.tone === 'primary' && !item.inputs.some(input => input.required)
@@ -218,7 +223,7 @@ export function OfferForm({ quest, item, onSubmit, onCancel }: { quest: Quest; i
           {input.kind === 'text' && <input autoFocus={index === 0} value={values[input.name] ?? ''} maxLength={300} placeholder={input.placeholder} onChange={event => setValues({ ...values, [input.name]: event.target.value })} />}
           {input.kind === 'date' && <input type="date" value={values[input.name] ?? ''} onChange={event => setValues({ ...values, [input.name]: event.target.value })} />}
           {input.kind === 'person' && <PersonSelect state={state} label={input.label} value={values[input.name] ?? ''} emptyLabel={input.required ? 'Choose…' : 'The team'} onChange={id => setValues({ ...values, [input.name]: id })} />}
-          {input.kind === 'choice' && <select value={values[input.name] ?? ''} onChange={event => setValues({ ...values, [input.name]: event.target.value })}>{input.options?.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>}
+          {input.kind === 'choice' && <Select value={values[input.name] ?? ''} onChange={event => setValues({ ...values, [input.name]: event.target.value })}>{input.options?.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</Select>}
         </label>
       ))}
       <div className="offer-form-actions"><button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button><button className="btn btn-primary btn-sm" disabled={!ready}>{item.label}</button></div>

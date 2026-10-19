@@ -55,10 +55,10 @@ export function Latch({ label, tone, onCommit, disabled = false, disabledLabel, 
     if (!alive.current) return;
     setDrag(null);
     if (ok) {
-      setPhase('success'); setAnnounce(`${label}: ${successLabel}`); feedbackSound('success');
+      setPhase('success'); setAnnounce(`${label}: ${successLabel}`);
       setTimeout(() => { if (alive.current) setPhase('rest'); }, SUCCESS_MS);
     } else {
-      setPhase('error'); setAnnounce(`${label} was not applied`); feedbackSound('error');
+      setPhase('error'); setAnnounce(`${label} was not applied`);
       setTimeout(() => { if (alive.current) setPhase('rest'); }, 420);
     }
   }

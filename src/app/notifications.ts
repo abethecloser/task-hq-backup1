@@ -6,6 +6,7 @@ import { decisionDesk } from '../core/executive.ts';
 import { insights } from '../core/rules.ts';
 import { firstName, inFocus, isOpen, nameOf, person, taskById } from '../core/selectors.ts';
 import type { Severity } from '../core/rules.ts';
+import type { InboxSource, WorkspaceRef } from '../core/inbox.ts';
 
 export type NotificationKind = 'assignment' | 'handoff' | 'approval' | 'escalation' | 'deadline' | 'decision';
 export type NotificationSection = 'my-work' | 'needs-attention' | 'leads' | 'executive';
@@ -80,4 +81,21 @@ export function notificationsFor(state: QuestState, now: number, actor: string):
   const focusTask = inFocus(state, actor) ? state.focus?.taskId : undefined;
   const visible = focusTask ? out.filter(item => item.target.taskId === focusTask) : out;
   return visible.sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.at - a.at || a.id.localeCompare(b.id));
+}
+
+/**
+ * Task notifications as one source of the universal inbox. Item ids are the notification
+ * ids, so the sidebar and the inbox share one read state and nothing appears twice.
+ */
+export function notificationSource(notes: Notification[], workspace: WorkspaceRef): InboxSource {
+  return {
+    id: `workspace:${workspace.id}:tasks`,
+    label: `${workspace.name} · tasks`,
+    status: 'connected',
+    note: 'Assignments, handoffs, approvals, decisions and deadlines.',
+    items: () => notes.map(note => ({
+      id: note.id, kind: 'notification' as const, workspace, taskId: note.target.taskId, leadId: note.target.leadId,
+      at: note.at, from: '', title: note.title, detail: `${NOTIFICATION_LABELS[note.kind]} · ${note.detail}`, urgent: note.severity !== 'normal',
+    })),
+  };
 }

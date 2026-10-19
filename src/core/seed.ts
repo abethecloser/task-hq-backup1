@@ -1,6 +1,6 @@
 // Synthetic demo workspace. Every person, project and lead here is fictional.
 import { DEFAULT_POLICY, SCHEMA_VERSION } from './contract.ts';
-import type { Lead, NewTask, Person, Project, QuestState, SimulatedLeadInput, Task } from './contract.ts';
+import type { Lead, NewTask, Person, Project, QuestState, SimulatedLeadInput, Task, Taxonomy } from './contract.ts';
 import { HOUR, MINUTE, addDays, localDate } from './time.ts';
 import { QUEST_ROOFING_WORKSPACE } from './workspace.ts';
 
@@ -43,6 +43,9 @@ export function blankTask(id: string, input: NewTask, actor: string, now: number
     blocker: null,
     leadId: input.leadId ?? '',
     ultra: false,
+    ...(input.type ? { type: input.type } : {}),
+    ...(input.tags?.length ? { tags: input.tags } : {}),
+    ...(input.dueTime && input.due ? { dueTime: input.dueTime } : {}),
     createdBy: actor,
     createdAt: now,
     updatedAt: now,
@@ -125,5 +128,19 @@ export function seedState(now: number): QuestState {
     workspace: { ...QUEST_ROOFING_WORKSPACE },
     feedback: [],
     invites: [],
+    taxonomy: DEMO_TAXONOMY,
   };
 }
+
+/** Synthetic demo taxonomy. A real organization configures its own (Policy & data). */
+export const DEMO_TAXONOMY: Taxonomy = {
+  types: [
+    { id: 'meeting', label: 'Meeting', keywords: ['meeting', 'meet', 'sync'] },
+    { id: 'call', label: 'Call', keywords: ['call', 'phone'] },
+    { id: 'inspection', label: 'Inspection', keywords: ['inspection', 'inspect'] },
+    { id: 'estimate', label: 'Estimate', keywords: ['estimate', 'quote', 'bid'] },
+    { id: 'follow-up', label: 'Follow-up', keywords: ['follow-up', 'follow up', 'followup'] },
+    { id: 'permit', label: 'Permit', keywords: ['permit', 'permits'] },
+  ],
+  tags: ['permits', 'northside', 'maple', 'safety', 'insurance', 'warranty'],
+};

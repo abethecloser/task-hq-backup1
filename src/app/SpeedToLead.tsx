@@ -1,3 +1,7 @@
+import { Select } from '../ui/Select.tsx';
+import { useFeedbackRecord } from '../ui/Feedback.tsx';
+import { ReferenceInput, ReferenceTextarea, ReferencedText } from '../ui/ReferenceEditor.tsx';
+import { ResponseLeague } from './Relationships.tsx';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { ContactChannel, ContactOutcome, Lead } from '../core/contract.ts';
@@ -43,11 +47,13 @@ export function SpeedToLead({ quest, onOpen, selectedLead = null, onSelectLead }
       <header className="view-head">
         <div>
           <p className="eyebrow">Response target {state.policy.leadResponseMinutes} min{quest.backend.kind === 'live' ? '' : ' · demo default'}</p>
-          <h1>Speed to Lead</h1>
+          <h1>First Response</h1>
           <p className="lede">New lead → owner → first response → follow-up → {presetFor(state).leadHandoffAction.toLowerCase()} or escalate.</p>
         </div>
         {quest.backend.kind !== 'live' && state.people.find(item => item.id === quest.actor)?.role !== 'reviewer' && <button type="button" className="btn btn-primary" onClick={() => void dispatch({ type: 'lead/receive', lead: nextSimulatedLead(state.leads) })}>Simulate new lead</button>}
       </header>
+      <p className="boundary">External sources: unconnected. Synthetic intake uses the task engine; no calls, messages or CRM writes are sent.</p>
+      <ResponseLeague quest={quest} />
       <div className="stats lead-stats">
         <div><b>{leads.filter(lead => !lead.firstResponseAt).length}</b><span>waiting for response</span></div>
         <div><b>{avg ? duration(avg) : '—'}</b><span>average first response</span></div>
@@ -136,6 +142,7 @@ export function LeadCard({ quest, lead, onOpen, selected = false, onSelect }: { 
     }
   }
 
+  const feedback = useFeedbackRecord(lead.id);
   const followUp = lead.followUpTaskId ? taskById(state, lead.followUpTaskId) : undefined;
   const handoff = lead.handoffTaskId ? taskById(state, lead.handoffTaskId) : undefined;
   const closed = lead.stage === 'won' || state.people.find(item => item.id === actor)?.role === 'reviewer';
@@ -145,7 +152,7 @@ export function LeadCard({ quest, lead, onOpen, selected = false, onSelect }: { 
   };
 
   return (
-    <RecordCard kind="intake" tone={lead.stage === 'blocked' || lead.stage === 'escalated' ? 'critical' : 'neutral'} className={`lead-card stage-${lead.stage} ${selected ? 'is-selected' : ''}`}>
+    <div {...feedback} data-feedback-record={lead.id}><RecordCard kind="intake" tone={lead.stage === 'blocked' || lead.stage === 'escalated' ? 'critical' : 'neutral'} className={`lead-card stage-${lead.stage} ${selected ? 'is-selected' : ''}`}>
       <div className="lead-top">
         <LeadClock quest={quest} lead={lead} />
         <div className="lead-id">
@@ -156,6 +163,7 @@ export function LeadCard({ quest, lead, onOpen, selected = false, onSelect }: { 
           {onSelect && <button type="button" className="link" aria-pressed={selected} onClick={() => onSelect(selected ? null : lead.id)}>{selected ? 'Close lead instruments ↑' : 'Open lead instruments ↑'}</button>}
         </div>
       </div>
+      {!lead.assignee && !closed && quest.backend?.kind !== 'live' && <button type="button" className="btn btn-primary btn-sm" onClick={() => void dispatch({ type: 'lead/claim', id: lead.id })}>Claim inquiry</button>}
       <div className="lead-owner">
         <Avatar state={state} id={lead.assignee} size="sm" />
         <PersonSelect state={state} value={lead.assignee} label="Lead owner" emptyLabel="Assign an owner…" onChange={to => to && void dispatch({ type: 'lead/assign', id: lead.id, to })} disabled={closed} />
@@ -164,7 +172,7 @@ export function LeadCard({ quest, lead, onOpen, selected = false, onSelect }: { 
       {lead.blocker && lead.stage === 'blocked' && <p className="lead-blocker">Blocked: {lead.blocker}</p>}
       {lead.stage === 'escalated' && <p className="lead-blocker">Escalated to {nameOf(state, lead.escalatedTo)}</p>}
       {lead.attempts.length > 0 && (
-        <ol className="lead-attempts">{lead.attempts.map(item => <li key={item.at}><time>{clock(item.at)}</time> {firstName(state, item.by)} · {item.channel} · {item.outcome.replace('-', ' ')}{item.note && ` — ${item.note}`} <em>(logged)</em></li>)}</ol>
+        <ol className="lead-attempts">{lead.attempts.map(item => <li key={item.at}><time>{clock(item.at)}</time> {firstName(state, item.by)} · {item.channel} · {item.outcome.replace('-', ' ')}{item.note && <> — <ReferencedText text={item.note} document={item.references?.note} /></>} <em>(logged)</em></li>)}</ol>
       )}
       {(followUp || handoff) && (
         <div className="lead-links">
@@ -186,18 +194,18 @@ export function LeadCard({ quest, lead, onOpen, selected = false, onSelect }: { 
         <form id={`lead-action-form-${lead.id}`} className="lead-form" onSubmit={submit} aria-busy={submitting}>
           {form === 'attempt' && (
             <>
-              <select value={channel} onChange={event => setChannel(event.target.value as ContactChannel)} aria-label="Channel"><option value="phone">Phone</option><option value="text">Text</option><option value="email">Email</option><option value="in-person">In person</option></select>
-              <select value={outcome} onChange={event => setOutcome(event.target.value as ContactOutcome)} aria-label="Outcome"><option value="reached">Reached them</option><option value="no-answer">No answer</option><option value="left-message">Left a message</option></select>
+              <Select value={channel} onChange={event => setChannel(event.target.value as ContactChannel)} aria-label="Channel"><option value="phone">Phone</option><option value="text">Text</option><option value="email">Email</option><option value="in-person">In person</option></Select>
+              <Select value={outcome} onChange={event => setOutcome(event.target.value as ContactOutcome)} aria-label="Outcome"><option value="reached">Reached them</option><option value="no-answer">No answer</option><option value="left-message">Left a message</option></Select>
             </>
           )}
           {form === 'follow' && <input type="date" value={due} onChange={event => setDue(event.target.value)} aria-label="Follow-up date" required />}
-          <input value={note} onChange={event => setNote(event.target.value)} maxLength={200} aria-label="Note"
+          <ReferenceInput value={note} onChange={event => setNote(event.target.value)} maxLength={200} aria-label="Note"
             placeholder={form === 'attempt' ? 'What happened? (optional)' : form === 'follow' ? 'Next step (optional)' : form === 'block' ? 'What is blocking this lead?' : 'Why escalate?'} required={form === 'block' || form === 'escalate'} />
           <button className="btn btn-primary btn-sm" disabled={submitting}>{submitting ? 'Saving…' : form === 'attempt' ? lead.firstResponseAt ? 'Log attempt' : 'Save first response' : form === 'follow' ? 'Create follow-up task' : form === 'block' ? 'Flag blocker' : 'Escalate to manager'}</button>
           {actionError && <p className="lead-action-error" role="alert">{actionError}</p>}
           {form === 'attempt' && !lead.assignee && <small className="muted">Logging an attempt makes {firstName(state, actor)} the owner.</small>}
         </form>
       )}
-    </RecordCard>
+    </RecordCard></div>
   );
 }

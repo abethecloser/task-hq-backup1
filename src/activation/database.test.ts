@@ -1,0 +1,52 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createDb,PRODUCTION_BASELINE,read,addUser,addOrg,addMember,rpcAs,uuid} from '../../tests/db/pg.ts';
+async function setup(){
+ const db=await createDb([...PRODUCTION_BASELINE,'20261018030000_team_staging.sql']);
+ await db.pg.exec(`alter table auth.users add column raw_app_meta_data jsonb default '{}';create table public.team_activation_codes(id uuid primary key default gen_random_uuid(),employee_name text not null,employee_ref text,code_hash text not null unique,created_at timestamptz default now(),expires_at timestamptz not null default now()+interval '7 days',redeemed_at timestamptz,redeemed_by uuid references auth.users(id));alter table public.team_activation_codes enable row level security;`);
+ await db.pg.exec(`insert into public.team_activation_codes(employee_name,code_hash) values('Preserved legacy employee',repeat('f',64));`);
+ await db.pg.exec(read('supabase/migrations/20261019115203_employee_activation_v1.sql'));
+ const org=await addOrg(db,'activation-test','Activation Test'),owner=await addUser(db,'owner@test.invalid'),admin=await addUser(db,'admin@test.invalid'),outsider=await addUser(db,'outsider@test.invalid');
+ await addMember(db,org,owner,'owner','manager');await addMember(db,org,admin,'admin','manager');
+ const employee=uuid();await db.pg.query(`insert into public.staged_contacts(id,org_id,staging_key,full_name,affiliation_confirmed,provisional_role) values($1,$2,'test-employee','Test Employee',true,'member')`,[employee,org]);
+ const issue=(actor=owner,hash='a'.repeat(64))=>rpcAs(db,actor,'employee_activation_admin',{p_org:org,p_action:'generate',p_employee:employee,p_hash:hash});
+ const lookup=async(hash='a'.repeat(64),email:string|null=null)=>(await db.pg.query<{v:any}>(`select public.employee_activation_lookup($1,$2) v`,[hash,email])).rows[0].v;
+ const insert=async(claim:string,email='test@test.invalid',id=uuid())=>{await db.pg.transaction(async tx=>{await tx.exec("select set_config('request.jwt.claims','{}',true)");await tx.query(`insert into auth.users(id,email) values($1,$2)`,[id,email]);await tx.query(`update auth.users set raw_app_meta_data=$2 where id=$1`,[id,JSON.stringify({quest_employee_activation:claim})]);await tx.query(`update auth.users set email_confirmed_at=now() where id=$1`,[id]);});return id;};
+ return {db,org,owner,admin,outsider,employee,issue,lookup,insert};
+}
+test('activation SQL: exact employee, atomic confirmed Auth linking, role snapshot, single use and idempotent recovery',async()=>{
+ const s=await setup();try{
+ assert.equal((await s.issue()).error,null);
+ const preview=await s.lookup();assert.equal(preview.employee_id,s.employee);assert.equal(preview.name,'Test Employee');assert.equal(preview.claim,null);
+ const claim=await s.lookup(undefined,'test@test.invalid');assert.ok(claim.claim);
+ assert.equal(await s.lookup(undefined,'changed@test.invalid'),null);
+ const user=await s.insert(claim.claim);
+ const links=await s.db.pg.query<any>(`select l.*,m.role,m.work_role,a.redeemed_by from public.employee_auth_links l join public.memberships m using(org_id,user_id) join public.team_activation_codes a on a.id=l.activation_id`);
+ assert.equal(links.rows[0].employee_id,s.employee);assert.equal(links.rows[0].user_id,user);assert.equal(links.rows[0].role,'member');assert.equal(links.rows[0].redeemed_by,user);
+ assert.equal(await s.lookup(),null);assert.equal((await s.lookup(undefined,'test@test.invalid')).activated,true);
+ await assert.rejects(s.insert(claim.claim));assert.ok((await s.issue()).error);
+ assert.equal((await s.db.pg.query<any>('select count(*)::int n from public.employee_auth_links')).rows[0].n,1);
+ }finally{await s.db.close();}
+});
+test('activation SQL: revoke/regenerate, expiration, permission changes, and failed Auth insert roll back',async()=>{
+ const s=await setup();try{
+ assert.equal(await s.lookup('f'.repeat(64)),null);assert.equal((await s.db.pg.query<any>("select employee_ref from public.team_activation_codes where code_hash=repeat('f',64)")).rows[0].employee_ref,null);assert.ok((await s.issue(s.outsider)).error);await s.issue();const old=await s.lookup(undefined,'test@test.invalid');
+ await s.issue(s.owner,'b'.repeat(64));assert.equal(await s.lookup(),null);await assert.rejects(s.insert(old.claim));
+ const claim=await s.lookup('b'.repeat(64),'test@test.invalid');
+ await s.db.pg.query(`update public.staged_contacts set provisional_role='admin',updated_at=now() where id=$1`,[s.employee]);
+ await assert.rejects(s.insert(claim.claim));
+ assert.equal((await s.db.pg.query<any>(`select count(*)::int n from auth.users where email='test@test.invalid'`)).rows[0].n,0);
+ assert.ok((await s.issue(s.admin,'c'.repeat(64))).error);
+ await s.issue(s.owner,'c'.repeat(64));const revoked=await s.lookup('c'.repeat(64),'test@test.invalid');
+ assert.equal((await rpcAs(s.db,s.owner,'employee_activation_admin',{p_org:s.org,p_action:'revoke',p_employee:s.employee})).error,null);await assert.rejects(s.insert(revoked.claim));
+ await s.issue(s.owner,'d'.repeat(64));await s.db.pg.exec(`update public.team_activation_codes set created_at=now()-interval '2 days',expires_at=now()-interval '1 day' where code_hash=repeat('d',64)`);assert.equal(await s.lookup('d'.repeat(64)),null);
+ }finally{await s.db.close();}
+});
+test('activation SQL: direct access denied, persistent rate limits, no fake user-metadata activation',async()=>{
+ const s=await setup();try{
+ await assert.rejects(s.db.pg.transaction(async tx=>{await tx.exec('set local role authenticated');await tx.exec('select * from public.team_activation_codes');}));
+ assert.ok((await rpcAs(s.db,s.owner,'employee_activation_lookup',{p_hash:'a'.repeat(64)})).error);
+ for(let i=0;i<4;i++){const r=await s.db.pg.query<any>(`select public.employee_activation_limit('test',3,900) v`);assert.equal(r.rows[0].v,i<3);}
+ await s.issue();const normal=await addUser(s.db,'normal@test.invalid');assert.equal((await s.db.pg.query<any>('select count(*)::int n from public.memberships where user_id=$1',[normal])).rows[0].n,0);
+ }finally{await s.db.close();}
+});

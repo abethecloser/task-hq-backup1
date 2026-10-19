@@ -1,3 +1,6 @@
+import { Select } from '../ui/Select.tsx';
+import { FeedbackDemo } from './FeedbackDemo.tsx';
+import { ReferencedText } from '../ui/ReferenceEditor.tsx';
 import { useEffect, useState } from 'react';
 import type { ChangeEvent } from 'react';
 import type { Policy, Role } from '../core/contract.ts';
@@ -19,17 +22,17 @@ export function Activity({ quest, onOpen }: { quest: Quest; onOpen: (id: string)
     <div className="view">
       <header className="view-head">
         <div><p className="eyebrow">Event history</p><h1>Activity</h1><p className="lede">Every change, who made it, and what it set in motion.</p></div>
-        <select value={kind} onChange={event => setKind(event.target.value)} aria-label="Filter activity">
+        <Select value={kind} onChange={event => setKind(event.target.value)} aria-label="Filter activity">
           <option value="">All activity</option><option value="task">Tasks</option><option value="handoff">Handoffs</option><option value="help">Help</option>
           <option value="approval">Approvals</option><option value="ultra">Ultra Priority</option><option value="grant">Access requests</option><option value="lead">Leads</option>
-        </select>
+        </Select>
       </header>
       <ol className="timeline">
         {events.map(event => (
           <li key={event.id} className={event.undone ? 'is-undone' : ''}>
             <time>{clock(event.at)}</time>
             <span className={`tl-kind k-${event.kind}`}>{event.kind}</span>
-            <p>{event.text} <small>— {event.actor === 'system' ? 'Task-HQ' : nameOf(state, event.actor)}</small></p>
+            <p><ReferencedText text={event.text} document={event.references?.text} /> <small>— {event.actor === 'system' ? 'Task-HQ' : nameOf(state, event.actor)}</small></p>
             <span className="tl-actions">
               {event.taskId && <button type="button" className="link" onClick={() => onOpen(event.taskId!)}>Open</button>}
               {event.undo && !event.undone && event.actor === actor && <button type="button" className="link" onClick={() => void dispatch({ type: 'undo', eventId: event.id })}>Undo</button>}
@@ -56,11 +59,14 @@ export function Settings({ quest, onPeople }: { quest: Quest; onPeople?: () => v
 
   return (
     <div className="view">
+      <details className="panel"><summary>Try the sensory feedback control board (synthetic)</summary><FeedbackDemo /></details>
       <header className="view-head"><div><p className="eyebrow">{backend.kind === 'live' ? state.workspace.name : 'Configurable · demo defaults'}</p><h1>Policy & data</h1><p className="lede">{backend.kind === 'live' ? 'Policy applies to everyone in this workspace. ' : 'These are starting points to try, not company policy. '}{isManager ? 'You can change them as a manager.' : 'Only a manager can change them.'}</p></div></header>
 
       {backend.kind === 'live'
         ? <section className="panel settings"><h3>Members & access</h3><p className="muted">Members, invitations, access requests and roles{live ? ` for ${live.org.name}` : ''} live in People & Roles.</p>{onPeople && <button type="button" className="btn btn-ghost" onClick={onPeople}>Open People & Roles</button>}</section>
         : <WorkspacePanel quest={quest} isManager={isManager} />}
+
+      <TaxonomyPanel quest={quest} isManager={isManager} />
 
       <section className="panel settings">
         <h3>Appearance</h3>
@@ -73,10 +79,10 @@ export function Settings({ quest, onPeople }: { quest: Quest; onPeople?: () => v
         <p className="muted">Governance is undecided on purpose: try both scopes and choose.</p>
         <fieldset disabled={!isManager}>
           <label className="row-field">Who decides access requests
-            <select value={draft.ultraScope} onChange={event => setDraft({ ...draft, ultraScope: event.target.value as Policy['ultraScope'] })}>
+            <Select value={draft.ultraScope} onChange={event => setDraft({ ...draft, ultraScope: event.target.value as Policy['ultraScope'] })}>
               <option value="manager-context">Only the manager who activated focus</option>
               <option value="company-wide">Any approver in the company</option>
-            </select>
+            </Select>
           </label>
           {(['ultraActivators', 'ultraApprovers'] as const).map(key => (
             <div key={key} className="row-field">{key === 'ultraActivators' ? 'Who can activate Ultra Priority' : 'Who can approve, revoke and release'}
@@ -140,7 +146,7 @@ function WorkspacePanel({ quest, isManager }: { quest: Quest; isManager: boolean
       <fieldset disabled={!isManager}>
         <label className="row-field">Workspace name<input value={name} maxLength={80} onChange={event => setName(event.target.value)} /></label>
         <label className="row-field">Industry preset
-          <select value={preset} onChange={event => setPreset(event.target.value as PresetId)}>{(Object.keys(PRESETS) as PresetId[]).map(id => <option key={id} value={id}>{PRESETS[id].label}</option>)}</select>
+          <Select value={preset} onChange={event => setPreset(event.target.value as PresetId)}>{(Object.keys(PRESETS) as PresetId[]).map(id => <option key={id} value={id}>{PRESETS[id].label}</option>)}</Select>
         </label>
         <p className="muted">Lead handoff in this preset: “{PRESETS[preset].leadHandoffAction}” creates an {PRESETS[preset].leadHandoffNoun}.</p>
       </fieldset>
@@ -150,6 +156,40 @@ function WorkspacePanel({ quest, isManager }: { quest: Quest; isManager: boolean
         <dt>Tenant</dt><dd>{workspace.tenantId} (local; a server would enforce isolation per tenant)</dd>
         <dt>Plan</dt><dd>Local demo — every feature on, no billing{features.maxMembers ? ` · up to ${features.maxMembers} members` : ''}</dd>
       </dl>
+    </section>
+  );
+}
+
+/** Task types (with the words that suggest them) and known tags, used by the command input. */
+function TaxonomyPanel({ quest, isManager }: { quest: Quest; isManager: boolean }) {
+  const { state, dispatch, backend } = quest;
+  const supported = backend.supports?.taskTaxonomy !== false;
+  const [types, setTypes] = useState(() => (state.taxonomy?.types ?? []).map(item => ({ ...item, words: item.keywords.join(', ') })));
+  const [tags, setTags] = useState(() => (state.taxonomy?.tags ?? []).join(', '));
+  useEffect(() => { setTypes((state.taxonomy?.types ?? []).map(item => ({ ...item, words: item.keywords.join(', ') }))); setTags((state.taxonomy?.tags ?? []).join(', ')); }, [state.taxonomy]);
+  const [aliases, setAliases] = useState(() => Object.entries(state.taxonomy?.tagAliases ?? {}).map(([a, t]) => `${a}=${t}`).join(', '));
+  const save = () => void dispatch({ type: 'taxonomy/update', taxonomy: {
+    tagAliases: Object.fromEntries(aliases.split(',').map(pair => pair.trim().split('=').map(p => p.trim())).filter(parts => parts.length === 2 && parts[0] && parts[1])),
+    types: types.filter(item => item.label.trim()).map(item => ({ id: item.id || item.label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''), label: item.label, keywords: item.words.split(',').map(word => word.trim()).filter(Boolean) })),
+    tags: tags.split(/[\s,]+/).map(tag => tag.replace(/^#/, '').trim()).filter(Boolean),
+  } });
+  return (
+    <section className="panel settings">
+      <h3>Task types & tags</h3>
+      <p className="muted">The command input recognizes a word like “meeting” or “permit” as a task type only if it’s listed here.{supported ? '' : ' Saving these needs the next server update.'}</p>
+      <fieldset disabled={!isManager || !supported} className="taxonomy">
+        {types.map((item, index) => (
+          <div key={index} className="taxonomy-row">
+            <input aria-label="Type name" value={item.label} placeholder="e.g. Inspection" onChange={event => setTypes(current => current.map((other, i) => (i === index ? { ...other, label: event.target.value } : other)))} />
+            <input aria-label="Words that suggest it" value={item.words} placeholder="inspect, inspection" onChange={event => setTypes(current => current.map((other, i) => (i === index ? { ...other, words: event.target.value } : other)))} />
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTypes(current => current.filter((_, i) => i !== index))}>Remove</button>
+          </div>
+        ))}
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setTypes(current => [...current, { id: '', label: '', keywords: [], words: '' }])}>+ Add type</button>
+        <label className="row-field">Known tags<input value={tags} placeholder="permits, safety, northside" onChange={event => setTags(event.target.value)} /></label>
+        <label className="row-field">Explicit tag aliases<input value={aliases} onChange={e => setAliases(e.target.value)} placeholder="maple-ave=mapleave, maple_ave=mapleave" /></label><p className="muted">Capitalization resolves automatically. Punctuation stays distinct unless explicitly aliased; an existing tag cannot be merged here.</p>
+      </fieldset>
+      {isManager && supported && <button type="button" className="btn btn-primary" onClick={save}>Save types & tags</button>}
     </section>
   );
 }

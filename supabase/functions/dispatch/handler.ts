@@ -1,3 +1,5 @@
+import { searchReferences, workspaceIndex } from './core/reference-index.ts';
+import type { SearchQuery } from './core/reference-index.ts';
 import { runExecCommand } from './core/executive-commands.ts';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.117.2';
 import type { Action, QuestState } from './core/contract.ts';
@@ -21,6 +23,22 @@ const cors = {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * A refused or failed task write still leaves a durable, inspectable trace: who tried
+ * what, on which record, at which revision, and why it didn't happen. Successful writes
+ * are audited by commit_workspace_action. Never changes the reply; a failed audit write
+ * is logged, not surfaced.
+ */
+async function recordAttempt(admin: SupabaseClient, orgId: string, user: { id: string; email?: string }, action: unknown, outcome: 'denied' | 'failed', reason: string, rev: number) {
+  try {
+    const fields = (action && typeof action === 'object' ? action : {}) as Record<string, unknown>;
+    const type = typeof fields.type === 'string' ? fields.type.slice(0, 40) : 'unknown';
+    const target = Object.fromEntries(['id', 'taskId', 'eventId'].filter(key => typeof fields[key] === 'string').map(key => [key, String(fields[key]).slice(0, 100)]));
+    const { error } = await admin.from('audit_log').insert({ actor: user.id, actor_label: user.email ?? '', org_id: orgId, action: `task.${type}.${outcome}`, detail: { outcome, reason: reason.slice(0, 300), rev, target } });
+    if (error) console.error('attempt audit failed', error);
+  } catch (error) { console.error('attempt audit failed', error); }
+}
+
 export async function handleDispatch(req: Request, dependencies: DispatchDependencies): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ ok: false, error: 'POST only.' }, 405);
@@ -29,8 +47,8 @@ export async function handleDispatch(req: Request, dependencies: DispatchDepende
     const user = await dependencies.getUser(authHeader);
     if (!user) return json({ ok: false, error: 'Sign in again.' }, 401);
 
-    const body = await req.json().catch(() => null) as { op?: string; orgId?: string; action?: Action; expectedRev?: number; limit?: number; since?:string; text?: string; subject?: {taskId?:string;leadId?:string} } | null;
-    if (!body || !body.orgId || !UUID.test(body.orgId) || !['load','dispatch','tick','operations','automation','command-preview','intake-events'].includes(body.op ?? '')) return json({ ok: false, error: 'Malformed request.' }, 400);
+    const body = await req.json().catch(() => null) as { op?: string; query?: SearchQuery; orgId?: string; action?: Action; expectedRev?: number; limit?: number; since?:string; text?: string; subject?: {taskId?:string;leadId?:string} } | null;
+    if (!body || !body.orgId || !UUID.test(body.orgId) || !['load','dispatch','tick','operations','automation','command-preview','intake-events','search'].includes(body.op ?? '')) return json({ ok: false, error: 'Malformed request.' }, 400);
 
     const admin = dependencies.getAdmin();
     const { data: me, error: memberError } = await admin.from('memberships').select('role, work_role').eq('org_id', body.orgId).eq('user_id', user.id).maybeSingle();
@@ -70,6 +88,7 @@ export async function handleDispatch(req: Request, dependencies: DispatchDepende
     const now = dependencies.now?.() ?? Date.now();
     let { data: row, error: stateError } = await admin.from('workspace_state').select('state, rev').eq('org_id', body.orgId).maybeSingle();
     if (stateError) { console.error('state read failed', stateError); return json({ ok: false, error: 'Server error. Nothing was changed.' }, 500); }
+    if (!row && body.op === 'search') return json({ ok: true, results: [] });
     if (!row && (body.op==='operations'||body.op==='automation'||body.op==='command-preview')) return json({ok:false,error:'Open the workspace before requesting its operational records.'},409);
     if (!row) {
       const fresh = emptyState(org as OrgRow, members, now);
@@ -80,6 +99,12 @@ export async function handleDispatch(req: Request, dependencies: DispatchDepende
       row=loaded.data;
     }
     const stored = row!.state as QuestState;
+    if (body.op === 'search') {
+      const q = body.query;
+      if (!q || typeof q.text !== 'string' || q.text.length > 300 || (q.kind && !['tasks', 'messages', 'relationships', 'notes', 'activity', 'tools'].includes(q.kind)) || [q.workspaceId, q.personId, q.tag].some(v => v !== undefined && (typeof v !== 'string' || v.length > 150))) return json({ ok: false, error: 'Supply a bounded search query.' }, 400);
+      const authorized = withAuthority(stored, org as OrgRow, members);
+      return json({ ok: true, orgId: body.orgId, revision: row!.rev, results: searchReferences(workspaceIndex(authorized, user.id, now), { ...q, limit: 200 }) });
+    }
 
     if(body.op==='operations'||body.op==='automation'||body.op==='command-preview') {
       const authorized=withAuthority({...stored,rev:row!.rev},org as OrgRow,members);
@@ -115,9 +140,16 @@ export async function handleDispatch(req: Request, dependencies: DispatchDepende
       return json({ ok: false, error: 'Someone else just changed this workspace. Reloaded the latest version.', conflict: true, state: { ...withAuthority(stored, org as OrgRow, members), rev: row!.rev }, rev: row!.rev }, 409);
     }
     const result = runAction(stored, org as OrgRow, members, user.id, body.action as Action, now);
-    if (!result.ok) return json({ ok: false, error: result.error }, result.status);
+    if (!result.ok) {
+      await recordAttempt(admin, body.orgId, user, body.action, 'denied', result.error, row!.rev);
+      return json({ ok: false, error: result.error }, result.status);
+    }
     const saved=await commitWorkspace(admin,body.orgId,user.id,row!.rev,result.state,`task.${(body.action as Action).type}`,{eventId:result.eventId},authorityFor(members));
-    if(!saved.ok) return json(saved,saved.status);
+    if(!saved.ok) {
+      // A revision conflict is retried by the client after reloading; anything else is a failed write.
+      if (!('conflict' in saved && saved.conflict)) await recordAttempt(admin, body.orgId, user, body.action, 'failed', saved.error, row!.rev);
+      return json(saved,saved.status);
+    }
     return json({ok:true,state:saved.state,rev:saved.rev,message:result.message,eventId:result.eventId,undoable:result.undoable});
   } catch (error) {
     console.error('dispatch failed', error);
