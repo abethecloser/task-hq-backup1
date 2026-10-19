@@ -66,7 +66,11 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
       const channel = client.channel(`workspace-${org.id}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'workspace_state', filter: `org_id=eq.${org.id}` }, payload => {
           const row = payload.new as { state?: QuestState; rev?: number };
-          if (row.state) listener(remember(row.state, row.rev));
+          if (!row.state) return;
+          // Realtime rows are stored state. Authority is server-derived: keep what the last load or dispatch said, and fail closed to Member.
+          const known = new Map((latest?.people ?? []).map(item => [item.id, item.authority]));
+          const people = row.state.people.map(item => (item.authority ? item : { ...item, authority: known.get(item.id) ?? 'member' as const }));
+          listener(remember({ ...row.state, people }, row.rev));
         })
         .subscribe();
       return () => { void client.removeChannel(channel); };

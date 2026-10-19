@@ -85,6 +85,7 @@ export function runAction(stored: QuestState, org: OrgRow, members: MemberRow[],
   if (!members.some(member => member.user_id === actorId)) return { ok: false, status: 403, error: 'You are not a member of this workspace.' };
   const state = reconcile(withAuthority(stored, org, members), now, 'server').state;
   const result = apply(state, action, { actor: actorId, now, writer: 'server' });
+  if (!result) return { ok: false, status: 400, error: 'That action isn’t available on this server yet. Nothing was changed.' };
   if (!result.ok) return { ok: false, status: 422, error: result.error };
   return { ok: true, state: result.state, message: result.message, eventId: result.event?.id ?? null, undoable: !!result.event?.undo };
 }
