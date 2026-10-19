@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanUrl, linkProblem, parseAuthCallback } from './callback.ts';
+import { cleanUrl, linkProblem, parseAuthCallback, rememberMagicLink, takeMagicLink } from './callback.ts';
 
 const PROD = 'https://task-hq-three.vercel.app';
 
@@ -26,4 +26,18 @@ test('the cleaned address keeps no token and lands on the chosen route', () => {
   assert.equal(clean, `${PROD}/#/auth/reset`);
   assert.ok(!clean.includes('secret'));
   assert.equal(cleanUrl(`${PROD}/?code=xyz`, '#/auth/forgot'), `${PROD}/#/auth/forgot`);
+});
+
+test('a magic-link sign-in offers a password once, within two hours, only in the browser that asked', () => {
+  const store = new Map<string, string>();
+  const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) };
+  const t0 = Date.parse('2026-10-19T20:00:00Z');
+  assert.equal(takeMagicLink(storage, t0), false, 'no request in this browser (e.g. a sign-up confirmation): no offer');
+  rememberMagicLink(storage, t0);
+  assert.equal(takeMagicLink(storage, t0 + 5 * 60_000), true);
+  assert.equal(takeMagicLink(storage, t0 + 6 * 60_000), false, 'offered only once');
+  rememberMagicLink(storage, t0);
+  assert.equal(takeMagicLink(storage, t0 + 3 * 60 * 60_000), false, 'a stale request is ignored');
+  // Template links say what they are; only magic links get the offer.
+  assert.deepEqual(parseAuthCallback(`${PROD}/?token_hash=abc&type=magiclink#/`), { kind: 'token-hash', tokenHash: 'abc', type: 'magiclink' });
 });

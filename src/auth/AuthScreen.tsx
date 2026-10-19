@@ -5,10 +5,10 @@ import { useEffect, useState } from 'react';
 import brandMark from '../assets/brand/mark.png';
 import type { FormEvent, ReactNode } from 'react';
 import { backendConfigured, redirectUrl, supabase } from './client.ts';
-import { handleAuthCallback } from './callback.ts';
+import { handleAuthCallback, rememberMagicLink } from './callback.ts';
 import './auth.css';
 
-export type AuthView = 'sign-in' | 'magic' | 'sign-up' | 'forgot' | 'reset' | 'request';
+export type AuthView = 'sign-in' | 'magic' | 'sign-up' | 'forgot' | 'reset' | 'set-password' | 'request';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -40,12 +40,13 @@ export function AuthScreen({ view, go, onDemo, notice = null }: { view: AuthView
         <section className="auth-panel">
           <div className="auth-icon" aria-hidden="true"><Glyph /></div>
           <div className="auth-form-wrap" key={view}>
-            {notice && view !== 'reset' && <Notice notice={{ tone: 'error', text: notice }} />}
+            {notice && view !== 'reset' && view !== 'set-password' && <Notice notice={{ tone: 'error', text: notice }} />}
             {view === 'sign-in' && <SignIn go={go} />}
             {view === 'magic' && <MagicLink go={go} />}
             {view === 'sign-up' && <SignUp go={go} />}
             {view === 'forgot' && <Forgot go={go} />}
             {view === 'reset' && <Reset go={go} />}
+            {view === 'set-password' && <Reset go={go} optional />}
             {view === 'request' && <RequestAccess go={go} />}
             <p className="auth-foot">Access is limited to what your role permits.</p>
             <button type="button" className="auth-demo" onClick={onDemo}>Explore the Task-HQ Demo</button>
@@ -155,6 +156,7 @@ function MagicLink({ go }: { go: (view: AuthView) => void }) {
     <form noValidate onSubmit={event => void form.submit(event,
       (): Errors => { const m = emailError(email); return m ? { email: m } : {}; },
       async client => {
+        rememberMagicLink();
         const { error } = await client.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: false, emailRedirectTo: redirectUrl('#/') } });
         if (error) throw error;
         form.setSent({ title: 'Check your email', text: `If ${email.trim()} has an account, a one-time sign-in link is on its way.` });
@@ -217,7 +219,8 @@ function Forgot({ go }: { go: (view: AuthView) => void }) {
   );
 }
 
-function Reset({ go }: { go: (view: AuthView) => void }) {
+/** Choose a new password. `optional`: offered once after a magic-link sign-in, and skippable. */
+function Reset({ go, optional = false }: { go: (view: AuthView) => void; optional?: boolean }) {
   const [password, setPassword] = useState('');
   const form = useForm();
   if (form.sent) return <Sent sent={form.sent} go={go} />;
@@ -230,13 +233,17 @@ function Reset({ go }: { go: (view: AuthView) => void }) {
         if (!data.session) throw new Error('reset-link-missing');
         const { error } = await client.auth.updateUser({ password });
         if (error) throw error;
+        // Offered after a magic-link sign-in: straight on into Task-HQ.
+        if (optional) { go('sign-in'); return; }
         form.setSent({ title: 'Password updated', text: 'Your new password is saved. Use it next time you sign in.' });
       })}>
-      <Heading title="Choose a new password" subtitle="Use at least 8 characters." />
+      {optional
+        ? <Heading title="Set a password for next time" subtitle="You’re signed in. A password lets you sign in without waiting for an email link. At least 8 characters." />
+        : <Heading title="Choose a new password" subtitle="Use at least 8 characters." />}
       <Field id="password" label="New password" type="password" value={password} onChange={setPassword} placeholder="At least 8 characters" autoComplete="new-password" error={form.errors.password} />
       <Notice notice={form.notice} />
-      <button className="auth-primary" disabled={form.busy}>{form.busy ? 'Saving…' : 'Update password'}</button>
-      <div className="auth-links"><button type="button" onClick={() => go('sign-in')}>Back to sign in</button></div>
+      <button className="auth-primary" disabled={form.busy}>{form.busy ? 'Saving…' : optional ? 'Save password' : 'Update password'}</button>
+      <div className="auth-links"><button type="button" onClick={() => go('sign-in')}>{optional ? 'Skip for now' : 'Back to sign in'}</button></div>
     </form>
   );
 }
@@ -270,7 +277,7 @@ function RequestAccess({ go }: { go: (view: AuthView) => void }) {
 }
 
 export function useSession() {
-  const [state, setState] = useState<{ ready: boolean; email: string | null; recovery: boolean; notice: string | null }>({ ready: !backendConfigured, email: null, recovery: false, notice: null });
+  const [state, setState] = useState<{ ready: boolean; email: string | null; recovery: boolean; notice: string | null; offerPassword: boolean }>({ ready: !backendConfigured, email: null, recovery: false, notice: null, offerPassword: false });
   useEffect(() => {
     const client = supabase();
     if (!client) return;
@@ -284,7 +291,7 @@ export function useSession() {
       const link = await handleAuthCallback(client);
       const { data: current } = await client.auth.getSession();
       settled = true;
-      setState({ ready: true, email: current.session?.user.email ?? null, recovery: link.recovery, notice: link.notice });
+      setState({ ready: true, email: current.session?.user.email ?? null, recovery: link.recovery, notice: link.notice, offerPassword: !!link.offerPassword && !!current.session });
     })();
     return () => data.subscription.unsubscribe();
   }, []);

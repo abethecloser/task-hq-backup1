@@ -18,7 +18,7 @@ import { applyLook } from './ui/look.ts';
 // Entry: real sign-in by default on the web; the synthetic demo is a separate,
 // explicit mode with its own local data. The extension stays demo-only for now.
 const MODE_KEY = 'tmhq.mode';
-const AUTH_VIEWS: AuthView[] = ['sign-in', 'magic', 'sign-up', 'forgot', 'reset', 'request'];
+const AUTH_VIEWS: AuthView[] = ['sign-in', 'magic', 'sign-up', 'forgot', 'reset', 'set-password', 'request'];
 
 function readMode(): 'demo' | 'auth' {
   if (isExtensionContext()) return 'demo';
@@ -41,6 +41,8 @@ function Root() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
   useEffect(() => { if (session.recovery) setView('reset'); }, [session.recovery]);
+  // Signed in by magic link: offer (once, skippable) to set a password for next time.
+  useEffect(() => { if (session.offerPassword) { history.replaceState(null, '', '#/auth/set-password'); setView('set-password'); } }, [session.offerPassword]);
   // An email link that couldn't be used lands on the page it chose (sign-in or forgot), with its notice.
   useEffect(() => { if (session.notice) setView(authViewFromHash()); }, [session.notice]);
   useEffect(() => { document.title = mode === 'demo' ? PRODUCT.demo : `Sign in — ${PRODUCT.name}`; }, [mode]);
@@ -64,7 +66,7 @@ function Root() {
   if (mode === 'demo') return <App onExitDemo={isExtensionContext() ? undefined : exitDemo} />;
   if (!session.ready) return null;
   const client = supabase();
-  if (session.email && client && view !== 'reset') {
+  if (session.email && client && view !== 'reset' && view !== 'set-password') {
     return <LiveRoot key={session.email} client={client} onSignOut={() => { history.replaceState(null, '', '#/auth/sign-in'); void client.auth.signOut(); }} onDemo={enterDemo} />;
   }
   return <AuthScreen view={view} go={go} onDemo={enterDemo} notice={session.notice} />;

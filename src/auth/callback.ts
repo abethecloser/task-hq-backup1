@@ -47,10 +47,38 @@ export function cleanUrl(href: string, route: string): string {
   return `${url.origin}${url.pathname}${url.search}${route}`;
 }
 
-export interface CallbackResult { recovery: boolean; notice: string | null }
+/** The address the page opened with, read before supabase-js consumes a `?code=` from it. */
+export const LANDING_HREF = typeof window === 'undefined' ? '' : window.location.href;
+
+// A magic link request is remembered in this browser (PKCE links only work in the browser that asked),
+// so the sign-in it produces can offer to set a password. Sign-up confirmations never get the offer.
+const MAGIC_KEY = 'tmhq.magic-link';
+const MAGIC_WINDOW = 2 * 60 * 60_000;
+export function rememberMagicLink(storage: Pick<Storage, 'setItem'> = localStorage, now = Date.now()) {
+  try { storage.setItem(MAGIC_KEY, String(now)); } catch { /* the offer is optional */ }
+}
+/** True once, within two hours of asking for a magic link in this browser. */
+export function takeMagicLink(storage: Pick<Storage, 'getItem' | 'removeItem'> = localStorage, now = Date.now()) {
+  try {
+    const at = Number(storage.getItem(MAGIC_KEY));
+    storage.removeItem(MAGIC_KEY);
+    return Number.isFinite(at) && at > 0 && now - at < MAGIC_WINDOW;
+  } catch { return false; }
+}
+
+export interface CallbackResult { recovery: boolean; notice: string | null; /** Signed in by magic link: offer to set a password (skippable). */ offerPassword?: boolean }
 
 /** Call after the client has initialised (await auth.getSession()), so it can't undo what this sets. */
-export async function handleAuthCallback(client: SupabaseClient, href = window.location.href): Promise<CallbackResult> {
+// One-time links are handled once per page load, even if the caller runs twice.
+let landing: Promise<CallbackResult> | null = null;
+
+export function handleAuthCallback(client: SupabaseClient, href = LANDING_HREF || window.location.href): Promise<CallbackResult> {
+  if (href !== LANDING_HREF) return handleLink(client, href);
+  landing ??= handleLink(client, href);
+  return landing;
+}
+
+async function handleLink(client: SupabaseClient, href: string): Promise<CallbackResult> {
   const found = parseAuthCallback(href);
   const land = (route: string) => window.history.replaceState(null, '', cleanUrl(href, route));
   switch (found.kind) {
@@ -64,20 +92,20 @@ export async function handleAuthCallback(client: SupabaseClient, href = window.l
       if (error) { land('#/auth/sign-in'); return { recovery: false, notice: linkProblem(error.code ?? '', error.message) }; }
       const recovery = found.type === 'recovery';
       land(recovery ? '#/auth/reset' : '#/');
-      return { recovery, notice: null };
+      return { recovery, notice: null, offerPassword: found.type === 'magiclink' };
     }
     case 'implicit': {
       const { error } = await client.auth.setSession({ access_token: found.accessToken, refresh_token: found.refreshToken });
       if (error) { land('#/auth/sign-in'); return { recovery: false, notice: linkProblem(error.code ?? '', error.message) }; }
       const recovery = found.type === 'recovery';
       land(recovery ? '#/auth/reset' : '#/');
-      return { recovery, notice: null };
+      return { recovery, notice: null, offerPassword: found.type === 'magiclink' };
     }
     case 'code': {
       // supabase-js has already exchanged a code this browser asked for (and removed it). A code still here
       // was requested in another browser or app, so it can't be completed in this one.
       const { data } = await client.auth.getSession();
-      if (data.session) return { recovery: false, notice: null };
+      if (data.session) return { recovery: false, notice: null, offerPassword: takeMagicLink() };
       land('#/auth/forgot');
       return { recovery: false, notice: 'Open the link in the same browser where you requested it, or request a new one here.' };
     }
