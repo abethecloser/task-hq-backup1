@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import brandMark from '../assets/brand/mark.png';
 import type { FormEvent, ReactNode } from 'react';
 import { backendConfigured, redirectUrl, supabase } from './client.ts';
+import { handleAuthCallback } from './callback.ts';
 import './auth.css';
 
 export type AuthView = 'sign-in' | 'magic' | 'sign-up' | 'forgot' | 'reset' | 'request';
@@ -17,12 +18,14 @@ function friendly(message: string) {
   if (/already registered|already been registered/i.test(message)) return 'An account with that email already exists. Sign in instead.';
   if (/rate limit|too many/i.test(message)) return 'Too many attempts. Wait a minute and try again.';
   if (/password/i.test(message) && /least|short|weak/i.test(message)) return 'Choose a stronger password (at least 8 characters).';
+  if (/session missing|reset-link-missing/i.test(message)) return 'This reset link has expired or was already used. Use Forgot password to get a new one.';
+  if (/different from the old password/i.test(message)) return 'Choose a password different from your current one.';
   return message;
 }
 
 const NOT_CONNECTED = 'Sign-in isn’t connected yet. This build has no Task-HQ backend, so accounts can’t be created or verified here.';
 
-export function AuthScreen({ view, go, onDemo }: { view: AuthView; go: (view: AuthView) => void; onDemo: () => void }) {
+export function AuthScreen({ view, go, onDemo, notice = null }: { view: AuthView; go: (view: AuthView) => void; onDemo: () => void; /** From an email link that couldn't be used. */ notice?: string | null }) {
   return (
     <div className="auth-page">
       <main className="auth-card">
@@ -37,6 +40,7 @@ export function AuthScreen({ view, go, onDemo }: { view: AuthView; go: (view: Au
         <section className="auth-panel">
           <div className="auth-icon" aria-hidden="true"><Glyph /></div>
           <div className="auth-form-wrap" key={view}>
+            {notice && view !== 'reset' && <Notice notice={{ tone: 'error', text: notice }} />}
             {view === 'sign-in' && <SignIn go={go} />}
             {view === 'magic' && <MagicLink go={go} />}
             {view === 'sign-up' && <SignUp go={go} />}
@@ -221,9 +225,12 @@ function Reset({ go }: { go: (view: AuthView) => void }) {
     <form noValidate onSubmit={event => void form.submit(event,
       (): Errors => (password.length < 8 ? { password: 'Use at least 8 characters.' } : {}),
       async client => {
+        // The recovery link (or an existing sign-in) provides the session; without one there's nothing to update.
+        const { data } = await client.auth.getSession();
+        if (!data.session) throw new Error('reset-link-missing');
         const { error } = await client.auth.updateUser({ password });
         if (error) throw error;
-        form.setSent({ title: 'Password updated', text: 'You can sign in with your new password.' });
+        form.setSent({ title: 'Password updated', text: 'Your new password is saved. Use it next time you sign in.' });
       })}>
       <Heading title="Choose a new password" subtitle="Use at least 8 characters." />
       <Field id="password" label="New password" type="password" value={password} onChange={setPassword} placeholder="At least 8 characters" autoComplete="new-password" error={form.errors.password} />
@@ -263,12 +270,22 @@ function RequestAccess({ go }: { go: (view: AuthView) => void }) {
 }
 
 export function useSession() {
-  const [state, setState] = useState<{ ready: boolean; email: string | null; recovery: boolean }>({ ready: !backendConfigured, email: null, recovery: false });
+  const [state, setState] = useState<{ ready: boolean; email: string | null; recovery: boolean; notice: string | null }>({ ready: !backendConfigured, email: null, recovery: false, notice: null });
   useEffect(() => {
     const client = supabase();
     if (!client) return;
-    void client.auth.getSession().then(({ data }) => setState(current => ({ ...current, ready: true, email: data.session?.user.email ?? null })));
-    const { data } = client.auth.onAuthStateChange((event, session) => setState({ ready: true, email: session?.user.email ?? null, recovery: event === 'PASSWORD_RECOVERY' }));
+    // Not ready until any email link in the address has been handled, so a recovery session never flashes the workspace first.
+    let settled = false;
+    const { data } = client.auth.onAuthStateChange((event, session) => {
+      if (settled) setState(current => ({ ...current, email: session?.user.email ?? null, recovery: event === 'PASSWORD_RECOVERY' }));
+    });
+    void (async () => {
+      await client.auth.getSession();
+      const link = await handleAuthCallback(client);
+      const { data: current } = await client.auth.getSession();
+      settled = true;
+      setState({ ready: true, email: current.session?.user.email ?? null, recovery: link.recovery, notice: link.notice });
+    })();
     return () => data.subscription.unsubscribe();
   }, []);
   return state;

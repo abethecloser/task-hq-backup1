@@ -41,6 +41,8 @@ function Root() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
   useEffect(() => { if (session.recovery) setView('reset'); }, [session.recovery]);
+  // An email link that couldn't be used lands on the page it chose (sign-in or forgot), with its notice.
+  useEffect(() => { if (session.notice) setView(authViewFromHash()); }, [session.notice]);
   useEffect(() => { document.title = mode === 'demo' ? PRODUCT.demo : `Sign in — ${PRODUCT.name}`; }, [mode]);
 
   function enterDemo() {
@@ -65,7 +67,7 @@ function Root() {
   if (session.email && client && view !== 'reset') {
     return <LiveRoot key={session.email} client={client} onSignOut={() => { history.replaceState(null, '', '#/auth/sign-in'); void client.auth.signOut(); }} onDemo={enterDemo} />;
   }
-  return <AuthScreen view={view} go={go} onDemo={enterDemo} />;
+  return <AuthScreen view={view} go={go} onDemo={enterDemo} notice={session.notice} />;
 }
 
 applyLook();

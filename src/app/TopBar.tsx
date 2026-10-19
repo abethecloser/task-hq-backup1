@@ -68,6 +68,7 @@ function UserChip({ quest }: { quest: Quest }) {
       {live
         ? <>
             <p className="menu-note">{me?.name && me.name !== live.email ? <><b>{me.name}</b><br />{live.email}</> : live.email}<br />{role} of {live.org.name}</p>
+            <button type="button" role="menuitem" onClick={() => { setOpen(false); location.hash = '#/auth/reset'; }}>Change password</button>
             {live.canSwitch && <button type="button" role="menuitem" onClick={() => { setOpen(false); live.onLeaveWorkspace(); }}>{live.isPlatformAdmin ? 'Platform console' : 'Switch workspace'}</button>}
             <button type="button" role="menuitem" onClick={() => { setOpen(false); live.onSignOut(); }}>Sign out</button>
           </>
