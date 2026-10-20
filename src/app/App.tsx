@@ -376,7 +376,16 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       <Sidebar
         control={leftReserved && leftReserved !== sidebar.width ? { ...sidebar, width: leftReserved } : sidebar}
         notifications={notifications}
-        unreadTotal={inboxUnread}
+        settings={close => <>
+          <p className="menu-note">{live ? <><b>{me.name && !me.name.includes('@') ? me.name : live.email}</b><br />{ROLE_LABELS[live.role]} · {live.org.name}</> : <><b>Task-HQ Demo</b><br />Synthetic people and data</>}</p>
+          <div className="rail-settings-look"><LookSwitch /></div>
+          {live && <button type="button" role="menuitem" onClick={() => { close(); location.hash = '#/auth/reset'; }}>Change password</button>}
+          {open('people') && allowed('people') && <button type="button" role="menuitem" onClick={() => { close(); go('people'); }}>People &amp; access</button>}
+          {open('settings') && allowed('settings') && <button type="button" role="menuitem" onClick={() => { close(); go('settings'); }}>Workspace settings<small>Policy &amp; data</small></button>}
+          {live
+            ? <button type="button" role="menuitem" onClick={() => { close(); live.onSignOut(); }}>Sign out</button>
+            : onExitDemo && <button type="button" role="menuitem" onClick={() => { close(); onExitDemo(); }}>Leave demo · sign in</button>}
+        </>}
         awareness={<Awareness quest={quest} control={sidebar} inbox={inbox} attention={awareAttention}
           onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
           onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />}

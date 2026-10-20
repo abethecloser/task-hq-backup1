@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, PointerEvent, ReactNode } from 'react';
 import type { Snooze } from '../core/awareness.ts';
 import type { Notification } from './notifications.ts';
+import { useDropdown } from '../ui/useDropdown.tsx';
 
 const MOBILE_QUERY = '(max-width: 760px)';
 export const PANEL_MIN = 232;
@@ -132,7 +133,7 @@ function unreadIn(notes: Notification[], read: Set<string>, section?: string) {
   return notes.filter(note => (!section || note.section === section) && !read.has(note.id)).length;
 }
 
-export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, awareness, unreadTotal }: {
+export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, awareness, settings }: {
   control: SidebarControl;
   items: SidebarItem[];
   brand: ReactNode;
@@ -143,13 +144,12 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
   notifications: Notification[];
   /** The pullout body: Inbox · Attention · Activity. */
   awareness: ReactNode;
-  /** Unread across the whole inbox (notifications and messages), for the bell. */
-  unreadTotal: number;
+  /** The settings menu at the foot of the rail; `close` dismisses it after a choice. */
+  settings: (close: () => void) => ReactNode;
 }) {
   const { read, isMobile } = control;
   const panel = useRef<HTMLElement>(null);
   const dragging = useRef(false);
-  const totalUnread = unreadTotal;
   const panelHidden = isMobile ? !control.mobileOpen : !control.open;
   // Rail labels: shown instantly on hover or keyboard focus, beside the icon. Rendered
   // outside the rail (position: fixed) so its scroll container never clips them.
@@ -170,10 +170,6 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
   useEffect(() => {
     if (isMobile && control.mobileOpen) panel.current?.querySelector<HTMLElement>('.panel-close')?.focus();
   }, [isMobile, control.mobileOpen]);
-
-  function focusNotifications() {
-    control.showTab('inbox');
-  }
 
   function onResizeKey(event: KeyboardEvent) {
     const step = event.shiftKey ? 48 : 16;
@@ -245,13 +241,7 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
           <span className="nav-icon" aria-hidden="true">+</span>
         </button>
         <div className="sidebar-foot">
-          <button type="button" className="nav-item rail-bell" onClick={focusNotifications}
-            aria-label={`Awareness${totalUnread ? `, ${totalUnread} unread` : ''}`} {...hintFor('Inbox · Attention · Activity', totalUnread ? `${totalUnread} unread` : 'What changed and what needs you')}>
-            <span className="nav-icon">
-              <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4" /></svg>
-              {totalUnread > 0 && <span className="rail-unread" aria-hidden="true">{totalUnread > 9 ? '9+' : totalUnread}</span>}
-            </span>
-          </button>
+          <RailSettings hint={hintFor('Settings', 'Account, look and workspace')}>{settings}</RailSettings>
           <button type="button" className="nav-toggle" onClick={control.toggle} aria-controls="quest-sidebar" aria-expanded={control.open}
             aria-label={control.open ? 'Collapse sidebar' : 'Expand sidebar'} {...hintFor(control.open ? 'Collapse sidebar' : 'Expand sidebar')}>
             <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={control.open ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} /></svg>
@@ -300,6 +290,30 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
             onKeyDown={onResizeKey} onDoubleClick={() => control.setWidth(PANEL_DEFAULT)} />
         )}
       </aside>
+    </>
+  );
+}
+
+/** Settings, at the foot of the rail. The menu is fixed beside the button so the rail's scroll never clips it. */
+type HintHandlers = { onMouseEnter: (event: { currentTarget: HTMLElement }) => void; onFocus: (event: { currentTarget: HTMLElement }) => void; onMouseLeave: () => void; onBlur: () => void };
+function RailSettings({ hint, children }: { hint: HintHandlers; children: (close: () => void) => ReactNode }) {
+  const [at, setAt] = useState<{ left: number; bottom: number } | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setAt(null), []);
+  useDropdown({ open: !!at, onClose: close, trigger: () => button.current, content: () => menu.current });
+  function toggle() {
+    const box = button.current?.getBoundingClientRect();
+    setAt(at || !box ? null : { left: box.right + 8, bottom: Math.max(8, window.innerHeight - box.bottom) });
+  }
+  return (
+    <>
+      <button ref={button} type="button" className={`nav-item rail-settings ${at ? 'is-active' : ''}`} aria-label="Settings" aria-haspopup="menu" aria-expanded={!!at} onClick={toggle} {...hint}>
+        <span className="nav-icon">
+          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
+        </span>
+      </button>
+      {at && <div ref={menu} className="top-menu rail-settings-menu" role="menu" aria-label="Settings" style={{ left: at.left, bottom: at.bottom }}>{children(close)}</div>}
     </>
   );
 }
