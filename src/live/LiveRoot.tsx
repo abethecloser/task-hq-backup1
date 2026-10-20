@@ -9,7 +9,7 @@ import type { LiveAccount, OrgRole } from '../app/LiveContext.tsx';
 import { createLiveBackend } from '../adapter/live.ts';
 import { Glyph } from '../auth/AuthScreen.tsx';
 import { PRODUCT } from '../core/workspace.ts';
-import { AUTHENTICATED_NAVIGATION, forOrg } from '../core/navigation.ts';
+import { CLOSED, forOrg, parseNavigation } from '../core/navigation.ts';
 import type { NavigationAccess } from '../core/navigation.ts';
 import { PlatformConsole } from './PlatformConsole.tsx';
 import './live.css';
@@ -39,7 +39,7 @@ export const errorText = (reason: unknown) => {
 
 export function LiveRoot({ client, onSignOut, onDemo }: { client: SupabaseClient; onSignOut: () => void; onDemo: () => void }) {
   const [context, setContext] = useState<MyContext | null>(null);
-  const navigation = AUTHENTICATED_NAVIGATION;
+  const [navigation, setNavigation] = useState<NavigationAccess>(CLOSED);
   const [error, setError] = useState('');
   const [orgId, setOrgId] = useState<string | null>(() => { try { return localStorage.getItem(ORG_KEY); } catch { return null; } });
   const [console_, setConsole] = useState(false);
@@ -49,6 +49,8 @@ export function LiveRoot({ client, onSignOut, onDemo }: { client: SupabaseClient
     setError('');
     const { data, error: rpcError } = await client.rpc('my_context');
     if (rpcError || !data) { setError(rpcError ? errorText(rpcError) : 'Could not load your account.'); return; }
+    const access = await client.rpc('my_navigation');
+    setNavigation(access.error ? CLOSED : parseNavigation(access.data));
     setContext(data as MyContext);
   }, [client]);
   useEffect(() => { void refresh(); }, [refresh]);
