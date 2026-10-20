@@ -57,6 +57,9 @@ import { CLOSED, UNDER_CONSTRUCTION, canManage, canNavigate, isManageView } from
 import { panelLayout } from '../core/layout.ts';
 import type { Notification } from './notifications.ts';
 
+// Product feedback is archived for the team; only this account still sees it.
+const FEEDBACK_KEEPER = 'team@enternovum.com';
+
 export type View = 'home' | 'reports' | 'all-tasks' | 'inbox' | 'tools' | 'company-work' | 'needs-attention' | 'leads' | 'executive' | 'people' | 'feedback' | 'activity' | 'settings' | 'agents' | 'relationships' | 'search';
 
 // All Tasks shows company-wide work, so Critical Focus gates it exactly like Company Work.
@@ -131,6 +134,7 @@ export default function App({ onExitDemo, backend }: { onExitDemo?: () => void; 
 function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void }) {
   const { state, actor, now, dispatch } = quest;
   const live = useLive();
+  const feedbackOn = live?.email?.toLowerCase() === FEEDBACK_KEEPER;
   const initial = parseHash();
   const [requested, setRequested] = useState<View>(initial.view);
   const [taskId, setTaskId] = useState<string | null>(initial.taskId);
@@ -218,7 +222,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const access = live?.navigation ?? CLOSED;
   // Work / Manage: a permanent permission from organization role (demo: work role), separate from the temporary restriction.
   const manager = canManage(live ? live.role : me.role === 'manager' ? 'owner' : me.role === 'coordinator' ? 'supervisor' : me.role);
-  const open = (next: View) => (manager || !isManageView(next)) && canNavigate(access, next);
+  const open = (next: View) => (manager || !isManageView(next)) && canNavigate(access, next) && (next !== 'feedback' || feedbackOn);
   const underConstruction = () => quest.say(UNDER_CONSTRUCTION);
   const view: View = allowed(requested) && open(requested) && (requested !== 'executive' || hasDesk) ? requested : 'home';
 
@@ -326,7 +330,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     { id: 'people', label: 'Team', count: state.people.length, icon: <Icon d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" /> },
     { id: 'reports', label: 'Reports', icon: <Icon d="M4 20V10M10 20V4M16 20v-7M22 20H2" /> },
     { id: 'activity', label: 'Activity', icon: <Icon d="M4 12h4l3-7 3 14 3-7h3" /> },
-    { id: 'feedback', label: 'Feedback', count: state.feedback.filter(item => item.status !== 'resolved').length, icon: <Icon d="M4 5h16v11H9l-5 4z" /> },
+    ...(feedbackOn ? [{ id: 'feedback' as View, label: 'Feedback', count: state.feedback.filter(item => item.status !== 'resolved').length, icon: <Icon d="M4 5h16v11H9l-5 4z" /> }] : []),
     { id: 'settings', label: 'Policy & data', icon: <Icon d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3" /> },
     ...(state.policy.agentPilot ? [{ id: 'agents' as View, label: 'Agent pilot', icon: <Icon d="M12 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM5 21a7 7 0 0 1 14 0" /> }] : []),
   ];
@@ -398,7 +402,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           onTab={id => { if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} onSearch={openSearch} searchOpen={open('search')} onAsk={() => setAskOpen(value => !value)} onBell={() => sidebar.showTab('inbox')}
           onMenu={sidebar.openMobile} menuOpen={sidebar.mobileOpen} />
 
-        <FeedbackBar quest={quest}><CompanySignals quest={quest} onOpen={openTask} /></FeedbackBar>
+        <FeedbackBar quest={quest} preferences={feedbackOn}><CompanySignals quest={quest} onOpen={openTask} /></FeedbackBar>
         {focused && grant && <GrantBar quest={quest} grant={grant} onReturn={() => { closeTask(); go('home'); }} />}
 
         <section className={`content view-${selected && contextAllowed ? 'task' : view}`}>
@@ -468,7 +472,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       )}
       {askOpen && !focused && <AskTasks quest={quest} company={company} onClose={() => setAskOpen(false)} />}
       {creating && canCreate && <CreateTask quest={quest} onClose={() => setCreating(false)} onCreated={id => { setCreating(false); openTask(id); }} />}
-      <ReviewLayer quest={quest} openRequest={reviewRequest}
+      {feedbackOn && <ReviewLayer quest={quest} openRequest={reviewRequest}
         screen={{ view: VIEW_LABELS[view], route: `#/${view}${view === 'leads' && leadId ? `/${leadId}` : ''}`, taskId: selected?.id ?? '', leadId: view === 'leads' && leadId ? leadId : '', deck: view === 'leads' && leadId ? 'lead' : selected ? 'task' : '' }}
         itemId={feedbackId} onItem={id => { setFeedbackId(id); if (!id && location.hash.startsWith('#/feedback/')) history.replaceState(null, '', '#/feedback'); }}
         onNavigate={target => {
@@ -476,7 +480,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           if (target.taskId) { openTask(target.taskId); return; }
           if (target.leadId) { openLead(target.leadId); return; }
           if (target.route) { location.hash = target.route; }
-        }} />
+        }} />}
       <ToastBar toast={quest.feedback.cue?.text === quest.toast?.text ? null : quest.toast} onUndo={eventId => void dispatch({ type: 'undo', eventId })} onDismiss={quest.dismissToast} />
     </div>
   );

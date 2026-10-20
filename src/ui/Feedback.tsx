@@ -12,7 +12,7 @@ export function feedbackAttributes(cue?: FeedbackCue) {
 }
 export function useFeedbackRecord(id?: string) { const feedback = useContext(Context); return id ? feedbackAttributes(feedback?.record(id)) : {}; }
 export function RecordCue({ id }: { id: string }) { const f = useContext(Context), cue = f?.record(id); return cue ? <small className="record-cue" key={cue.id} data-feedback={cue.signature}>{cue.phase === 'processing' || cue.phase === 'acknowledged' ? 'Saving…' : `${cue.passive ? 'Incoming · ' : ''}${FEEDBACK[cue.signature].label}`}</small> : null; }
-export function FeedbackBar({ quest, children }: { quest: Quest; children?: ReactNode }) {
+export function FeedbackBar({ quest, preferences = true, children }: { quest: Quest; preferences?: boolean; children?: ReactNode }) {
   const { cue } = quest.feedback;
   const [sound, setSound] = useSoundPreference();
   const [haptics, setHaptics] = useState(false);
@@ -43,7 +43,7 @@ export function FeedbackBar({ quest, children }: { quest: Quest; children?: Reac
     <div className="feedback-controls">
       {undo && <button type="button" className="btn btn-sm" onClick={() => void quest.dispatch({ type: 'undo', eventId: undo })}>Undo ↶</button>}
       {cue && !pending && <button type="button" className="icon-btn" aria-label="Dismiss operational feedback" onClick={quest.feedback.dismiss}>×</button>}
-      <DropdownDetails><summary aria-label="Sensory feedback preferences">Feedback</summary><div className="feedback-preferences"><label><input type="checkbox" checked={sound} onChange={e => setSound(e.target.checked)} />Event tones</label><label><input type="checkbox" checked={haptics} disabled={typeof navigator.vibrate !== 'function'} onChange={e => setHaptics(e.target.checked)} />Haptics {typeof navigator.vibrate !== 'function' && '(unavailable)'}</label><small>Audio starts only after your interaction. System reduced-motion settings are respected.</small></div></DropdownDetails>
+      {preferences && <DropdownDetails><summary aria-label="Sensory feedback preferences">Feedback</summary><div className="feedback-preferences"><label><input type="checkbox" checked={sound} onChange={e => setSound(e.target.checked)} />Event tones</label><label><input type="checkbox" checked={haptics} disabled={typeof navigator.vibrate !== 'function'} onChange={e => setHaptics(e.target.checked)} />Haptics {typeof navigator.vibrate !== 'function' && '(unavailable)'}</label><small>Audio starts only after your interaction. System reduced-motion settings are respected.</small></div></DropdownDetails>}
     </div>
   </section>;
 }
