@@ -13,7 +13,6 @@ import { firstName, projectName } from '../core/selectors.ts';
 import { localDate, shortDate } from '../core/time.ts';
 import { Avatar, Empty } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
-import { Composer } from './Composer.tsx';
 import { JobPicker } from './JobPicker.tsx';
 import { AssigneeSelect, DueInput, PrioritySelect, StatusMenu } from './TaskControls.tsx';
 import { ActiveFilters, FILTER_DEFAULTS, FilterSection, activeFilterCount, filterFields, sameFilters } from './RegistryFilters.tsx';
@@ -129,7 +128,6 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
         )}
       </header>
 
-      {canCreate && <Composer quest={quest} variant="registry" />}
 
       <div className="registry-controls">
       <div className="registry-tools" role="group" aria-label="Search, filter and sort">
