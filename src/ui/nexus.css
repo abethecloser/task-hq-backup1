@@ -207,9 +207,8 @@ body { background: var(--canvas); }
 .segmented button { min-height: 28px; padding: 0 11px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 700; }
 .segmented button.is-on { background: var(--sunk); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hair); }
 
-.registry-table { display: grid; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); }
-.registry-row.is-head { border-radius: var(--radius) var(--radius) 0 0; }
-.registry-row:last-child { border-radius: 0 0 var(--radius) var(--radius); }
+/* Tables run the full width with no side edges: rows are separated by lines only. */
+.registry-table { display: grid; border-bottom: 1px solid var(--hair); background: var(--card); }
 .registry-row { display: grid; grid-template-columns: minmax(0, 1fr) 156px 168px 104px 142px; align-items: center; gap: 12px; min-height: 64px; padding: 9px 16px; border-top: 1px solid var(--hair); cursor: pointer; transition: background .12s; animation: rise .38s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 16ms); }
 .registry-row.is-head { min-height: 38px; border-top: 0; background: var(--surface-2); cursor: default; animation: none; color: var(--faint); font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .registry-row:not(.is-head):hover { background: var(--surface-2); }
@@ -651,7 +650,7 @@ i.sev.sev-high { background: var(--accent); }
 .tools-form-actions { display: flex; gap: 8px; }
 .check { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
 .check input { min-height: 0; }
-.tools-table { display: grid; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); overflow: hidden; }
+.tools-table { display: grid; border-block: 1px solid var(--hair); background: var(--card); overflow: hidden; }
 .tools-row { display: grid; grid-template-columns: minmax(0, 2fr) 150px 110px 130px minmax(0, 1.4fr); align-items: center; gap: 12px; min-height: 56px; padding: 9px 16px; border: 0; border-top: 1px solid var(--hair); background: transparent; color: inherit; font-size: 13px; text-align: left; }
 .tools-row:first-child { border-top: 0; }
 .tools-row:not(.is-head):hover { background: var(--sunk); }
