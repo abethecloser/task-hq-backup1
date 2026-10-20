@@ -236,10 +236,6 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
             );
           })}
         </nav>
-        <button type="button" className="nav-create" disabled={!create.enabled} aria-label="New task"
-          {...hintFor('New task', create.enabled ? 'Shortcut: N' : 'Locked during Critical Focus')} onClick={create.onCreate}>
-          <span className="nav-icon" aria-hidden="true">+</span>
-        </button>
         <div className="sidebar-foot">
           <RailSettings hint={hintFor('Settings', 'Account, look and workspace')}>{settings}</RailSettings>
           <button type="button" className="nav-toggle" onClick={control.toggle} aria-controls="quest-sidebar" aria-expanded={control.open}
