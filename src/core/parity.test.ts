@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Action, QuestState } from './contract.ts';
 import { apply } from './engine.ts';
-import { canAssignOthers, canCreateTask, canEditTask, canReopenTask, lockedTaskFields, offersMoveForward } from './permissions.ts';
+import { canAssignOthers, canCreateTask, canEditTask, canReopenTask, lockedTaskFields, offersMoveForward, statusAction, statusMoves } from './permissions.ts';
 import { seedState } from './seed.ts';
 
 const T0 = new Date('2026-10-17T09:00:00').getTime();
@@ -120,4 +120,27 @@ test('live authority: Move Work Forward and Ultra locks still agree with the eng
     if (ui !== engine) mismatch.push(`${name}: advance ${who.id} → ${task.id} ui=${ui} engine=${engine}`);
   }
   assert.deepEqual(mismatch, []);
+});
+
+test('status pill: every move it offers is one the engine accepts', () => {
+  const serverStricter: string[] = [];
+  for (const { name, state } of [...states(), ...liveStates()]) for (const who of state.people) for (const task of state.tasks) {
+    for (const move of statusMoves(state, task, who.id, T0)) {
+      const result = run(state, who.id, statusAction(task, move, 'Parity check'));
+      if (!result.ok) { serverStricter.push(`${name}: ${move.key} ${who.id} → ${task.id}: ${result.error}`); continue; }
+      const after = result.state.tasks.find(item => item.id === task.id)!;
+      if (after.status !== move.to) serverStricter.push(`${name}: ${move.key} ${who.id} → ${task.id} became ${after.status}, pill said ${move.to}`);
+    }
+  }
+  assert.deepEqual(serverStricter, []);
+});
+
+test('status pill: blocked and send-back are offered whenever the engine would accept them', () => {
+  const uiStricter: string[] = [];
+  for (const { name, state } of [...states(), ...liveStates()]) for (const who of state.people) for (const task of state.tasks) {
+    const keys = statusMoves(state, task, who.id, T0).map(move => move.key);
+    if (task.status !== 'blocked' && !keys.includes('block') && run(state, who.id, { type: 'task/request-help', id: task.id, note: 'Probe' }).ok) uiStricter.push(`${name}: block ${who.id} → ${task.id}`);
+    if (!keys.includes('send-back') && run(state, who.id, { type: 'task/send-back', id: task.id, note: 'Probe' }).ok) uiStricter.push(`${name}: send-back ${who.id} → ${task.id}`);
+  }
+  assert.deepEqual(uiStricter, []);
 });

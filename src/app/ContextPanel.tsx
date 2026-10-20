@@ -1,204 +1,26 @@
 import { Select } from '../ui/Select.tsx';
-import { useFeedbackRecord } from '../ui/Feedback.tsx';
-import { ReferenceInput, ReferenceTextarea, ReferencedText } from '../ui/ReferenceEditor.tsx';
-// RIGHT ZONE — Context & Execution. With a task selected it shows identity,
-// ownership, urgency, dependencies, history and the authorized next actions
-// (composed by the engine, never invented here). With nothing selected it shows
-// compact operational signals, or stays collapsed when there is nothing to say.
+// RIGHT ZONE — the Instrument Deck: compact operational signals, the due-date calendar
+// and system insights, or collapsed when there is nothing to say. An open task is a
+// full page in the canvas (TaskPage.tsx), never a side panel.
 // Docked beside the canvas on wide screens (the canvas reflows); a drawer otherwise.
 import { useEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
-import type { EditableTaskFields, Task } from '../core/contract.ts';
+import type { Task } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
 import { dailySignal } from '../core/executive.ts';
 import type { Lens, RegistryQuery } from '../core/registry.ts';
 import { digest, dueOn, heatGrid, systemInsights } from '../core/dashboard.ts';
 import type { SystemInsight } from '../core/dashboard.ts';
-import { canAssignOthers, canEditTask, canReopenTask, lockedTaskFields } from '../core/permissions.ts';
-import { blockingDeps, dependents, firstName, isOpen, isOverdue, leadById, nameOf, projectName, taskById } from '../core/selectors.ts';
-import { localDate, shortDate } from '../core/time.ts';
-import { Avatar, PersonSelect, StatusPill, TaskTags } from '../ui/components.tsx';
+import { firstName, isOpen, isOverdue } from '../core/selectors.ts';
+import { localDate } from '../core/time.ts';
 import type { Quest } from '../ui/useQuest.ts';
 import type { Notification } from './notifications.ts';
 import { NOTIFICATION_LABELS } from './notifications.ts';
-import { TaskSituation } from './WorkSurface.tsx';
-
-const when = (at: number) => new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-
-export function TaskContext({ quest, task, docked, onClose, onOpen }: { quest: Quest; task: Task; docked: boolean; onClose: () => void; onOpen: (id: string) => void }) {
-  const { state, actor, now, dispatch } = quest;
-  const [title, setTitle] = useState(task.title);
-  const [nextAction, setNextAction] = useState(task.nextAction);
-  const [description, setDescription] = useState(task.description);
-  const [comment, setComment] = useState('');
-  const [waitingOn, setWaitingOn] = useState(task.waitingOn);
-  const feedback = useFeedbackRecord(task.id);
-  const panel = useRef<HTMLElement>(null);
-  useEffect(() => { setTitle(task.title); setNextAction(task.nextAction); setDescription(task.description); setWaitingOn(task.waitingOn); }, [task.title, task.nextAction, task.description, task.waitingOn]);
-  useEffect(() => { if (!docked) panel.current?.querySelector<HTMLElement>('.context-close')?.focus(); }, [docked, task.id]);
-
-  const me = state.people.find(item => item.id === actor);
-  const reviewer = me?.role === 'reviewer';
-  const lockedFields = lockedTaskFields(state, task, actor);
-  // Live members edit their own tasks; on anyone else's they can comment, watch and ask for help where they're involved.
-  const editable = canEditTask(state, task, actor);
-  const assigns = canAssignOthers(state, actor);
-  const update = (changes: Partial<EditableTaskFields>) => dispatch({ type: 'task/update', id: task.id, changes });
-  const saveText = (key: 'title' | 'nextAction' | 'description' | 'waitingOn', value: string) => { if (value.trim() !== task[key]) void update({ [key]: value.trim() }); };
-  const lead = task.leadId ? leadById(state, task.leadId) : undefined;
-  const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter(item => item !== id) : [...list, id]);
-  const candidates = state.tasks.filter(item => (item.id !== task.id && item.status !== 'done') || task.dependsOn.includes(item.id));
-  const waitsOn = task.dependsOn.map(id => taskById(state, id)).filter((item): item is Task => !!item);
-  const unlocks = dependents(state, task);
-  const history = state.events.filter(event => event.taskId === task.id).slice(0, 8);
-  const created = state.events.find(event => event.taskId === task.id && event.text.includes('created'));
-  const today = localDate(now);
-
-  return (
-    <aside {...feedback} data-feedback-record={task.id} ref={panel} className={`context context-task ${docked ? 'is-docked' : 'is-drawer'}`}
-      role={docked ? 'complementary' : 'dialog'} aria-modal={docked ? undefined : true} aria-labelledby="context-title"
-      onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}>
-      <header className="context-head">
-        <span className="context-label">Instrument deck</span>
-        <span className={`ctx-verify ${quest.backend.kind === 'live' ? 'is-live' : ''}`} title={quest.backend.kind === 'live' ? 'Every change is checked again by the server before it is saved.' : 'Demo: every change is checked by the same rules engine, on this device.'}>{quest.backend.kind === 'live' ? 'Server-enforced' : 'Local · engine-checked'}</span>
-        <button type="button" className="icon-btn context-close" aria-label="Close task" onClick={onClose}>×</button>
-      </header>
-      <div className="context-body">
-        <section className="ctx-identity">
-          <p className="ctx-eyebrow">{projectName(state, task.projectId) || 'No project'}{task.leadId ? ' · from a lead' : ''}</p>
-          <ReferenceTextarea id="context-title" className="title-edit" rows={2} referenceDocument={task.references?.title} value={title} maxLength={160} readOnly={!editable}
-            onChange={event => setTitle(event.target.value)} onBlur={() => saveText('title', title)} aria-label="Task name" />
-          <p className="ctx-sub">Created by {nameOf(state, task.createdBy, 'someone')}{created ? ` · ${when(created.at)}` : ''} · updated {when(task.updatedAt)}</p>
-          <div className="ctx-tags"><TaskTags state={state} task={task} now={now} /></div>
-        </section>
-
-        <dl className="ctx-state" aria-label="State, owner, priority and due date">
-          <div><dt>State</dt><dd><span className={`state-dot dot-${task.status}`} aria-hidden="true" />{STATUS_LABELS[task.status]}</dd></div>
-          <div><dt>Owner</dt><dd><Avatar state={state} id={task.owner} size="sm" />{task.owner ? (task.owner === actor ? 'You' : nameOf(state, task.owner)) : <em>Unassigned</em>}</dd></div>
-          <div><dt>Priority</dt><dd>{task.ultra ? 'Ultra Priority' : task.priority === 'high' ? 'High' : 'Normal'}</dd></div>
-          <div><dt>Due</dt><dd className={isOverdue(task, now) ? 'text-danger' : ''}>{task.due ? shortDate(task.due, today) : '—'}{task.dueTime ? ` · ${task.dueTime}` : ''}{isOverdue(task, now) ? ' · overdue' : ''}</dd></div>
-        </dl>
-        <dl className="ctx-grid" aria-label="People and classification">
-          {task.type && <div><dt>Type</dt><dd>{state.taxonomy?.types.find(item => item.id === task.type)?.label ?? task.type}</dd></div>}
-          {(task.tags ?? []).length > 0 && <div><dt>Tags</dt><dd>{(task.tags ?? []).map(tag => `#${tag}`).join(' ')}</dd></div>}
-          <div><dt>Next step owner</dt><dd>{task.nextOwner ? nameOf(state, task.nextOwner) : '—'}</dd></div>
-          <div><dt>Approver</dt><dd>{task.approver ? nameOf(state, task.approver) : 'None'}</dd></div>
-          {task.decisionOwner && <div><dt>Decision owner</dt><dd>{nameOf(state, task.decisionOwner)}</dd></div>}
-          {task.waitingOn && <div><dt>Waiting on</dt><dd>{task.waitingOn}</dd></div>}
-        </dl>
-
-        {task.status !== 'done' && (
-          <label className="field next-field"><span>Next action</span>
-            <ReferenceInput referenceDocument={task.references?.nextAction} value={nextAction} maxLength={200} readOnly={!editable} placeholder="The next physical step, in one line" onChange={event => setNextAction(event.target.value)} onBlur={() => saveText('nextAction', nextAction)} onKeyDown={event => { if (event.key === 'Enter') (event.target as HTMLInputElement).blur(); }} />
-          </label>
-        )}
-
-        {task.status === 'done' ? <Completed quest={quest} task={task} /> : <TaskSituation quest={quest} taskId={task.id} onOpen={onOpen} />}
-
-        {lead && <div className="callout"><b>Lead</b> {lead.name} · {lead.phone} · {lead.address}</div>}
-
-        {(waitsOn.length > 0 || unlocks.length > 0) && (
-          <section className="ctx-deps" aria-label="Dependencies">
-            {waitsOn.length > 0 && <>
-              <h4 className="ctx-label">Starts after</h4>
-              <ul>{waitsOn.map(item => <li key={item.id}><button type="button" className="ctx-link" onClick={() => onOpen(item.id)}><span className={`state-dot dot-${item.status}`} aria-hidden="true" />{item.title}<small>{item.status === 'done' ? 'done' : `${firstName(state, item.owner, 'unassigned')} · ${item.status}`}</small></button></li>)}</ul>
-            </>}
-            {unlocks.length > 0 && <>
-              <h4 className="ctx-label">Unlocks</h4>
-              <ul>{unlocks.map(item => <li key={item.id}><button type="button" className="ctx-link" onClick={() => onOpen(item.id)}><span className={`state-dot dot-${item.status}`} aria-hidden="true" />{item.title}<small>{firstName(state, item.owner || task.nextOwner, 'needs an owner')}</small></button></li>)}</ul>
-            </>}
-            {blockingDeps(state, task).length > 0 && isOpen(task) && <p className="muted">This task can’t move until the work above is done.</p>}
-          </section>
-        )}
-
-        {history.length > 0 && (
-          <section className="ctx-history" aria-label="History">
-            <h4 className="ctx-label">History & evidence</h4>
-            <ol>{history.map(event => <li key={event.id} className={event.undone ? 'is-undone' : ''}><time>{when(event.at)}</time><p><ReferencedText text={event.text} document={event.references?.text} /></p></li>)}</ol>
-          </section>
-        )}
-
-        {!reviewer && !editable && (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => void update({ watchers: toggle(task.watchers, actor) })}>{task.watchers.includes(actor) ? 'Stop watching' : 'Watch this task'}</button>
-        )}
-        {editable && (
-          <details className="drawer-details">
-            <summary>Edit people, dates & dependencies</summary>
-            <div className="roles">
-              <label className="field"><span>Owner (does the work)</span><PersonSelect state={state} label="Owner" value={task.owner} emptyLabel="Unassigned" disabled={lockedFields || !assigns} onChange={id => void update({ owner: id })} />{!assigns && <small className="field-hint">Use Hand off to pass your task on. A supervisor, admin or owner reassigns work.</small>}</label>
-              <label className="field"><span>Next-step owner (receives the handoff)</span><PersonSelect state={state} label="Next-step owner" value={task.nextOwner} onChange={id => void update({ nextOwner: id })} /></label>
-              <label className="field"><span>Approver (reviews before done)</span><PersonSelect state={state} label="Approver" value={task.approver} emptyLabel="No approval needed" onChange={id => void update({ approver: id })} /></label>
-              <label className="field"><span>Decision owner</span><PersonSelect state={state} label="Decision owner" value={task.decisionOwner} onChange={id => void update({ decisionOwner: id })} /></label>
-              <label className="field"><span>Waiting on (outside Task-HQ)</span><ReferenceInput value={waitingOn} maxLength={120} placeholder="e.g. City permit office" onChange={event => setWaitingOn(event.target.value)} onBlur={() => saveText('waitingOn', waitingOn)} /></label>
-              <div className="field"><span>Watchers / coordinators</span>
-                <div className="watchers">{state.people.filter(item => item.role !== 'reviewer').map(item => (
-                  <button key={item.id} type="button" className={`chip ${task.watchers.includes(item.id) ? 'is-on' : ''}`} onClick={() => void update({ watchers: toggle(task.watchers, item.id) })}>{item.name.split(' ')[0]}</button>
-                ))}</div>
-              </div>
-              <label className="field"><span>Due</span><input type="date" value={task.due} disabled={lockedFields} onChange={event => void update({ due: event.target.value })} /></label>
-              <label className="field"><span>Priority</span><Select value={task.priority} disabled={lockedFields} onChange={event => void update({ priority: event.target.value as Task['priority'] })}><option value="normal">Normal</option><option value="high">High</option></Select></label>
-              <label className="field"><span>Project</span><Select value={task.projectId} onChange={event => void update({ projectId: event.target.value })}><option value="">No project</option>{state.projects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
-              {quest.backend.supports?.taskTaxonomy !== false && <>
-                <label className="field"><span>Time</span><input type="time" value={task.dueTime ?? ''} disabled={!task.due} onChange={event => void update({ dueTime: event.target.value || undefined })} /></label>
-                {(state.taxonomy?.types.length ?? 0) > 0 && <label className="field"><span>Type</span><Select value={task.type ?? ''} onChange={event => void update({ type: event.target.value || undefined })}><option value="">No type</option>{state.taxonomy!.types.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</Select></label>}
-                <label className="field"><span>Tags</span><input defaultValue={(task.tags ?? []).join(' ')} placeholder="permits safety" onBlur={event => { const tags = event.target.value.split(/[\s,]+/).map(tag => tag.replace(/^#/, '').toLowerCase()).filter(Boolean); if (tags.join(' ') !== (task.tags ?? []).join(' ')) void update({ tags }); }} /></label>
-              </>}
-            </div>
-            <details className="deps">
-              <summary>Depends on ({task.dependsOn.length})</summary>
-              {candidates.map(item => <label key={item.id} className="dep-check"><input type="checkbox" checked={task.dependsOn.includes(item.id)} onChange={() => void update({ dependsOn: toggle(task.dependsOn, item.id) })} />{item.title}</label>)}
-            </details>
-            <label className="field"><span>Notes</span><ReferenceTextarea referenceDocument={task.references?.description} rows={3} value={description} maxLength={1000} onChange={event => setDescription(event.target.value)} onBlur={() => saveText('description', description)} /></label>
-            {!reviewer && <form className="task-comment-form" onSubmit={async e => { e.preventDefault(); const r = await dispatch({ type: 'task/comment', id: task.id, note: comment }); if (r.ok) setComment(''); }}><label className="field"><span>Comment</span><ReferenceTextarea rows={2} maxLength={2000} value={comment} onChange={e => setComment(e.target.value)} aria-label="Task comment" placeholder="Add a note with @people or #tags" /></label><button className="btn btn-sm" disabled={!comment.trim()}>Add comment</button></form>}
-            {task.dependsOn.some(id => !taskById(state, id)) && <p className="muted">A dependency was removed.</p>}
-          </details>
-        )}
-      </div>
-    </aside>
-  );
-}
-
-/** Completed work: who finished it, and the authorized way to reopen it. */
-function Completed({ quest, task }: { quest: Quest; task: Task }) {
-  const { state, actor, dispatch, backend } = quest;
-  const [note, setNote] = useState('');
-  const [open, setOpen] = useState(false);
-  const finish = state.events.find(event => event.taskId === task.id && !event.undone && event.undo?.tasks[task.id] && event.undo.tasks[task.id]!.status !== 'done');
-  const latest = state.events.find(event => event.taskId === task.id && !event.undone);
-  const canUndo = !!finish && finish === latest && finish.actor === actor && !!finish.undo;
-  // The deployed live server predates `task/reopen`; until the staged dispatch
-  // function is released, live reopen is limited to undoing your own completion.
-  const reopenAvailable = backend.kind !== 'live';
-  const allowed = canReopenTask(state, task, actor);
-
-  async function reopen(event: FormEvent) {
-    event.preventDefault();
-    const result = await dispatch({ type: 'task/reopen', id: task.id, note });
-    if (result.ok) { setNote(''); setOpen(false); }
-  }
-  return (
-    <section className="ctx-done" aria-label="Completed">
-      <p className="ctx-label">Completed</p>
-      <p><b>{task.completedAt ? when(task.completedAt) : 'Done'}</b>{finish ? ` · ${nameOf(state, finish.actor, 'someone')}` : ''}</p>
-      {canUndo && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void dispatch({ type: 'undo', eventId: finish!.id })}>Undo my completion</button>}
-      {allowed && reopenAvailable && !open && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(true)}>Reopen…</button>}
-      {allowed && reopenAvailable && open && (
-        <form className="offer-form" onSubmit={event => void reopen(event)}>
-          <label className="field"><span>Why is it being reopened?</span><ReferenceInput autoFocus required maxLength={200} value={note} onChange={event => setNote(event.target.value)} placeholder="Becomes the next action" /></label>
-          <span className="offer-form-actions"><button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>Cancel</button><button className="btn btn-primary btn-sm" disabled={!note.trim()}>Reopen</button></span>
-        </form>
-      )}
-      {allowed && !reopenAvailable && !canUndo && <p className="muted">Reopening finished work arrives with the next server release. Until then, create a follow-up task.</p>}
-    </section>
-  );
-}
 
 export type DeckSection = 'signals' | 'calendar' | 'insights';
 const DECK_SECTIONS: { id: DeckSection; label: string }[] = [{ id: 'signals', label: 'Signals' }, { id: 'calendar', label: 'Calendar' }, { id: 'insights', label: 'Insights' }];
 
 /** Nothing selected: the Instrument Deck's contextual sections. Operational signals, the due-date
- * calendar and deterministic system insights, each linked to the work behind it. A selected task
- * replaces all of this with TaskContext, so there is only ever one right-side panel. */
+ * calendar and deterministic system insights, each linked to the work behind it. */
 export function Signals({ quest, notifications, company, section, onSection, docked = true, onOpenNotification, onOpenTask, onLens, onRegistry, onClose }: {
   quest: Quest; notifications: Notification[]; company: boolean; section: DeckSection; onSection: (next: DeckSection) => void; docked?: boolean;
   onOpenNotification: (note: Notification) => void; onOpenTask: (id: string) => void;

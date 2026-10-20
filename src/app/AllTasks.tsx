@@ -11,10 +11,11 @@ import { BOARD_ORDER, DEFAULT_QUERY, LEGACY_LENSES, LENSES, LENS_HINTS, LENS_LAB
 import type { Lens, RegistryQuery, Scope, SortKey, StatusFilter } from '../core/registry.ts';
 import { firstName, projectName } from '../core/selectors.ts';
 import { localDate, shortDate } from '../core/time.ts';
-import { Avatar, Empty, MoveForward, StatusPill } from '../ui/components.tsx';
+import { Avatar, Empty } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import { Composer } from './Composer.tsx';
 import { JobPicker } from './JobPicker.tsx';
+import { AssigneeSelect, DueInput, PrioritySelect, StatusMenu } from './TaskControls.tsx';
 import { ActiveFilters, FILTER_DEFAULTS, FilterSection, activeFilterCount, filterFields, sameFilters } from './RegistryFilters.tsx';
 import type { DraftEdit, FilterFields } from './RegistryFilters.tsx';
 
@@ -121,6 +122,11 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
           </div>
           <p className="lede">{query.lens === 'watching' ? LENS_HINTS.watching : `${query.scope === 'mine' ? 'Your work' : 'The whole company'} · ${LENS_HINTS[query.lens]}`}</p>
         </div>
+        {canCreate && (
+          <button type="button" className="btn btn-primary new-task-btn" onClick={onCreate} title="New task (N)">
+            <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>New task
+          </button>
+        )}
       </header>
 
       {canCreate && <Composer quest={quest} variant="registry" />}
@@ -133,9 +139,6 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
           <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4" /></svg>
           <input ref={search} type="search" value={query.search} placeholder="Search tasks, people, projects…  ( / )" aria-label="Search tasks" onChange={event => set({ search: event.target.value })} />
         </label>
-        <button type="button" className="btn btn-primary registry-add" disabled={!canCreate} onClick={onCreate} aria-label="New task" title={canCreate ? 'New task (N)' : 'Not available right now'}>
-          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-        </button>
         <button type="button" className={`btn filters-button ${activeFilters ? 'is-on' : ''}`} aria-controls="registry-filters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(open => !open)}>
           <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4" /></svg>
           Filters{pending && <span className="filters-pending-dot" title="Changes not applied yet" />}{activeFilters > 0 && <span className="filters-badge" aria-label={`${activeFilters} active`}>{activeFilters}</span>}
@@ -168,7 +171,7 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
   );
 }
 
-function Flags({ quest, task }: { quest: Quest; task: Task }) {
+function Flags({ quest, task, priority = true }: { quest: Quest; task: Task; priority?: boolean }) {
   const flags = rowFlags(quest.state, task, quest.now);
   return (
     <>
@@ -179,18 +182,17 @@ function Flags({ quest, task }: { quest: Quest; task: Task }) {
       {flags.blocked && <span className="tag tag-overdue">Blocked</span>}
       {flags.waiting && <span className="tag tag-wait">Waiting</span>}
       {flags.unowned && <span className="tag tag-wait">No owner</span>}
-      {task.priority === 'high' && !task.ultra && <span className="tag tag-high">High</span>}
+      {priority && task.priority === 'high' && !task.ultra && <span className="tag tag-high">High</span>}
     </>
   );
 }
 
 function Table({ quest, tasks, selectedId, onSelect }: { quest: Quest; tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void }) {
   const { state, now } = quest;
-  const today = localDate(now);
   return (
     <div className="registry-table" role="table" aria-label="Tasks">
       <div className="registry-row is-head" role="row">
-        <span role="columnheader">Task</span><span role="columnheader">Owner</span><span role="columnheader">Status</span><span role="columnheader">Due</span><span role="columnheader">Project</span><span role="columnheader"><span className="sr-only">Move work forward</span></span>
+        <span role="columnheader">Task</span><span role="columnheader">Assigned</span><span role="columnheader">Status</span><span role="columnheader">Priority</span><span role="columnheader">Due</span>
       </div>
       {tasks.map((task, index) => {
         const flags = rowFlags(state, task, now);
@@ -202,15 +204,15 @@ function Table({ quest, tasks, selectedId, onSelect }: { quest: Quest; tasks: Ta
               <span className={`state-dot dot-${task.status}`} aria-hidden="true" />
               <span className="cell-task-text">
                 <button type="button" className="row-open" aria-label={`Open ${task.title}`} aria-current={task.id === selectedId || undefined} onClick={event => { event.stopPropagation(); onSelect(task.id); }}><strong>{task.title}</strong></button>
+                {task.projectId && <span className="cell-project">{projectName(state, task.projectId)}</span>}
                 <small>{task.status === 'blocked' ? `Blocked: ${task.blocker?.note ?? ''}` : task.status === 'done' ? `Completed ${task.completedAt ? new Date(task.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}` : task.nextAction ? `Next: ${task.nextAction}` : 'No next action yet'}</small>
-                <span className="cell-flags"><Flags quest={quest} task={task} /></span>
+                <span className="cell-flags"><Flags quest={quest} task={task} priority={false} /></span>
               </span>
             </span>
-            <span role="cell" className="cell-owner"><Avatar state={state} id={task.owner} size="sm" /><span>{task.owner ? firstName(state, task.owner) : <em>Unassigned</em>}</span></span>
-            <span role="cell"><StatusPill task={task} /></span>
-            <span role="cell" className={flags.overdue ? 'text-danger' : ''}>{task.due ? shortDate(task.due, today) : '—'}{task.dueTime && <small className="cell-time"> {task.dueTime}</small>}</span>
-            <span role="cell" className="cell-project">{projectName(state, task.projectId) || '—'}</span>
-            <span role="cell" className="cell-act">{task.status !== 'done' && <MoveForward quest={quest} task={task} compact />}</span>
+            <span role="cell" className="cell-owner"><Avatar state={state} id={task.owner} size="sm" /><AssigneeSelect quest={quest} task={task} short /></span>
+            <span role="cell" className="cell-status"><StatusMenu quest={quest} task={task} /></span>
+            <span role="cell" className="cell-priority"><PrioritySelect quest={quest} task={task} /></span>
+            <span role="cell" className={`cell-due ${flags.overdue ? 'text-danger' : ''}`}><DueInput quest={quest} task={task} overdue={flags.overdue} />{task.dueTime && <small className="cell-time"> {task.dueTime}</small>}</span>
           </div>
         );
       })}

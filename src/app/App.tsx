@@ -21,7 +21,8 @@ import type { Quest } from '../ui/useQuest.ts';
 import { AllTasks, useRegistryPrefs } from './AllTasks.tsx';
 import type { RegistryPreset } from './AllTasks.tsx';
 import { CompanyWork } from './CompanyWork.tsx';
-import { Signals, TaskContext, hasSignals } from './ContextPanel.tsx';
+import { Signals, hasSignals } from './ContextPanel.tsx';
+import { TaskPage } from './TaskPage.tsx';
 import type { DeckSection } from './ContextPanel.tsx';
 import { CreateTask } from './CreateTask.tsx';
 import { ExecutiveDesk } from './ExecutiveDesk.tsx';
@@ -71,7 +72,6 @@ const VIEW_LABELS: Record<View, string> = {
 
 /** Views where the Instrument Deck (signals, calendar, insights) is useful beside the canvas. */
 const SIGNAL_VIEWS: View[] = ['home', 'all-tasks', 'company-work', 'needs-attention'];
-const TASK_PANEL = 420;
 const SIGNAL_PANEL = 288;
 /** The canvas never gets narrower than this because of a docked panel. */
 const MIN_CANVAS = 600;
@@ -358,10 +358,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     setDeckSection(section);
     if (signalsFit) setContextPref('open'); else setDeckDrawer(true);
   }
-  const taskLayout = geometry(!!selected && !!contextAllowed, TASK_PANEL);
-  const taskDocked = taskLayout.right === 'docked';
-  const contextOffset = taskDocked ? TASK_PANEL : showSignals ? SIGNAL_PANEL : 0;
-  const leftReserved = (selected && contextAllowed ? taskLayout : geometry(showSignals, SIGNAL_PANEL)).left;
+  // An open task is a full page in the canvas, so only the deck ever takes the right side.
+  const contextOffset = showSignals ? SIGNAL_PANEL : 0;
+  const leftReserved = geometry(showSignals, SIGNAL_PANEL).left;
   const deckOpen = showSignals || showDeckDrawer;
   const closeDeck = () => { setDeckDrawer(false); if (showSignals || contextPref === 'open') setContextPref('closed'); };
   const signalSeam = !selected && deckAllowed && !sidebar.isMobile;
@@ -402,8 +401,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         <FeedbackBar quest={quest}><CompanySignals quest={quest} onOpen={openTask} /></FeedbackBar>
         {focused && grant && <GrantBar quest={quest} grant={grant} onReturn={() => { closeTask(); go('home'); }} />}
 
-        <section className={`content view-${view}`}>
-          {focused && !grant && view === 'home'
+        <section className={`content view-${selected && contextAllowed ? 'task' : view}`}>
+          {selected && contextAllowed ? <TaskPage key={selected.id} quest={quest} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)} />
+            : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
             : view === 'home' && me.role === 'reviewer' ? <ReviewerWelcome quest={quest} onOpenFeedback={() => setReviewRequest(value => value + 1)} go={next => go(next as View)} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
@@ -447,10 +447,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         </nav>
       </main>
 
-      {selected && contextAllowed && <>
-        {!taskDocked && <button className="scrim" aria-label="Close task" onClick={closeTask} />}
-        <TaskContext key={selected.id} quest={quest} task={selected} docked={taskDocked} onClose={closeTask} onOpen={openTask} />
-      </>}
       {selected && !contextAllowed && (
         <div className="locked-note" role="alert">“{selected.title}” is outside your Critical Focus. Request access to {SECTION_LABELS['company-work']} first. <button className="btn btn-ghost btn-sm" onClick={closeTask}>Close</button></div>
       )}

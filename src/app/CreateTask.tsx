@@ -32,9 +32,14 @@ export function CreateTask({ quest, onClose, onCreated }: { quest: Quest; onClos
     setProposed({ owner: member(parsed.owner), approver: member(parsed.approver) });
   }
 
+  // Assigning work to someone else keeps you posted by default: you watch it.
+  const [watch, setWatch] = useState(true);
+  const delegated = !!draft.owner && draft.owner !== actor;
+
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const result = await dispatch({ type: 'task/create', task: draft });
+    const watchers = [...new Set([...(draft.watchers ?? []), ...(delegated && watch ? [actor] : [])])];
+    const result = await dispatch({ type: 'task/create', task: { ...draft, watchers } });
     if (result.ok) onCreated(result.state.tasks[0]!.id);
   }
 
@@ -49,7 +54,7 @@ export function CreateTask({ quest, onClose, onCreated }: { quest: Quest; onClos
           <label className="field"><span>Next action</span><ReferenceInput maxLength={200} value={draft.nextAction} onChange={event => set({ nextAction: event.target.value })} placeholder="The first physical step" /></label>
           <label className="field"><span>Description / notes</span><ReferenceTextarea rows={3} value={draft.description ?? ''} maxLength={1000} onChange={event => set({ description: event.target.value })} placeholder="Context, @people and #tags" /></label>
           <div className="form-grid">
-            <label className="field"><span>Owner</span><small className="field-hint">{delegates ? 'Who moves this forward. You don’t have to own what you create.' : 'Accountable for moving this task forward.'}</small><PersonSelect state={owners} label="Owner" value={draft.owner ?? ''} emptyLabel={delegates ? 'Choose later (unassigned)' : 'Unassigned'} onChange={owner => set({ owner })} />
+            <label className="field"><span>Assigned to</span><small className="field-hint">{delegates ? 'Who moves this forward. You don’t have to own what you create.' : 'Accountable for moving this task forward.'}</small><PersonSelect state={owners} label="Assigned to" value={draft.owner ?? ''} emptyLabel={delegates ? 'Choose later (unassigned)' : 'Unassigned'} onChange={owner => set({ owner })} />
               {assigns && proposed.owner && draft.owner !== proposed.owner.id && <button type="button" className="proposal-chip" onClick={() => set({ owner: proposed.owner!.id })}>Proposed: {proposed.owner.name} · <b>Use</b></button>}</label>
             <label className="field"><span>Approver</span><PersonSelect state={state} label="Approver" value={draft.approver ?? ''} emptyLabel="No approval needed" onChange={approver => set({ approver })} />
               {proposed.approver && draft.approver !== proposed.approver.id && <button type="button" className="proposal-chip" onClick={() => set({ approver: proposed.approver!.id })}>Proposed: {proposed.approver.name} · <b>Use</b></button>}</label>
@@ -59,6 +64,7 @@ export function CreateTask({ quest, onClose, onCreated }: { quest: Quest; onClos
             <label className="field"><span>Priority</span><Select value={draft.priority} onChange={event => set({ priority: event.target.value as NewTask['priority'] })}><option value="normal">Normal</option><option value="high">High</option></Select></label>
             <label className="field"><span>Project</span><Select value={draft.projectId} onChange={event => set({ projectId: event.target.value })}><option value="">No project</option>{state.projects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
           </div>
+          {delegated && <label className="check-row watch-check"><input type="checkbox" checked={watch} onChange={event => setWatch(event.target.checked)} />Watch this task: follow its comments and changes</label>}
           <label className="field"><span>Starts after</span>
             <Select value={draft.dependsOn?.[0] ?? ''} onChange={event => set({ dependsOn: event.target.value ? [event.target.value] : [] })}>
               <option value="">No dependency — can start now</option>
