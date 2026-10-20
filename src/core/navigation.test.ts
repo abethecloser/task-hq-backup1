@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CLOSED, MANAGE_VIEWS, RESTRICTABLE, canManage, canNavigate, forOrg, isManageView, parseNavigation } from './navigation.ts';
+import { AUTHENTICATED_NAVIGATION, ALWAYS_OPEN, CLOSED, MANAGE_VIEWS, RESTRICTABLE, canManage, canNavigate, forOrg, isManageView, parseNavigation } from './navigation.ts';
 
 const server = { full: false, restricted: ['people', 'leads', 'reports'] };
 
@@ -10,7 +10,11 @@ test('Home and Tasks are always open, even when fully closed', () => {
   assert.ok(canNavigate({ full: false, restricted: ['home', 'all-tasks'] }, 'home'), 'the server cannot close the approved experience');
 });
 
-test('restricted sections are closed for everyone except the allowlisted account', () => {
+test('authenticated workspaces can navigate every application section', () => {
+  for (const view of [...ALWAYS_OPEN, ...RESTRICTABLE]) assert.ok(canNavigate(AUTHENTICATED_NAVIGATION, view), view);
+});
+
+test('restricted sections are closed for legacy server responses', () => {
   assert.equal(canNavigate(server, 'people'), false);
   assert.equal(canNavigate(server, 'leads'), false);
   assert.ok(canNavigate({ ...server, full: true }, 'people'));
