@@ -234,6 +234,31 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
   background-image: linear-gradient(color-mix(in srgb, var(--bar, transparent) 45%, transparent), color-mix(in srgb, var(--bar, transparent) 45%, transparent));
   background-repeat: no-repeat; background-position: left center; background-size: 3px calc(100% - 16px);
 }
+/* Wide fields are open lines: no box, a rule that fades out to the right over a faint shade,
+   and the caret in the accent. Pills and small inline controls keep their own look. */
+:root:root:root :is(.field > :is(input, textarea, select), .task-comment-form textarea, .tp-people select, .tp-card > select, .search-field input, .composer-box):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not(.pill-select) {
+  --field-rule: rgb(0 0 0 / 20%);
+  border: 0; border-radius: 0; box-shadow: none; outline: none; caret-color: var(--accent);
+  background:
+    linear-gradient(to right, var(--field-rule), transparent) left bottom / 100% 1px no-repeat,
+    radial-gradient(70% 10px at 0 100%, rgb(0 0 0 / 4%), transparent) left bottom / 100% 10px no-repeat;
+}
+:root:root:root :is(.field > :is(input, textarea, select), .task-comment-form textarea, .tp-people select, .tp-card > select, .search-field input, .composer-box):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not(.pill-select):hover { --field-rule: rgb(0 0 0 / 32%); }
+:root:root:root :is(.field > :is(input, textarea, select), .task-comment-form textarea, .tp-people select, .tp-card > select, .search-field input, .composer-box):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not(.pill-select):focus, :root:root:root .composer-box:focus-within { --field-rule: rgb(0 0 0 / 60%); box-shadow: none; outline: none; }
+:root:root:root .field > :is(input, textarea):not([type="checkbox"]):not([type="radio"]) { padding-inline: 2px; }
+/* No side edges: containers are sections divided by hairlines above and below, with square
+   corners and no side shade. Only actionable controls (buttons, links) keep a full outline;
+   menus, pop-ups and dialogs keep theirs because they float over the page. */
+:root:root:root :is(.note-item, .panel, .stats div, .hero, .mwf, .mwf-mini, .rows, .record-card, .mini-form, .lead-deck-shell, .lead-form, .timeline,
+  .aw-card, .situation, .offer, .queue-card, .deck, .instrument, .dep-node, .filter-section-inner, .filter-list, .board-col, .board-card,
+  .context-task .ctx-grid, .context-task .ctx-deps, .context-task .ctx-history, .context-task .ctx-done, .context-task .drawer-details,
+  .sig-item, .answer, .decision, .brief-card, .measure, .composer-suggest, .composer-review, .draft, .thread-post, .tools-policy,
+  .tools-section, .tools-result, .tools-linked, .home-stat, .queue, .aware-row, .status-note, .hd-hero, .hd-panel, .hd-metric, .hd-row,
+  .ask-panel, .company-signals ul, .msg-composer, .search-result, .feedback-demo-records > div, .tp-facts, .inbox-nav):not(button):not(a):not([role="button"]) {
+  border-left-color: transparent; border-right-color: transparent; border-radius: 0; box-shadow: none;
+}
+/* Vertical dividers inside the content give way to spacing. */
+:root:root:root :is(.tp-facts > div, .tp-side, .ctx-history ol, .ctx-state > div, .insight-split p + p, .lead-stats div) { border-left-color: transparent; border-right-color: transparent; }
 /* Calendar: expand, hover card, right-click day menu, full page */
 .deck-cal-actions { display: flex; align-items: center; gap: 8px; }
 .deck-cal-expand { width: 28px; height: 28px; border: 1px solid var(--hair-2); border-radius: 8px; }
