@@ -8,3 +8,9 @@
 supabase/.temp
 tsconfig.tsbuildinfo
 *.tar.gz
+.claude
+.serena
+.codex
+.agents
+**/.claude/**
+**/.serena/**

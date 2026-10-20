@@ -1,0 +1,15 @@
+# Quest mobile experience standard
+
+Approved direction, 2026-10-20: mobile is a first-class operational experience. Applies to Task Detail and future modules, including Operations Workbook. Workbook visual direction is accepted; this does not approve schema deployment or interrupt the production launch.
+
+Maintain the white continuous workspace; adapt layout rather than shrinking desktop columns. Prioritize one-handed common actions, targets at least 44×44 CSS pixels, readable full content, visible context, and accessible keyboard/focus behavior. Prevent unintended overflow, clipped controls and overlapping panels. Use focused full-screen editors, sheets or drawers when useful. Comments, mentions, attachments, forms and updates must remain usable with the mobile keyboard. Preserve loading/error/empty/success states and reduced-motion support; avoid expensive rendering and decorative animation.
+
+Task priorities: understand status on opening; start/help/status updates; comments/mentions; authorized assignment; brief/due/project/people/dependencies; quick creation. Workbook priorities: sheet navigation, complete cell content, keyboard-friendly row editing, authorized row/sheet creation, file operations and print, and supported data/format preservation. The current desktop-shaped Workbook prototype is a visual review artifact, not mobile acceptance. Its future phone layout needs a focused row editor, readable cell expansion and touch-friendly sheet navigation.
+
+Validate actual interactions at 375px, 430px, a tablet width and desktop. Check scrolling, touch targets, keyboard behavior, orientation and persistence. Prefer real mobile browsers; label emulation and hardware gaps clearly. Current Task Detail scope is essential workflow/usability fixes only, maximum two implementation passes. Do not delay release for Workbook or speculative enhancements.
+
+## Current bounded refinement
+
+Preserved existing TaskPage.tsx changes. Added scoped Task Detail CSS for 44px controls and watcher buttons, readable phone inputs, wrapping facts/actions and long content, bounded status-note forms, and touch-friendly dropdown/mention options. Existing narrow-screen layout keeps conversation/actions ahead of details. No persistence/permission logic or release configuration changed. Existing loading/error/empty/success behavior is unchanged and requires its own acceptance coverage.
+
+Local Chrome emulation with synthetic demo data passed at 375, 430, 768 and 1440px: start work, comment with mention selection, priority update, assigned-person selection, watcher toggle, comment/status retained after reload, and landscape resize without document overflow. Mobile rendered controls met the 44px height check after layout settled; dependency checkbox labels provide the touch target. Existing assignee was selected; cross-user reassignment authority was not proven. No real device was available in this run. Real mobile keyboards, attachment upload/camera, live authenticated persistence, network error recovery and native print/share remain unverified. Build validation uses npm run build:app; no deployment performed.

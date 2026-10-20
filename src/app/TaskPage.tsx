@@ -1,6 +1,6 @@
 // A task, full screen: identity and the four everyday fields (status, assigned, priority,
-// due) up top; the conversation first, then the brief, on the left; quick actions, people and
-// watchers on the right. The quick actions are the engine's authorized offers
+// due) up top; brief, people and dependencies on the left; contextual actions and
+// the conversation on the right. The quick actions are the engine's authorized offers
 // (TaskSituation), never invented here, and every edit is an engine action.
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
@@ -27,7 +27,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
   const [description, setDescription] = useState(task.description);
   const [waitingOn, setWaitingOn] = useState(task.waitingOn);
   const [comment, setComment] = useState('');
-  const [tab, setTab] = useState<'comments' | 'activity'>('comments');
+  const [tab, setTab] = useState<'comments' | 'activity' | 'history'>('comments');
   const feedback = useFeedbackRecord(task.id);
   const back = useRef<HTMLButtonElement>(null);
   useEffect(() => { setTitle(task.title); setNextAction(task.nextAction); setDescription(task.description); setWaitingOn(task.waitingOn); }, [task.title, task.nextAction, task.description, task.waitingOn]);
@@ -46,6 +46,8 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
   const candidates = state.tasks.filter(item => (item.id !== task.id && item.status !== 'done') || task.dependsOn.includes(item.id));
   const events = state.events.filter(event => event.taskId === task.id);
   const comments = events.filter(event => / commented: /.test(event.text));
+  const historyEvents = events.filter(event => !/ commented: /.test(event.text));
+  const feed = tab === 'comments' ? comments : tab === 'history' ? historyEvents : events;
   const created = events.find(event => event.text.includes('created'));
   const people = state.people.filter(item => item.role !== 'reviewer');
   const watching = task.watchers.includes(actor);
@@ -97,27 +99,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
       </dl>
 
       <div className="tp-grid">
-        <div className="tp-col">
-          <section className="tp-card tp-talk" aria-label="Comments and activity">
-            <div className="tp-tabs" role="tablist" aria-label="Comments and activity">
-              <button type="button" role="tab" aria-selected={tab === 'comments'} onClick={() => setTab('comments')}>Comments <span>{comments.length}</span></button>
-              <button type="button" role="tab" aria-selected={tab === 'activity'} onClick={() => setTab('activity')}>Activity <span>{events.length}</span></button>
-            </div>
-            {!reviewer && tab === 'comments' && (
-              <form className="task-comment-form" onSubmit={event => void addComment(event)}>
-                <ReferenceTextarea rows={2} maxLength={2000} value={comment} onChange={event => setComment(event.target.value)} aria-label="Task comment" placeholder="Write a comment. Use @ to mention someone." />
-                <button className="btn btn-primary btn-sm" disabled={!comment.trim()}>Comment</button>
-              </form>
-            )}
-            {(tab === 'comments' ? comments : events).length === 0
-              ? <p className="muted">{tab === 'comments' ? 'No comments yet.' : 'No activity yet.'}</p>
-              : (
-                <ol className="ctx-history tp-feed">{(tab === 'comments' ? comments : events).slice(0, 60).map(event => (
-                  <li key={event.id} className={event.undone ? 'is-undone' : ''}><time>{when(event.at)}</time><p><ReferencedText text={event.text} document={event.references?.text} /></p></li>
-                ))}</ol>
-              )}
-          </section>
-
+        <div className="tp-col tp-details" aria-label="Task details">
           <section className="tp-card" aria-labelledby="tp-brief">
             <h2 id="tp-brief" className="ctx-label">Brief</h2>
             {task.status !== 'done' && (
@@ -137,14 +119,6 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             )}
             {lead && <div className="callout"><b>Lead</b> {lead.name} · {lead.phone} · {lead.address}</div>}
           </section>
-        </div>
-
-        <aside className="tp-col tp-side" aria-label="Actions and people">
-          <section className="tp-card tp-actions" aria-labelledby="tp-actions">
-            <h2 id="tp-actions" className="ctx-label">Quick actions</h2>
-            {task.status === 'done' ? <Completed quest={quest} task={task} /> : <TaskSituation quest={quest} taskId={task.id} onOpen={onOpen} />}
-          </section>
-
           <section className="tp-card" aria-labelledby="tp-people">
             <h2 id="tp-people" className="ctx-label">People</h2>
             <dl className="tp-people">
@@ -196,11 +170,48 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
               </div>
               <details className="deps">
                 <summary>Depends on ({task.dependsOn.length})</summary>
-                {candidates.map(item => <label key={item.id} className="dep-check"><input type="checkbox" checked={task.dependsOn.includes(item.id)} onChange={() => void update({ dependsOn: toggle(task.dependsOn, item.id) })} />{item.title}</label>)}
+                {candidates.map(item => <label key={item.id} className={`dep-check ${item.status === 'done' ? 'is-completed' : ''}`}><input type="checkbox" checked={task.dependsOn.includes(item.id)} onChange={() => void update({ dependsOn: toggle(task.dependsOn, item.id) })} />{item.title}</label>)}
               </details>
               {task.dependsOn.some(id => !taskById(state, id)) && <p className="muted">A dependency was removed.</p>}
             </details>
           )}
+        </div>
+
+        <aside className="tp-col tp-conversation" aria-label="Conversation and quick actions">
+          <section className="tp-card tp-actions" aria-labelledby="tp-actions">
+            <h2 id="tp-actions" className="ctx-label">Quick actions</h2>
+            {task.status === 'done' ? <Completed quest={quest} task={task} /> : <TaskSituation quest={quest} taskId={task.id} onOpen={onOpen} />}
+          </section>
+
+          <section className="tp-card tp-talk" aria-label="Comments and activity">
+            <div className="tp-tabs" role="tablist" aria-label="Comments, activity and history" onKeyDown={event => {
+              const tabs = ['comments', 'activity', 'history'] as const;
+              const index = tabs.indexOf(tab);
+              const next = event.key === 'ArrowRight' ? (index + 1) % 3 : event.key === 'ArrowLeft' ? (index + 2) % 3 : event.key === 'Home' ? 0 : event.key === 'End' ? 2 : null;
+              if (next !== null) { event.preventDefault(); setTab(tabs[next]!); (event.currentTarget.children[next] as HTMLButtonElement).focus(); }
+            }}>
+              <button type="button" role="tab" id="tp-tab-comments" aria-controls="tp-feed-panel" tabIndex={tab === 'comments' ? 0 : -1} aria-selected={tab === 'comments'} onClick={() => setTab('comments')}>Comments <span>{comments.length}</span></button>
+              <button type="button" role="tab" id="tp-tab-activity" aria-controls="tp-feed-panel" tabIndex={tab === 'activity' ? 0 : -1} aria-selected={tab === 'activity'} onClick={() => setTab('activity')}>Activity <span>{events.length}</span></button>
+              <button type="button" role="tab" id="tp-tab-history" aria-controls="tp-feed-panel" tabIndex={tab === 'history' ? 0 : -1} aria-selected={tab === 'history'} onClick={() => setTab('history')}>History <span>{historyEvents.length}</span></button>
+            </div>
+            <p className="muted tp-sub">Recent retained workspace activity; older events may no longer be available.</p>
+            {!reviewer && tab === 'comments' && (
+              <form className="task-comment-form" onSubmit={event => void addComment(event)}>
+                <ReferenceTextarea rows={2} maxLength={2000} value={comment} onChange={event => setComment(event.target.value)} aria-label="Task comment" placeholder="Write a comment. Use @ to mention someone." />
+                <button className="btn btn-primary btn-sm" disabled={!comment.trim()}>Comment</button>
+              </form>
+            )}
+            <div id="tp-feed-panel" role="tabpanel" aria-labelledby={`tp-tab-${tab}`}>
+            {feed.length === 0
+              ? <p className="muted">{tab === 'comments' ? 'No comments yet.' : tab === 'history' ? 'No history yet.' : 'No activity yet.'}</p>
+              : (
+                <ol className="ctx-history tp-feed">{feed.slice(0, 60).map(event => (
+                  <li key={event.id} className={event.undone ? 'is-undone' : ''}><time>{when(event.at)}</time><p><ReferencedText text={event.text} document={event.references?.text} /></p></li>
+                ))}</ol>
+              )}
+            </div>
+          </section>
+
         </aside>
       </div>
     </article>

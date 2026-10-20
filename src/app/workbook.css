@@ -1,0 +1,48 @@
+.operations-workbook { min-width: 0; width: 100%; display: grid; gap: 18px; }
+.operations-workbook h1 { margin: 4px 0 12px; }
+.operations-workbook h2 { font-size: 18px; margin: 0 0 14px; }
+.operations-workbook p { overflow-wrap: anywhere; }
+.workbook-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.workbook-viewer { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.workbook-tabs { display: flex; gap: 6px; overflow-x: auto; border-bottom: 1px solid var(--hair-2); }
+.workbook-tabs button { flex: 0 0 auto; min-height: 44px; padding: 8px 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); }
+.workbook-tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--accent); }
+.workbook-sheet { display: none; min-width: 0; }
+.workbook-sheet.is-active { display: block; }
+.workbook-scroll { overflow-x: auto; }
+.operations-workbook table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.operations-workbook th, .operations-workbook td { border: 1px solid var(--hair-2); text-align: left; vertical-align: top; }
+.operations-workbook th { padding: 12px 8px; font-size: 13px; font-weight: 650; }
+.operations-workbook th:first-child { width: 44px; }
+:root:root .operations-workbook textarea { width: 100%; min-height: 64px; padding: 10px; border: 0; background: transparent; resize: vertical; font-size: 16px; overflow-wrap: anywhere; }
+:root:root .operations-workbook button { min-height: 44px; min-width: 44px; }
+.workbook-print-value { display: none; }
+.task-page.status-done .tp-title { text-decoration: line-through; text-decoration-thickness: 1px; color: var(--muted); }
+.task-page.status-done .tp-head { background: var(--done-pale); transition: background-color .18s ease; }
+.task-page .dep-check.is-completed { text-decoration: line-through; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .task-page.status-done .tp-head { transition: none; } }
+@media (max-width: 600px) {
+  .operations-workbook table, .operations-workbook tbody, .operations-workbook tr, .operations-workbook td { display: block; width: 100%; }
+  .operations-workbook thead { display: none; }
+  .operations-workbook tr { border-top: 1px solid var(--hair-2); margin-bottom: 20px; }
+  .operations-workbook td { border: 0; border-bottom: 1px solid var(--hair); }
+  .operations-workbook td::before { content: attr(data-label); display: block; padding: 8px 10px 0; color: var(--muted); font-size: 12px; }
+  .operations-workbook tbody th { display: block; width: 100%; border: 0; }
+  .workbook-toolbar .btn { flex: 1 1 140px; }
+}
+@media print {
+  body.printing-workbook * { visibility: hidden; }
+  body.printing-workbook .operations-workbook, body.printing-workbook .operations-workbook * { visibility: visible; }
+  body.printing-workbook .operations-workbook { position: absolute; inset: 0; display: block; color: #111; background: white; }
+  body.printing-workbook .operations-workbook > header, body.printing-workbook .workbook-toolbar, body.printing-workbook .workbook-tabs, body.printing-workbook .operations-workbook > p { display: none; }
+  body.printing-workbook .workbook-sheet { break-after: page; }
+  body.printing-workbook-all .workbook-sheet { display: block; }
+  body.printing-workbook .workbook-scroll { overflow: visible; }
+  body.printing-workbook .operations-workbook table { display: table; width: 100%; }
+  body.printing-workbook .operations-workbook thead { display: table-header-group; }
+  body.printing-workbook .operations-workbook tbody { display: table-row-group; }
+  body.printing-workbook .operations-workbook tr { display: table-row; break-inside: avoid; }
+  body.printing-workbook .operations-workbook td, body.printing-workbook .operations-workbook th { display: table-cell; width: auto; border: 1px solid #ccc; }
+  body.printing-workbook .operations-workbook td::before, body.printing-workbook .operations-workbook textarea { display: none; }
+  body.printing-workbook .workbook-print-value { display: block; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+}
