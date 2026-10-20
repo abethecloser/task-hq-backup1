@@ -21,7 +21,7 @@ import type { Quest } from '../ui/useQuest.ts';
 import { AllTasks, useRegistryPrefs } from './AllTasks.tsx';
 import type { RegistryPreset } from './AllTasks.tsx';
 import { CompanyWork } from './CompanyWork.tsx';
-import { Signals, hasSignals } from './ContextPanel.tsx';
+import { CalendarPage, Signals, hasSignals } from './ContextPanel.tsx';
 import { TaskPage } from './TaskPage.tsx';
 import type { DeckSection } from './ContextPanel.tsx';
 import { CreateTask } from './CreateTask.tsx';
@@ -29,7 +29,7 @@ import { ExecutiveDesk } from './ExecutiveDesk.tsx';
 import { Activity, Settings } from './Settings.tsx';
 import { Home } from './Home.tsx';
 import { AskTasks } from './AskTasks.tsx';
-import { TopBar } from './TopBar.tsx';
+import { AccountMark, AccountMenu, TopBar } from './TopBar.tsx';
 import { NeedsAttention } from './NeedsAttention.tsx';
 import { People } from './People.tsx';
 import { FeedbackProvider, FeedbackBar } from '../ui/Feedback.tsx';
@@ -57,19 +57,19 @@ import { CLOSED, UNDER_CONSTRUCTION, canManage, canNavigate, isManageView } from
 import { panelLayout } from '../core/layout.ts';
 import type { Notification } from './notifications.ts';
 
-// Product feedback is archived for the team; only this account still sees it.
-const FEEDBACK_KEEPER = 'team@enternovum.com';
+// Product feedback is archived: hidden for every account. Stored feedback is kept.
+const FEEDBACK_ON = false;
 
-export type View = 'home' | 'reports' | 'all-tasks' | 'inbox' | 'tools' | 'company-work' | 'needs-attention' | 'leads' | 'executive' | 'people' | 'feedback' | 'activity' | 'settings' | 'agents' | 'relationships' | 'search';
+export type View = 'home' | 'reports' | 'all-tasks' | 'inbox' | 'tools' | 'company-work' | 'needs-attention' | 'leads' | 'executive' | 'people' | 'feedback' | 'activity' | 'settings' | 'agents' | 'relationships' | 'search' | 'calendar';
 
 // All Tasks shows company-wide work, so Critical Focus gates it exactly like Company Work.
 const VIEW_SECTION: Record<View, Section | 'my-work' | 'never'> = {
-  home: 'my-work', reports: 'never', search: 'never', relationships: 'leads', 'all-tasks': 'company-work', inbox: 'never', tools: 'never', 'company-work': 'company-work', 'needs-attention': 'needs-attention', leads: 'leads', feedback: 'my-work',
+  home: 'my-work', calendar: 'my-work', reports: 'never', search: 'never', relationships: 'leads', 'all-tasks': 'company-work', inbox: 'never', tools: 'never', 'company-work': 'company-work', 'needs-attention': 'needs-attention', leads: 'leads', feedback: 'my-work',
   executive: 'never', people: 'never', activity: 'never', settings: 'never', agents: 'never',
 };
 
 const VIEW_LABELS: Record<View, string> = {
-  home: 'Home', reports: 'Reports', search: 'Search', relationships: 'Relationship Vault', 'all-tasks': 'All Tasks', inbox: 'Inbox', tools: 'Estimates & Proposals', 'company-work': 'Projects', 'needs-attention': 'Needs Attention', leads: 'First Response',
+  home: 'Home', calendar: 'Calendar', reports: 'Reports', search: 'Search', relationships: 'Relationship Vault', 'all-tasks': 'All Tasks', inbox: 'Inbox', tools: 'Estimates & Proposals', 'company-work': 'Projects', 'needs-attention': 'Needs Attention', leads: 'First Response',
   executive: 'Executive Desk', people: 'Team', feedback: 'Feedback', activity: 'Activity', settings: 'Policy & data', agents: 'Agent pilot',
 };
 
@@ -134,12 +134,15 @@ export default function App({ onExitDemo, backend }: { onExitDemo?: () => void; 
 function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void }) {
   const { state, actor, now, dispatch } = quest;
   const live = useLive();
-  const feedbackOn = live?.email?.toLowerCase() === FEEDBACK_KEEPER;
+  const feedbackOn = FEEDBACK_ON;
   const initial = parseHash();
   const [requested, setRequested] = useState<View>(initial.view);
   const [taskId, setTaskId] = useState<string | null>(initial.taskId);
   const [leadId, setLeadId] = useState<string | null>(initial.leadId);
   const [creating, setCreating] = useState(false);
+  // A due date chosen from the calendar, for the next task created.
+  const [createDue, setCreateDue] = useState<string | undefined>();
+  const createOn = (due: string) => { setCreateDue(due); setCreating(true); };
   const [askOpen, setAskOpen] = useState(false);
   // Which task view and scope All Tasks is showing, for the top-bar tabs.
   const registry = useRegistryPrefs(state.workspace.tenantId, actor);
@@ -377,15 +380,13 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         control={leftReserved && leftReserved !== sidebar.width ? { ...sidebar, width: leftReserved } : sidebar}
         notifications={notifications}
         settings={close => <>
-          <p className="menu-note">{live ? <><b>{me.name && !me.name.includes('@') ? me.name : live.email}</b><br />{ROLE_LABELS[live.role]} · {live.org.name}</> : <><b>Task-HQ Demo</b><br />Synthetic people and data</>}</p>
+          <p className="menu-note"><b>Settings</b>{live ? '' : <><br />Task-HQ Demo · synthetic people and data</>}</p>
           <div className="rail-settings-look"><LookSwitch /></div>
-          {live && <button type="button" role="menuitem" onClick={() => { close(); location.hash = '#/auth/reset'; }}>Change password</button>}
           {open('people') && allowed('people') && <button type="button" role="menuitem" onClick={() => { close(); go('people'); }}>People &amp; access</button>}
           {open('settings') && allowed('settings') && <button type="button" role="menuitem" onClick={() => { close(); go('settings'); }}>Workspace settings<small>Policy &amp; data</small></button>}
-          {live
-            ? <button type="button" role="menuitem" onClick={() => { close(); live.onSignOut(); }}>Sign out</button>
-            : onExitDemo && <button type="button" role="menuitem" onClick={() => { close(); onExitDemo(); }}>Leave demo · sign in</button>}
+          {!live && onExitDemo && <button type="button" role="menuitem" onClick={() => { close(); onExitDemo(); }}>Leave demo · sign in</button>}
         </>}
+        account={{ label: me.name && !me.name.includes('@') ? me.name : live?.email ?? me.name, detail: live ? ROLE_LABELS[live.role] : me.title, mark: <AccountMark quest={quest} />, menu: close => <AccountMenu quest={quest} close={close} /> }}
         awareness={<Awareness quest={quest} control={sidebar} inbox={inbox} attention={awareAttention}
           onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
           onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />}
@@ -433,6 +434,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             : view === 'executive' ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} />
             : view === 'relationships' ? <Relationships quest={quest} onOpen={openTask} />
             : view === 'people' ? <People quest={quest} />
+            : view === 'calendar' ? <CalendarPage quest={quest} company={company} onOpenTask={openTask} onCreate={canCreate ? createOn : undefined} />
             : view === 'feedback' ? <FeedbackInbox quest={quest} onOpen={id => { setFeedbackId(id); history.replaceState(null, '', `#/feedback/${id}`); }} />
             : view === 'company-work' ? <CompanyWork quest={quest} onOpen={openTask} />
             : view === 'needs-attention' ? <NeedsAttention quest={quest} onOpen={openTask} />
@@ -468,6 +470,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         <Signals quest={quest} notifications={notifications} company={company} section={deckSection} onSection={setDeckSection} docked={showSignals}
           onOpenNotification={note => { setDeckDrawer(false); openNotification(note); }} onOpenTask={id => { setDeckDrawer(false); openTask(id); }}
           onClose={closeDeck}
+          onExpandCalendar={() => { setDeckDrawer(false); go('calendar'); }} onCreate={canCreate ? due => { setDeckDrawer(false); createOn(due); } : undefined}
           onRegistry={(lens, changes) => { setDeckDrawer(false); openRegistry(lens, changes); }}
           onLens={(lens, filter) => { setDeckDrawer(false); openRegistry(lens, { scope: 'company', ...(filter === 'blocked' ? { status: 'blocked' } : filter === 'unowned' ? { owner: 'none' } : {}) }); }} />
       </>}
@@ -480,7 +483,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         </button>
       )}
       {askOpen && !focused && <AskTasks quest={quest} company={company} onClose={() => setAskOpen(false)} />}
-      {creating && canCreate && <CreateTask quest={quest} onClose={() => setCreating(false)} onCreated={id => { setCreating(false); openTask(id); }} />}
+      {creating && canCreate && <CreateTask quest={quest} due={createDue} onClose={() => { setCreating(false); setCreateDue(undefined); }} onCreated={id => { setCreating(false); setCreateDue(undefined); openTask(id); }} />}
       {feedbackOn && <ReviewLayer quest={quest} openRequest={reviewRequest}
         screen={{ view: VIEW_LABELS[view], route: `#/${view}${view === 'leads' && leadId ? `/${leadId}` : ''}`, taskId: selected?.id ?? '', leadId: view === 'leads' && leadId ? leadId : '', deck: view === 'leads' && leadId ? 'lead' : selected ? 'task' : '' }}
         itemId={feedbackId} onItem={id => { setFeedbackId(id); if (!id && location.hash.startsWith('#/feedback/')) history.replaceState(null, '', '#/feedback'); }}

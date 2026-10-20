@@ -40,8 +40,8 @@ body { background: var(--canvas); }
 .panel-section, .panel-notes { border-bottom-color: var(--hair); }
 .main { margin-right: var(--context-offset, 0px); transition: margin-left var(--sidebar-speed) var(--sidebar-ease), margin-right var(--sidebar-speed) var(--sidebar-ease); }
 .topbar { background: rgb(255 255 255 / 96%); }
-.content { max-width: 1120px; transition: max-width var(--sidebar-speed) var(--sidebar-ease); }
-.content.view-all-tasks, .content.view-executive, .content.view-people { max-width: 1320px; }
+/* Pages use the width they're given; the cap only keeps lines readable on very large monitors. */
+.content { max-width: 1600px; transition: max-width var(--sidebar-speed) var(--sidebar-ease); }
 
 /* Rail: active item is a lifted white key, not a black block. */
 .rail .nav-item.is-active { background: var(--card); color: var(--accent-ink); box-shadow: 0 0 0 1px var(--hair-2), 0 2px 6px rgb(17 18 20 / 8%); }
@@ -567,7 +567,7 @@ i.sev.sev-high { background: var(--accent); }
 
 /* ── Universal inbox ───────────────────────────────────────────────────── */
 .inbox-view { container-type: inline-size; }
-.inbox-layout { display: grid; grid-template-columns: minmax(200px, 250px) minmax(0, 1fr); gap: 18px; align-items: start; }
+.inbox-layout { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 40px; align-items: start; }
 .inbox-nav { position: sticky; top: 76px; display: grid; gap: 4px; padding: 10px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--card); }
 .inbox-ws { display: grid; gap: 2px; padding-top: 10px; border-top: 1px solid var(--hair); }
 .inbox-ws .section-label { padding: 0 8px 4px; }
@@ -575,13 +575,13 @@ i.sev.sev-high { background: var(--accent); }
 .inbox-nav-item:hover { background: var(--sunk); }
 .inbox-nav-item.is-active { background: var(--ink); color: #fff; }
 .inbox-nav-item.is-active .unread-badge { box-shadow: none; }
-.inbox-main { display: grid; gap: 12px; min-width: 0; }
+.inbox-main { display: grid; gap: 18px; min-width: 0; }
 .inbox-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .inbox-filters .lens { min-height: 32px; border: 1px solid var(--hair); background: var(--card); }
 .inbox-filters .lens.is-active { border-color: var(--ink); background: var(--ink); color: #fff; }
 .inbox-filters select { min-height: 32px; margin-left: auto; }
-.inbox-feed { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.inbox-item { display: grid; gap: 4px; width: 100%; padding: 12px 14px; border: 1px solid var(--hair); border-left: 3px solid transparent; border-radius: 12px; background: var(--card); text-align: left; transition: box-shadow .15s, transform .15s var(--ease-out); }
+.inbox-feed { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.inbox-item { display: grid; gap: 6px; width: 100%; padding: 14px 18px; border: 1px solid var(--hair); border-left: 3px solid transparent; border-radius: 12px; background: var(--card); text-align: left; transition: box-shadow .15s, transform .15s var(--ease-out); }
 .inbox-item:hover { box-shadow: var(--shadow-lift); }
 .inbox-item.is-unread { border-left-color: var(--ink); background: #fff; }
 .inbox-item.is-unread b { font-weight: 800; }
@@ -622,7 +622,7 @@ i.sev.sev-high { background: var(--accent); }
 .panel-notes-actions { display: inline-flex; gap: 10px; white-space: nowrap; }
 .panel-notes-actions .link { font-size: 12px; }
 @container (max-width: 720px) {
-  .inbox-layout { grid-template-columns: 1fr; }
+  .inbox-layout { grid-template-columns: 1fr; gap: 18px; }
   .inbox-nav { position: static; }
   .inbox-filters select { margin-left: 0; }
 }
@@ -987,7 +987,6 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .watch-check { color: var(--ink-2); font-size: 13px; font-weight: 600; }
 
 /* The task page: a full-screen task in the canvas. */
-.content.view-task { max-width: 1320px; }
 .task-page { container-type: inline-size; gap: 18px; }
 .tp-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .tp-bar .ctx-verify { margin: 0; }

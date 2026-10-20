@@ -11,14 +11,14 @@ import type { Quest } from '../ui/useQuest.ts';
 import type { Draft } from '../core/command.ts';
 import { Composer } from './Composer.tsx';
 
-export function CreateTask({ quest, onClose, onCreated }: { quest: Quest; onClose: () => void; onCreated: (id: string) => void }) {
+export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; due?: string; onClose: () => void; onCreated: (id: string) => void }) {
   const { state, actor, now, dispatch } = quest;
   // Managers delegate: creating work doesn't make them its owner by default.
   const delegates = hasRole(state, actor, ['manager']);
   // Live members create work for themselves or leave it unassigned; assigning others needs a supervisor, admin or owner.
   const assigns = canAssignOthers(state, actor);
   const owners = assigns ? state : { ...state, people: state.people.filter(item => item.id === actor) };
-  const [draft, setDraft] = useState<NewTask>({ title: '', owner: delegates ? '' : actor, due: localDate(now), priority: 'normal', nextAction: '', approver: '', nextOwner: '', projectId: '', dependsOn: [] });
+  const [draft, setDraft] = useState<NewTask>({ title: '', owner: delegates ? '' : actor, due: due ?? localDate(now), priority: 'normal', nextAction: '', approver: '', nextOwner: '', projectId: '', dependsOn: [] });
   const set = (changes: Partial<NewTask>) => setDraft(current => ({ ...current, ...changes }));
   const taxonomyOk = quest.backend.supports?.taskTaxonomy !== false;
   const types = state.taxonomy?.types ?? [];

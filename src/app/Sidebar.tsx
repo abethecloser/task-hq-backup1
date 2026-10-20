@@ -133,7 +133,7 @@ function unreadIn(notes: Notification[], read: Set<string>, section?: string) {
   return notes.filter(note => (!section || note.section === section) && !read.has(note.id)).length;
 }
 
-export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, awareness, settings }: {
+export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, awareness, settings, account }: {
   control: SidebarControl;
   items: SidebarItem[];
   brand: ReactNode;
@@ -146,6 +146,8 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
   awareness: ReactNode;
   /** The settings menu at the foot of the rail; `close` dismisses it after a choice. */
   settings: (close: () => void) => ReactNode;
+  /** Who is signed in: their mark on the rail, and the account menu. */
+  account: { label: string; detail: string; mark: ReactNode; menu: (close: () => void) => ReactNode };
 }) {
   const { read, isMobile } = control;
   const panel = useRef<HTMLElement>(null);
@@ -237,7 +239,8 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
           })}
         </nav>
         <div className="sidebar-foot">
-          <RailSettings hint={hintFor('Settings', 'Account, look and workspace')}>{settings}</RailSettings>
+          <RailMenu label="Settings" className="rail-settings" hint={hintFor('Settings', 'Look and workspace')} icon={<svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>}>{settings}</RailMenu>
+          <RailMenu label="Account" className="rail-account" hint={hintFor(account.label, account.detail)} icon={account.mark}>{account.menu}</RailMenu>
           <button type="button" className="nav-toggle" onClick={control.toggle} aria-controls="quest-sidebar" aria-expanded={control.open}
             aria-label={control.open ? 'Collapse sidebar' : 'Expand sidebar'} {...hintFor(control.open ? 'Collapse sidebar' : 'Expand sidebar')}>
             <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={control.open ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} /></svg>
@@ -290,9 +293,10 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
   );
 }
 
-/** Settings, at the foot of the rail. The menu is fixed beside the button so the rail's scroll never clips it. */
 type HintHandlers = { onMouseEnter: (event: { currentTarget: HTMLElement }) => void; onFocus: (event: { currentTarget: HTMLElement }) => void; onMouseLeave: () => void; onBlur: () => void };
-function RailSettings({ hint, children }: { hint: HintHandlers; children: (close: () => void) => ReactNode }) {
+
+/** A menu at the foot of the rail. It is fixed beside its button so the rail's scroll never clips it. */
+function RailMenu({ label, className, hint, icon, children }: { label: string; className: string; hint: HintHandlers; icon: ReactNode; children: (close: () => void) => ReactNode }) {
   const [at, setAt] = useState<{ left: number; bottom: number } | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -304,12 +308,10 @@ function RailSettings({ hint, children }: { hint: HintHandlers; children: (close
   }
   return (
     <>
-      <button ref={button} type="button" className={`nav-item rail-settings ${at ? 'is-active' : ''}`} aria-label="Settings" aria-haspopup="menu" aria-expanded={!!at} onClick={toggle} {...hint}>
-        <span className="nav-icon">
-          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
-        </span>
+      <button ref={button} type="button" className={`nav-item ${className} ${at ? 'is-active' : ''}`} aria-label={label} aria-haspopup="menu" aria-expanded={!!at} onClick={toggle} {...hint}>
+        <span className="nav-icon">{icon}</span>
       </button>
-      {at && <div ref={menu} className="top-menu rail-settings-menu" role="menu" aria-label="Settings" style={{ left: at.left, bottom: at.bottom }}>{children(close)}</div>}
+      {at && <div ref={menu} className="top-menu rail-menu" role="menu" aria-label={label} style={{ left: at.left, bottom: at.bottom }}>{children(close)}</div>}
     </>
   );
 }

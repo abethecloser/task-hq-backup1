@@ -4,6 +4,7 @@ import { Select } from '../ui/Select.tsx';
 // full page in the canvas (TaskPage.tsx), never a side panel.
 // Docked beside the canvas on wide screens (the canvas reflows); a drawer otherwise.
 import { useEffect, useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
 import type { Task } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
 import { dailySignal } from '../core/executive.ts';
@@ -15,16 +16,19 @@ import { localDate } from '../core/time.ts';
 import type { Quest } from '../ui/useQuest.ts';
 import type { Notification } from './notifications.ts';
 import { NOTIFICATION_LABELS } from './notifications.ts';
+import { DueInput } from './TaskControls.tsx';
+import { useDropdown } from '../ui/useDropdown.tsx';
 
 export type DeckSection = 'signals' | 'calendar' | 'insights';
 const DECK_SECTIONS: { id: DeckSection; label: string }[] = [{ id: 'signals', label: 'Signals' }, { id: 'calendar', label: 'Calendar' }, { id: 'insights', label: 'Insights' }];
 
 /** Nothing selected: the Instrument Deck's contextual sections. Operational signals, the due-date
  * calendar and deterministic system insights, each linked to the work behind it. */
-export function Signals({ quest, notifications, company, section, onSection, docked = true, onOpenNotification, onOpenTask, onLens, onRegistry, onClose }: {
+export function Signals({ quest, notifications, company, section, onSection, docked = true, onOpenNotification, onOpenTask, onLens, onRegistry, onClose, onExpandCalendar, onCreate }: {
   quest: Quest; notifications: Notification[]; company: boolean; section: DeckSection; onSection: (next: DeckSection) => void; docked?: boolean;
   onOpenNotification: (note: Notification) => void; onOpenTask: (id: string) => void;
   onLens: (lens: Lens, filter?: 'blocked' | 'unowned') => void; onRegistry: (lens: Lens, changes?: Partial<RegistryQuery>) => void; onClose: () => void;
+  onExpandCalendar?: () => void; onCreate?: (due: string) => void;
 }) {
   const { state, actor, now, backend } = quest;
   const [date, setDate] = useState(() => localDate(now));
@@ -80,7 +84,7 @@ export function Signals({ quest, notifications, company, section, onSection, doc
             <ul className="sig-sources">{sources.map(source => <li key={source.id} title={source.note}><i className={`sig-dot ${source.status === 'connected' ? 'is-live' : ''}`} aria-hidden="true" />{source.label}<small>{source.status === 'connected' ? 'connected' : 'not connected'}</small></li>)}</ul>
           </section>
         </>}
-        {section === 'calendar' && <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={sources.some(source => /calendar/i.test(source.label) && source.status === 'connected')} />}
+        {section === 'calendar' && <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={sources.some(source => /calendar/i.test(source.label) && source.status === 'connected')} onExpand={onExpandCalendar} onCreate={onCreate} />}
         {section === 'insights' && <DeckInsights quest={quest} company={company} onOpenTask={onOpenTask} onRegistry={onRegistry}
           onDate={next => { setDate(next); onSection('calendar'); }} />}
       </div>
@@ -88,10 +92,16 @@ export function Signals({ quest, notifications, company, section, onSection, doc
   );
 }
 
-/** Month or week of due dates, shaded by due-date load from records, with the chosen day's work below. */
-function DeckCalendar({ quest, company, date, onDate, onOpenTask, connected }: { quest: Quest; company: boolean; date: string; onDate: (date: string) => void; onOpenTask: (id: string) => void; connected: boolean }) {
+/** Month or week of due dates, shaded by due-date load from records, with the chosen day's work below.
+ * Hovering a day with work shows what's due; right-click (or the context-menu key) adds work to the day or moves what's due. */
+export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connected, variant = 'deck', onExpand, onCreate }: {
+  quest: Quest; company: boolean; date: string; onDate: (date: string) => void; onOpenTask: (id: string) => void; connected: boolean;
+  variant?: 'deck' | 'page'; onExpand?: () => void; onCreate?: (due: string) => void;
+}) {
   const { state, actor, now } = quest;
   const [mode, setMode] = useState<'month' | 'week'>('month');
+  const [peek, setPeek] = useState<DayAt | null>(null);
+  const [menu, setMenu] = useState<DayAt | null>(null);
   const today = localDate(now);
   const base = new Date(`${today}T12:00:00`), picked = new Date(`${date}T12:00:00`);
   const offset = (picked.getFullYear() - base.getFullYear()) * 12 + picked.getMonth() - base.getMonth();
@@ -103,13 +113,24 @@ function DeckCalendar({ quest, company, date, onDate, onOpenTask, connected }: {
   };
   const monday = new Date(picked); monday.setDate(picked.getDate() - ((picked.getDay() + 6) % 7));
   const week = Array.from({ length: 7 }, (_, at) => { const day = new Date(monday); day.setDate(monday.getDate() + at); return localDate(day.getTime()); });
-  const dayTasks = dueOn(state, actor, now, company, date);
-  const label = (day: string, options: Intl.DateTimeFormatOptions) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', options);
+  const due = (day: string) => dueOn(state, actor, now, company, day);
+  const dayTasks = due(date);
+  const page = variant === 'page';
+  const dayEvents = (day: string, count: number) => ({
+    onMouseEnter: (event: MouseEvent<HTMLElement>) => { if (count && !menu) setPeek(place(day, event.currentTarget.getBoundingClientRect())); },
+    onMouseLeave: () => setPeek(null),
+    onContextMenu: (event: MouseEvent<HTMLElement>) => {
+      event.preventDefault();
+      setPeek(null);
+      onDate(day);
+      setMenu(place(day, event.currentTarget.getBoundingClientRect(), { x: event.clientX, y: event.clientY }));
+    },
+  });
   return <>
-    <section className="sig deck-cal">
+    <section className={`sig deck-cal ${page ? 'is-page' : ''}`}>
       <div className="deck-cal-bar">
         <button type="button" className="icon-btn" aria-label={mode === 'month' ? 'Previous month' : 'Previous week'} onClick={() => shift(-1)}>‹</button>
-        <strong>{mode === 'month' ? grid.label : `${label(week[0]!, { month: 'short', day: 'numeric' })} – ${label(week[6]!, { month: 'short', day: 'numeric' })}`}</strong>
+        <strong>{mode === 'month' ? grid.label : `${dayLabel(week[0]!, { month: 'short', day: 'numeric' })} – ${dayLabel(week[6]!, { month: 'short', day: 'numeric' })}`}</strong>
         <button type="button" className="icon-btn" aria-label={mode === 'month' ? 'Next month' : 'Next week'} onClick={() => shift(1)}>›</button>
       </div>
       <div className="deck-cal-modes">
@@ -117,39 +138,117 @@ function DeckCalendar({ quest, company, date, onDate, onOpenTask, connected }: {
           <button type="button" aria-pressed={mode === 'month'} onClick={() => setMode('month')}>Month</button>
           <button type="button" aria-pressed={mode === 'week'} onClick={() => setMode('week')}>Week</button>
         </div>
-        {date !== today && <button type="button" className="link" onClick={() => onDate(today)}>Today</button>}
+        <span className="deck-cal-actions">
+          {date !== today && <button type="button" className="link" onClick={() => onDate(today)}>Today</button>}
+          {onExpand && <button type="button" className="icon-btn deck-cal-expand" aria-label="Open the full calendar" title="Full calendar" onClick={onExpand}>
+            <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+          </button>}
+        </span>
       </div>
       {mode === 'month'
         ? <div className="deck-cal-grid" role="grid" aria-label={grid.label}>
             {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => <div key={`d${index}`} className="dow" role="columnheader">{day}</div>)}
-            {grid.cells.map((cell, index) => cell
-              ? <button key={cell.date} type="button" role="gridcell" className={`h${cell.heat} ${cell.today ? 'is-today' : ''} ${cell.overdue ? 'has-late' : ''}`} aria-selected={cell.date === date} aria-current={cell.today ? 'date' : undefined}
-                  aria-label={`${label(cell.date, { weekday: 'long', month: 'long', day: 'numeric' })}: ${cell.due ? `${cell.due} due${cell.blocked ? `, ${cell.blocked} blocked` : ''}${cell.overdue ? `, ${cell.overdue} overdue` : ''}` : 'nothing due'}`}
-                  onClick={() => onDate(cell.date)}>{cell.day}</button>
-              : <div key={`b${index}`} aria-hidden="true" />)}
+            {grid.cells.map((cell, index) => {
+              if (!cell) return <div key={`b${index}`} aria-hidden="true" />;
+              const work = page ? due(cell.date) : [];
+              return <button key={cell.date} type="button" role="gridcell" className={`h${cell.heat} ${cell.today ? 'is-today' : ''} ${cell.overdue ? 'has-late' : ''}`} aria-selected={cell.date === date} aria-current={cell.today ? 'date' : undefined}
+                aria-label={`${dayLabel(cell.date, { weekday: 'long', month: 'long', day: 'numeric' })}: ${cell.due ? `${cell.due} due${cell.blocked ? `, ${cell.blocked} blocked` : ''}${cell.overdue ? `, ${cell.overdue} overdue` : ''}` : 'nothing due'}`}
+                onClick={() => onDate(cell.date)} {...dayEvents(cell.date, cell.due)}>
+                {page
+                  ? <><span className="cal-num">{cell.day}</span>{work.slice(0, 3).map(task => <span key={task.id} className="cal-chip">{task.title}</span>)}{work.length > 3 && <small className="cal-more">+{work.length - 3} more</small>}</>
+                  : cell.day}
+              </button>;
+            })}
           </div>
         : <ul className="deck-week">
             {week.map(day => {
-              const due = dueOn(state, actor, now, company, day);
-              return <li key={day}><button type="button" className={`${day === date ? 'is-on' : ''} ${day === today ? 'is-today' : ''}`} aria-pressed={day === date} onClick={() => onDate(day)}>
-                <span>{label(day, { weekday: 'short' })} <b>{label(day, { day: 'numeric' })}</b></span><i style={{ ['--n' as string]: Math.min(due.length, 6) }} aria-hidden="true" /><small>{due.length ? `${due.length} due` : '—'}</small>
+              const work = due(day);
+              return <li key={day}><button type="button" className={`${day === date ? 'is-on' : ''} ${day === today ? 'is-today' : ''}`} aria-pressed={day === date} onClick={() => onDate(day)} {...dayEvents(day, work.length)}>
+                <span>{dayLabel(day, { weekday: 'short' })} <b>{dayLabel(day, { day: 'numeric' })}</b></span><i style={{ ['--n' as string]: Math.min(work.length, 6) }} aria-hidden="true" /><small>{work.length ? `${work.length} due` : '—'}</small>
               </button></li>;
             })}
           </ul>}
       <p className="deck-cal-key"><span><i className="h1" /><i className="h2" /><i className="h3" /><i className="h4" /></span>Due-date load: open work due that day (blocked counts twice). Not a measure of anyone’s performance.</p>
     </section>
-    <section className="sig">
-      <h4 className="ctx-label">{date === today ? 'Due today' : label(date, { weekday: 'long', month: 'short', day: 'numeric' })} <span>{dayTasks.length}</span></h4>
+    <section className="sig deck-cal-day">
+      <h4 className="ctx-label">{date === today ? 'Due today' : dayLabel(date, { weekday: 'long', month: 'short', day: 'numeric' })} <span>{dayTasks.length}</span></h4>
       {dayTasks.length === 0 ? <p className="sig-note">Nothing {company ? '' : 'of yours '}is due this day.</p> : (
-        <ul className="sig-list">{dayTasks.slice(0, 8).map(task => (
+        <ul className="sig-list">{dayTasks.slice(0, page ? 30 : 8).map(task => (
           <li key={task.id}><button type="button" className={`sig-item ${task.ultra || isOverdue(task, now) ? 'sev-critical' : task.status === 'blocked' || task.priority === 'high' ? 'sev-high' : ''}`} onClick={() => onOpenTask(task.id)}>
-            <small>{[firstName(state, task.owner), STATUS_LABELS[task.status], task.dueTime].filter(Boolean).join(' · ')}</small>{task.title}
+            <small>{taskLine(quest, task)}</small>{task.title}
           </button></li>
         ))}</ul>
       )}
       <p className="sig-note">{connected ? 'Includes task due dates.' : 'Task due dates only. No calendar is connected, so meetings and events don’t appear yet.'}</p>
     </section>
+    {peek && !menu && <DayPeek quest={quest} at={peek} tasks={due(peek.date)} />}
+    {menu && <DayMenu quest={quest} at={menu} tasks={due(menu.date)} onClose={() => setMenu(null)} onOpenTask={onOpenTask} onCreate={onCreate} />}
   </>;
+}
+
+/** The calendar as its own page: the same records and actions as the deck, with room for titles. */
+export function CalendarPage({ quest, company, onOpenTask, onCreate }: { quest: Quest; company: boolean; onOpenTask: (id: string) => void; onCreate?: (due: string) => void }) {
+  const [date, setDate] = useState(() => localDate(quest.now));
+  const connected = dailySignal(quest.state, quest.now).sources.some(source => /calendar/i.test(source.label) && source.status === 'connected');
+  return (
+    <div className="view calendar-page">
+      <header className="view-head">
+        <div>
+          <p className="eyebrow">{company ? 'Due dates across the company' : 'Due dates on your work'}</p>
+          <h1>Calendar</h1>
+        </div>
+        <p className="lede">Hover a day to see what’s due. Right-click a day to add work or move what’s due.</p>
+      </header>
+      <div className="calendar-layout">
+        <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={connected} variant="page" onCreate={onCreate} />
+      </div>
+    </div>
+  );
+}
+
+type DayAt = { date: string; left: number; top: number };
+const dayLabel = (day: string, options: Intl.DateTimeFormatOptions) => new Date(`${day}T12:00:00`).toLocaleDateString('en-US', options);
+const taskLine = (quest: Quest, task: Task) => [firstName(quest.state, task.owner), STATUS_LABELS[task.status], task.dueTime].filter(Boolean).join(' · ');
+
+/** Beside the pointer for a right-click, under the day otherwise; always inside the window. */
+function place(date: string, box: DOMRect, point?: { x: number; y: number }): DayAt {
+  const fromPointer = !!point && (point.x > 0 || point.y > 0);
+  const left = fromPointer ? point!.x : box.left, top = fromPointer ? point!.y : box.bottom + 6;
+  return { date, left: Math.max(8, Math.min(left, window.innerWidth - 300)), top: Math.max(8, Math.min(top, window.innerHeight - 360)) };
+}
+
+function DayPeek({ quest, at, tasks }: { quest: Quest; at: DayAt; tasks: Task[] }) {
+  return (
+    <div className="cal-card cal-peek" role="tooltip" style={{ left: at.left, top: at.top }}>
+      <strong>{dayLabel(at.date, { weekday: 'long', month: 'short', day: 'numeric' })}</strong>
+      <ul>{tasks.slice(0, 5).map(task => <li key={task.id}>{task.title}<small>{taskLine(quest, task)}</small></li>)}</ul>
+      {tasks.length > 5 && <small className="cal-more">+{tasks.length - 5} more</small>}
+    </div>
+  );
+}
+
+function DayMenu({ quest, at, tasks, onClose, onOpenTask, onCreate }: {
+  quest: Quest; at: DayAt; tasks: Task[]; onClose: () => void; onOpenTask: (id: string) => void; onCreate?: (due: string) => void;
+}) {
+  const card = useRef<HTMLDivElement>(null);
+  useDropdown({ open: true, onClose, trigger: () => null, content: () => card.current });
+  useEffect(() => { card.current?.querySelector<HTMLElement>('button, input')?.focus(); }, []);
+  return (
+    <div ref={card} className="cal-card cal-menu" role="menu" aria-label={dayLabel(at.date, { weekday: 'long', month: 'long', day: 'numeric' })} style={{ left: at.left, top: at.top }}
+      onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}>
+      <strong>{dayLabel(at.date, { weekday: 'long', month: 'short', day: 'numeric' })}</strong>
+      {onCreate && <button type="button" role="menuitem" className="cal-menu-new" onClick={() => { onClose(); onCreate(at.date); }}>+ New task due this day</button>}
+      {tasks.length === 0
+        ? <p className="sig-note">Nothing is due this day.</p>
+        : <ul>{tasks.slice(0, 8).map(task => (
+            <li key={task.id}>
+              <button type="button" role="menuitem" className="cal-menu-task" onClick={() => { onClose(); onOpenTask(task.id); }}>{task.title}<small>{taskLine(quest, task)}</small></button>
+              <DueInput quest={quest} task={task} overdue={isOverdue(task, quest.now)} />
+            </li>
+          ))}</ul>}
+      {tasks.length > 8 && <small className="cal-more">+{tasks.length - 8} more in the day list</small>}
+    </div>
+  );
 }
 
 /** Deterministic observations plus the period digest. AI analysis, when added, joins this list and never replaces it. */

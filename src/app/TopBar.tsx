@@ -55,44 +55,58 @@ export function TopBar({ quest, demo, focused, unread, askOpen, mode, tabs, onTa
   );
 }
 
-/** Demo: who you're working as. Live: workspace and sign-out. */
-function UserChip({ quest }: { quest: Quest }) {
+/** The signed-in person's initial, for the account buttons. */
+export function AccountMark({ quest }: { quest: Quest }) {
+  return <span className="user-chip-mark" aria-hidden="true">{firstName(quest.state, quest.actor, '?').slice(0, 1).toUpperCase()}</span>;
+}
+
+/** Live: who you are, password, workspace and sign-out. Demo: who you're working as. */
+export function AccountMenu({ quest, close }: { quest: Quest; close: () => void }) {
   const live = useLive();
-  const [open, setOpen] = useState(false);
   const { state, actor, setActor } = quest;
   const me = person(state, actor);
   const role = live ? ROLE_LABELS[live.role] : me?.title ?? '';
+  return live
+    ? <>
+        <p className="menu-note">{me?.name && me.name !== live.email ? <><b>{me.name}</b><br />{live.email}</> : live.email}<br />{role} of {live.org.name}</p>
+        <button type="button" role="menuitem" onClick={() => { close(); location.hash = '#/auth/reset'; }}>Change password</button>
+        {live.canSwitch && <button type="button" role="menuitem" onClick={() => { close(); live.onLeaveWorkspace(); }}>{live.isPlatformAdmin ? 'Platform console' : 'Switch workspace'}</button>}
+        <button type="button" role="menuitem" onClick={() => { close(); live.onSignOut(); }}>Sign out</button>
+      </>
+    : <>
+        <p className="menu-note">Working as (demo person)</p>
+        {state.people.map(item => (
+          <button key={item.id} type="button" role="menuitemradio" aria-checked={item.id === actor} className={item.id === actor ? 'is-on' : ''} onClick={() => { close(); setActor(item.id); }}>
+            {item.name}<small>{item.title}</small>
+          </button>
+        ))}
+      </>;
+}
+
+/** Phones only: on wider screens the account sits at the foot of the rail. */
+function UserChip({ quest }: { quest: Quest }) {
+  const live = useLive();
+  const [open, setOpen] = useState(false);
+  const { state, actor } = quest;
+  const me = person(state, actor);
+  const role = live ? ROLE_LABELS[live.role] : me?.title ?? '';
   return (
-    <Popover open={open} setOpen={setOpen} align="end" triggerClass="user-chip" triggerLabel={`${me?.name ?? 'Account'} · ${role}`}
-      trigger={<><span className="user-chip-mark" aria-hidden="true">{firstName(state, actor, '?').slice(0, 1).toUpperCase()}</span><span className="user-chip-text"><b>{firstName(state, actor, 'You')}</b><small>{role}</small></span><TopIcon d="M6 9l6 6 6-6" small /></>}>
-      {live
-        ? <>
-            <p className="menu-note">{me?.name && me.name !== live.email ? <><b>{me.name}</b><br />{live.email}</> : live.email}<br />{role} of {live.org.name}</p>
-            <button type="button" role="menuitem" onClick={() => { setOpen(false); location.hash = '#/auth/reset'; }}>Change password</button>
-            {live.canSwitch && <button type="button" role="menuitem" onClick={() => { setOpen(false); live.onLeaveWorkspace(); }}>{live.isPlatformAdmin ? 'Platform console' : 'Switch workspace'}</button>}
-            <button type="button" role="menuitem" onClick={() => { setOpen(false); live.onSignOut(); }}>Sign out</button>
-          </>
-        : <>
-            <p className="menu-note">Working as (demo person)</p>
-            {state.people.map(item => (
-              <button key={item.id} type="button" role="menuitemradio" aria-checked={item.id === actor} className={item.id === actor ? 'is-on' : ''} onClick={() => { setOpen(false); setActor(item.id); }}>
-                {item.name}<small>{item.title}</small>
-              </button>
-            ))}
-          </>}
+    <Popover open={open} setOpen={setOpen} align="end" rootClass="account-pop" triggerClass="user-chip" triggerLabel={`${me?.name ?? 'Account'} · ${role}`}
+      trigger={<><AccountMark quest={quest} /><span className="user-chip-text"><b>{firstName(state, actor, 'You')}</b><small>{role}</small></span><TopIcon d="M6 9l6 6 6-6" small /></>}>
+      <AccountMenu quest={quest} close={() => setOpen(false)} />
     </Popover>
   );
 }
 
-function Popover({ open, setOpen, trigger, triggerClass, triggerLabel, align = 'start', children }: {
-  open: boolean; setOpen: (next: boolean) => void; trigger: ReactNode; triggerClass: string; triggerLabel?: string; align?: 'start' | 'end'; children: ReactNode;
+function Popover({ open, setOpen, trigger, triggerClass, triggerLabel, align = 'start', rootClass = '', children }: {
+  open: boolean; setOpen: (next: boolean) => void; trigger: ReactNode; triggerClass: string; triggerLabel?: string; align?: 'start' | 'end'; rootClass?: string; children: ReactNode;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   useDropdown({ open, onClose: () => setOpen(false), trigger: () => button.current, content: () => menu.current, region: () => root.current });
   return (
-    <div className="top-pop" ref={root}>
+    <div className={`top-pop ${rootClass}`} ref={root}>
       <button ref={button} type="button" className={triggerClass} aria-haspopup="menu" aria-expanded={open} aria-label={triggerLabel} onClick={() => setOpen(!open)}>{trigger}</button>
       {open && <div ref={menu} className={`top-menu align-${align}`} role="menu">{children}</div>}
     </div>

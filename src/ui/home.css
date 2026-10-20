@@ -4,7 +4,7 @@
    The rest of the app keeps Studio's tokens. */
 :root[data-look="studio"] :is(.home-dash, .ask-panel, .top-icon.is-on) {
   --ink: #111214; --ink-2: #393b41; --muted: #6c6f76; --faint: #9b9da4;
-  --line: #e7e7ea; --line-2: #d6d6db; --hair: rgb(17 18 20 / 7%); --hair-2: rgb(17 18 20 / 11%);
+  --line: #e7e7ea; --line-2: #d6d6db; --hair: rgb(17 18 20 / 4%); --hair-2: rgb(17 18 20 / 11%);
   --sunk: #f6f6f7; --surface-2: #f7f7f7; --surface-3: #efefef;
   --accent: #e8590c; --accent-ink: #b5440a; --accent-pale: #fff1e7; --accent-line: #ffd4b8;
   --act: #2563eb; --act-ink: #1d4ed8; --act-soft: #eef3fe;
@@ -16,7 +16,7 @@
 }
 
 /* ── Home ──────────────────────────────────────────────────────────────── */
-.content.view-home { max-width: 1320px; padding-top: 22px; }
+.content.view-home { padding-top: 22px; }
 /* Panels respond to the canvas width (which shrinks with the sidebar and the docked deck), not the viewport. */
 .home-dash { gap: 16px; container: home / inline-size; }
 .home-dash .seg button { min-height: 30px; }
@@ -223,6 +223,39 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .deck-week button.is-today span { color: var(--accent-ink); font-weight: 750; }
 .deck-week i { --n: 0; height: 6px; width: calc(var(--n) / 6 * 100%); min-width: 2px; border-radius: 3px; background: var(--accent); opacity: .75; }
 .deck-week small { color: var(--muted); font-size: 11px; }
+/* Quiet containers (Studio): cards are barely outlined; controls keep their edges. */
+:root[data-look="studio"] .aware-row { border-color: rgb(0 0 0 / 5%); }
+:root[data-look="studio"] .composer-box { border-color: rgb(0 0 0 / 9%); }
+:root[data-look="studio"] .tp-facts { border-color: var(--ink) var(--hair) var(--hair); }
+:root[data-look="studio"] .tp-facts > div { border-color: var(--hair); }
+/* Calendar: expand, hover card, right-click day menu, full page */
+.deck-cal-actions { display: flex; align-items: center; gap: 8px; }
+.deck-cal-expand { width: 28px; height: 28px; border: 1px solid var(--hair-2); border-radius: 8px; }
+.cal-card { position: fixed; z-index: 95; display: grid; gap: 8px; width: 290px; max-height: 340px; padding: 10px 12px; overflow-y: auto; border: 1px solid var(--hair-2); border-radius: 12px; background: var(--card); box-shadow: 0 14px 34px rgba(17, 17, 17, .14); }
+.cal-card > strong { font-size: 12.5px; font-weight: 750; }
+.cal-card ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.cal-card small { color: var(--muted); font-size: 11px; font-weight: 500; }
+.cal-peek { pointer-events: none; }
+.cal-peek li { display: grid; gap: 1px; font-size: 12.5px; font-weight: 650; }
+.cal-menu li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+.cal-menu-task { display: grid; gap: 1px; min-width: 0; padding: 4px 6px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font-size: 12.5px; font-weight: 650; text-align: left; }
+.cal-menu-task:hover { background: var(--sunk); }
+.cal-menu .inline-date { max-width: 132px; font-size: 12px; }
+.cal-menu-new { padding: 7px 8px; border: 0; border-radius: 8px; background: var(--accent-pale); color: var(--accent-ink); font-size: 12.5px; font-weight: 700; text-align: left; }
+.cal-menu-new:hover { background: var(--accent); color: #fff; }
+.calendar-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; gap: 28px; }
+.deck-cal.is-page .deck-cal-bar strong { font-size: 18px; }
+.deck-cal.is-page .deck-cal-grid { gap: 6px; text-align: left; }
+.deck-cal.is-page .deck-cal-grid .dow { padding-left: 8px; font-size: 11px; text-align: left; }
+.deck-cal.is-page .deck-cal-grid button { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 3px; aspect-ratio: auto; min-height: 104px; padding: 6px 7px; overflow: hidden; border-color: var(--hair); }
+.cal-num { font-size: 13px; font-weight: 700; }
+.cal-chip { overflow: hidden; padding: 2px 6px; border-radius: 5px; background: var(--card); color: var(--ink); font-size: 11.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.deck-cal-grid .cal-more { color: inherit; font-size: 10.5px; opacity: .8; }
+@media (max-width: 900px) {
+  .calendar-layout { grid-template-columns: minmax(0, 1fr); }
+  .deck-cal.is-page .deck-cal-grid button { min-height: 58px; }
+  .deck-cal.is-page .cal-chip, .deck-cal.is-page .deck-cal-grid .cal-more { display: none; }
+}
 .deck-digest { display: grid; gap: 4px; color: var(--muted); font-size: 12px; line-height: 1.45; }
 .deck-digest p:first-child { color: var(--ink-2); }
 .sig-item:disabled { cursor: default; }
@@ -300,7 +333,10 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .top-menu button:disabled { opacity: .4; }
 .top-menu button.is-on { box-shadow: inset 2px 0 0 var(--accent); background: var(--sunk); }
 .top-menu button small { color: var(--muted); font-size: 11.5px; font-weight: 500; }
-.rail-settings-menu { position: fixed; top: auto; z-index: 90; min-width: 240px; }
+.rail-menu { position: fixed; top: auto; z-index: 90; min-width: 240px; }
+.rail-account .user-chip-mark { width: 32px; height: 32px; font-size: 13px; }
+/* The account lives at the foot of the rail on wider screens; the top-bar chip is for phones. */
+@media (min-width: 761px) { .account-pop { display: none; } }
 .rail-settings-look { padding: 2px 10px 8px; border-bottom: 1px solid var(--hair-2); margin-bottom: 4px; }
 .rail-settings-look .look-switch button { display: inline-block; min-height: 28px; padding: 0 12px; box-shadow: none; font-size: 12px; }
 .rail-settings-look .look-switch button.is-on { background: var(--ink); color: #fff; }

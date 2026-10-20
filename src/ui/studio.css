@@ -5,12 +5,13 @@
   --rail-bg: #fff; --sidebar-bg: #fff; --context-bg: #fff;
   --surface-2: #f7f7f7; --surface-3: #efefef; --sunk: var(--surface-2);
   --ink: #111; --ink-2: #333; --muted: #595959; --faint: #6b6b6b;
-  --line: #e3e3e3; --line-2: #bdbdbd; --hair: #e5e5e5; --hair-2: #c9c9c9;
+  /* Cards and dividers (--hair) are barely there; controls keep visible edges (--hair-2, --line-2). */
+  --line: #e3e3e3; --line-2: #bdbdbd; --hair: rgb(0 0 0 / 5%); --hair-2: #c9c9c9;
   --accent: #c64b09; --accent-ink: #a73805; --accent-line: #cf612d; --accent-pale: #fafafa;
   --info: #333; --info-pale: #f5f5f5; --done-pale: #f3f3f3; --warn-pale: #fafafa;
   --act: var(--accent); --act-ink: var(--accent-ink); --act-soft: #fafafa;
   --graphite-soft: #f2f2f2; --attn-soft: #fafafa; --ok-soft: #f7f7f7;
-  --shadow: 0 1px 2px rgb(0 0 0 / 4%), 0 5px 18px rgb(0 0 0 / 5%);
+  --shadow: 0 1px 2px rgb(0 0 0 / 3%), 0 8px 24px rgb(0 0 0 / 4%);
   --shadow-lift: 0 2px 5px rgb(0 0 0 / 6%), 0 14px 32px rgb(0 0 0 / 9%);
   --shadow-lg: 0 3px 10px rgb(0 0 0 / 8%), 0 30px 80px rgb(0 0 0 / 16%);
   --active-depth: 0 0 0 1px var(--accent-line), 0 6px 28px rgb(198 75 9 / 9%);

@@ -16,7 +16,7 @@ export interface NavigationAccess {
 export const UNDER_CONSTRUCTION = 'Under construction :)';
 
 /** The approved experience: always open, whatever the server lists. */
-export const ALWAYS_OPEN: readonly string[] = ['home', 'all-tasks'];
+export const ALWAYS_OPEN: readonly string[] = ['home', 'all-tasks', 'calendar'];
 
 /** Every other view in the app (src/app/App.tsx `View`), restricted when the server can't be asked. */
 export const RESTRICTABLE: readonly string[] = [
