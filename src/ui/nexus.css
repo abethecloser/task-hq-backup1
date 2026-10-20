@@ -1036,6 +1036,7 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 @container (max-width: 560px) {
   .tp-talk .task-comment-form { grid-template-columns: minmax(0, 1fr); }
   .tp-bar .ctx-verify { display: none; }
+}
 /* Badges & check-ins */
 .badges .badge-pending { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--accent-line, var(--line)); border-radius: var(--radius); background: var(--accent-pale, var(--sunk)); }
 .badges .badge-pending-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
