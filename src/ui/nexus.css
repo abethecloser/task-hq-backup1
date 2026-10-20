@@ -1096,3 +1096,15 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
   .badges .badge-issued { position: absolute; inset: 0 auto auto 0; border: 0; }
   .badges .badge-issued .people-actions { display: none; }
 }
+
+/* Shared calendar/activity sidebar; signals and insights remain available in source only. */
+.calendar-activity .signals-body { padding-top: 0; }
+.calendar-activity .sig > .ctx-label { margin-top: 0; }
+@media (max-width: 760px) {
+  .calendar-activity { width: min(100%, 430px); max-width: 100vw; }
+  .calendar-activity .context-body { padding-inline: 12px; }
+  :root:root .calendar-activity button { min-height: 44px; }
+  .calendar-activity .deck-cal-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .calendar-activity .deck-cal-grid button { min-width: 0; }
+  .calendar-activity .sig-item { overflow-wrap: anywhere; }
+}

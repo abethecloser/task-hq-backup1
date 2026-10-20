@@ -23,7 +23,8 @@ _Prepared 2026-10-19. No passwords, keys or setup codes in this document. Never 
 - **Left panel:** Inbox, Attention and Activity. Toggle it with the arrow on its edge.
 - **Right panel:** the Instrument Deck (Signals / Calendar / Insights), or the task you have open. Both panels can stay open together.
 - **Tasks:** open a task to comment (use **@Name** to mention someone), ask for help, report a blocker, hand it off or move it forward. History is kept on every task.
-- Some sections show **"Under construction :)"**. That's a temporary restriction, not a permission problem.
+- Sections marked **"Under construction :)"** reflect intentional staged feature restrictions, not a reported defect or a permission problem.
+- Home, All Tasks and Calendar remain available to authenticated team members. Other sections follow the existing server-managed navigation policy; page visibility does not grant data or action permissions.
 
 ## Who can do what
 

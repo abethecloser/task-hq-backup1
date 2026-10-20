@@ -54,7 +54,6 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
       <Hero eyebrow={greeting.eyebrow} primary={greeting.primary} support={greeting.support}>
         <button type="button" className="btn btn-primary btn-sm" disabled={!canCreate} onClick={onCreate}>+ New task</button>
         {canDeck && <button type="button" className="btn btn-sm" onClick={() => onDeck('calendar')}>Calendar</button>}
-        {canDeck && <button type="button" className="btn btn-sm" onClick={() => onDeck('insights')}>Insights</button>}
       </Hero>
 
       <div className="hd-top">
