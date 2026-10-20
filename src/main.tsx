@@ -1,7 +1,10 @@
+// First: take a badge code out of the address bar before anything else reads or logs it.
+import { LANDING_BADGE } from './auth/badge.ts';
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './app/App.tsx';
 import { AuthScreen, useSession } from './auth/AuthScreen.tsx';
+import { BadgeCheckIn } from './auth/BadgeCheckIn.tsx';
 import { LiveRoot } from './live/LiveRoot.tsx';
 import type { AuthView } from './auth/AuthScreen.tsx';
 import { supabase } from './auth/client.ts';
@@ -33,6 +36,7 @@ function authViewFromHash(): AuthView {
 function Root() {
   const [mode, setMode] = useState(readMode);
   const [view, setView] = useState<AuthView>(authViewFromHash);
+  const [badge, setBadge] = useState(LANDING_BADGE);
   const session = useSession();
 
   useEffect(() => {
@@ -63,6 +67,8 @@ function Root() {
     setView(next);
   }
 
+  // A badge scan: check in (or out) on this phone, then continue into the workspace.
+  if (badge) return <BadgeCheckIn code={badge} onDone={() => { setBadge(null); go('sign-in'); }} />;
   if (mode === 'demo') return <App onExitDemo={isExtensionContext() ? undefined : exitDemo} />;
   if (!session.ready) return null;
   const client = supabase();

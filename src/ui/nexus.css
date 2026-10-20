@@ -1036,4 +1036,17 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 @container (max-width: 560px) {
   .tp-talk .task-comment-form { grid-template-columns: minmax(0, 1fr); }
   .tp-bar .ctx-verify { display: none; }
+/* Badges & check-ins */
+.badges .badge-pending { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--accent-line, var(--line)); border-radius: var(--radius); background: var(--accent-pale, var(--sunk)); }
+.badges .badge-pending-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.badges .badge-issued { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel, var(--card)); }
+.badges .badge-qr { width: 168px; max-width: 100%; aspect-ratio: 1; padding: 6px; border-radius: 10px; background: #fff; }
+.badges .badge-qr svg { display: block; width: 100%; height: 100%; }
+.badges .badge-issued-text { display: grid; gap: 6px; min-width: 0; flex: 1 1 220px; }
+.badges .badge-issued-text code { overflow-wrap: anywhere; font-size: 12px; }
+@media print {
+  body * { visibility: hidden; }
+  .badges .badge-issued, .badges .badge-issued * { visibility: visible; }
+  .badges .badge-issued { position: absolute; inset: 0 auto auto 0; border: 0; }
+  .badges .badge-issued .people-actions { display: none; }
 }

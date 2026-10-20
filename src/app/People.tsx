@@ -5,6 +5,7 @@ import { Select } from '../ui/Select.tsx';
 // this screen only renders what the server returns. Demo: the synthetic team,
 // clearly labeled, with no production identity or privilege.
 import { WorkLabels } from './Relationships.tsx';
+import { Badges } from './Badges.tsx';
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { isOpen } from '../core/selectors.ts';
@@ -230,6 +231,8 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
       )}
 
       <ProfileCard live={live} workRole={me?.role ?? ''} />
+
+      {isAdmin && data && <Badges live={live} members={data.members} />}
 
       {isAdmin && data && data.requests.length > 0 && (
         <section className="panel" aria-labelledby="requests-title">
