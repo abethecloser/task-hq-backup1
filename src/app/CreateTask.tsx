@@ -35,6 +35,8 @@ export function CreateTask({ quest, onClose, onCreated }: { quest: Quest; onClos
   // Assigning work to someone else keeps you posted by default: you watch it.
   const [watch, setWatch] = useState(true);
   const delegated = !!draft.owner && draft.owner !== actor;
+  // Secondary fields stay folded until one of them holds something.
+  const more = !!(draft.description || draft.approver || draft.type || draft.projectId || draft.dependsOn?.length || proposed.approver);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -52,25 +54,30 @@ export function CreateTask({ quest, onClose, onCreated }: { quest: Quest; onClos
         <form className="form" onSubmit={submit}>
           <label className="field"><span>What needs to get done?</span><ReferenceInput autoFocus required maxLength={160} value={draft.title} onChange={event => set({ title: event.target.value })} placeholder="e.g. Confirm the dumpster drop-off for Maple Ave" /></label>
           <label className="field"><span>Next action</span><ReferenceInput maxLength={200} value={draft.nextAction} onChange={event => set({ nextAction: event.target.value })} placeholder="The first physical step" /></label>
-          <label className="field"><span>Description / notes</span><ReferenceTextarea rows={3} value={draft.description ?? ''} maxLength={1000} onChange={event => set({ description: event.target.value })} placeholder="Context, @people and #tags" /></label>
-          <div className="form-grid">
+          <div className="form-grid create-main">
             <label className="field"><span>Assigned to</span><small className="field-hint">{delegates ? 'Who moves this forward. You don’t have to own what you create.' : 'Accountable for moving this task forward.'}</small><PersonSelect state={owners} label="Assigned to" value={draft.owner ?? ''} emptyLabel={delegates ? 'Choose later (unassigned)' : 'Unassigned'} onChange={owner => set({ owner })} />
               {assigns && proposed.owner && draft.owner !== proposed.owner.id && <button type="button" className="proposal-chip" onClick={() => set({ owner: proposed.owner!.id })}>Proposed: {proposed.owner.name} · <b>Use</b></button>}</label>
-            <label className="field"><span>Approver</span><PersonSelect state={state} label="Approver" value={draft.approver ?? ''} emptyLabel="No approval needed" onChange={approver => set({ approver })} />
-              {proposed.approver && draft.approver !== proposed.approver.id && <button type="button" className="proposal-chip" onClick={() => set({ approver: proposed.approver!.id })}>Proposed: {proposed.approver.name} · <b>Use</b></button>}</label>
-            <label className="field"><span>Next-step owner</span><small className="field-hint">Receives the handoff when this work is ready to move on.</small><PersonSelect state={state} label="Next-step owner" value={draft.nextOwner ?? ''} onChange={nextOwner => set({ nextOwner })} /></label>
             <label className="field"><span>Due</span><span className="draft-when"><input type="date" value={draft.due} onChange={event => set({ due: event.target.value, ...(event.target.value ? {} : { dueTime: undefined }) })} />{taxonomyOk && <input type="time" value={draft.dueTime ?? ''} disabled={!draft.due} aria-label="Due time" onChange={event => set({ dueTime: event.target.value || undefined })} />}</span></label>
-            {taxonomyOk && types.length > 0 && <label className="field"><span>Type</span><Select value={draft.type ?? ''} onChange={event => set({ type: event.target.value || undefined })}><option value="">No type</option>{types.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</Select></label>}
             <label className="field"><span>Priority</span><Select value={draft.priority} onChange={event => set({ priority: event.target.value as NewTask['priority'] })}><option value="normal">Normal</option><option value="high">High</option></Select></label>
-            <label className="field"><span>Project</span><Select value={draft.projectId} onChange={event => set({ projectId: event.target.value })}><option value="">No project</option>{state.projects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
+            <label className="field"><span>Next-step owner</span><small className="field-hint">Receives the handoff when this work is ready to move on.</small><PersonSelect state={state} label="Next-step owner" value={draft.nextOwner ?? ''} onChange={nextOwner => set({ nextOwner })} /></label>
           </div>
           {delegated && <label className="check-row watch-check"><input type="checkbox" checked={watch} onChange={event => setWatch(event.target.checked)} />Watch this task: follow its comments and changes</label>}
-          <label className="field"><span>Starts after</span>
-            <Select value={draft.dependsOn?.[0] ?? ''} onChange={event => set({ dependsOn: event.target.value ? [event.target.value] : [] })}>
-              <option value="">No dependency — can start now</option>
-              {state.tasks.filter(task => task.status !== 'done').map(task => <option key={task.id} value={task.id}>{task.title}</option>)}
-            </Select>
-          </label>
+          <details className="drawer-details create-more" open={more || undefined}>
+            <summary>More details</summary>
+            <label className="field"><span>Description / notes</span><ReferenceTextarea rows={3} value={draft.description ?? ''} maxLength={1000} onChange={event => set({ description: event.target.value })} placeholder="Context, @people and #tags" /></label>
+            <div className="form-grid">
+              <label className="field"><span>Approver</span><PersonSelect state={state} label="Approver" value={draft.approver ?? ''} emptyLabel="No approval needed" onChange={approver => set({ approver })} />
+                {proposed.approver && draft.approver !== proposed.approver.id && <button type="button" className="proposal-chip" onClick={() => set({ approver: proposed.approver!.id })}>Proposed: {proposed.approver.name} · <b>Use</b></button>}</label>
+              {taxonomyOk && types.length > 0 && <label className="field"><span>Type</span><Select value={draft.type ?? ''} onChange={event => set({ type: event.target.value || undefined })}><option value="">No type</option>{types.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</Select></label>}
+              <label className="field"><span>Project</span><Select value={draft.projectId} onChange={event => set({ projectId: event.target.value })}><option value="">No project</option>{state.projects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></label>
+            </div>
+            <label className="field"><span>Starts after</span>
+              <Select value={draft.dependsOn?.[0] ?? ''} onChange={event => set({ dependsOn: event.target.value ? [event.target.value] : [] })}>
+                <option value="">No dependency — can start now</option>
+                {state.tasks.filter(task => task.status !== 'done').map(task => <option key={task.id} value={task.id}>{task.title}</option>)}
+              </Select>
+            </label>
+          </details>
           <footer className="form-actions"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={!draft.title.trim()}>Create task →</button></footer>
         </form>
       </section>

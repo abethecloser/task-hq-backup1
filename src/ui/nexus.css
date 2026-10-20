@@ -1005,7 +1005,8 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .tp-facts dd small { color: var(--muted); font-size: 12px; }
 .tp-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr); align-items: start; gap: 18px; }
 .tp-col { display: grid; gap: 18px; min-width: 0; }
-.tp-card { display: grid; gap: 12px; min-width: 0; padding: 16px 18px; border: 1px solid var(--hair); border-radius: 14px; background: var(--card); box-shadow: var(--shadow); }
+.tp-card { display: grid; gap: 12px; min-width: 0; padding: 18px 0 0; border-top: 1px solid var(--hair-2); }
+.tp-side { padding-left: 22px; border-left: 1px solid var(--hair-2); }
 .tp-card > .ctx-label { margin: 0; font-size: 11px; }
 .tp-card .field > input, .tp-card .field > textarea { width: 100%; }
 .tp-card textarea { min-height: 0; padding: 9px 10px; field-sizing: content; resize: vertical; }
@@ -1030,6 +1031,7 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .tp-side .ctx-deps ul { margin: 0; padding: 0; list-style: none; }
 @container (max-width: 980px) {
   .tp-grid { grid-template-columns: minmax(0, 1fr); }
+  .tp-side { padding-left: 0; border-left: 0; }
   .tp-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tp-facts > div { border-bottom: 1px solid var(--hair-2); }
 }
@@ -1037,6 +1039,10 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
   .tp-talk .task-comment-form { grid-template-columns: minmax(0, 1fr); }
   .tp-bar .ctx-verify { display: none; }
 }
+/* Create task: the essentials first, the rest folded */
+.form-grid.create-main { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.create-more { padding-top: 12px; border-top: 1px solid var(--hair-2); }
+@media (max-width: 760px) { .form-grid.create-main { grid-template-columns: 1fr; } }
 /* Badges & check-ins */
 .badges .badge-pending { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--accent-line, var(--line)); border-radius: var(--radius); background: var(--accent-pale, var(--sunk)); }
 .badges .badge-pending-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

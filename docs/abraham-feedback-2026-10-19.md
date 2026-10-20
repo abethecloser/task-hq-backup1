@@ -45,3 +45,12 @@
   - adding watchers from the task page.
 - **Batch 2:** next-step follow-up task creation, a simpler create form, quick-action parity.
 - **Batch 3:** projects "+", labels, and the company switch. Blocked until the live server upgrade (`operational_attention` migration and the repository dispatch), because the patched live server can't create projects or save types or tags.
+
+## Follow-up voice note (2026-10-19, 9:15 PM)
+**Source:** WhatsApp voice note, about 22 s, with a screenshot of the old build's task page (Details / Checklist / Quick actions). Transcribed locally.
+- Clicking a task should open a full page to work on it. Done in Batch 1.
+- "Remove the checklist in the center". Task-HQ has no checklist.
+- "Make the comments more front and center". Done 2026-10-20: Comments now come right after the status strip, above the Brief.
+
+## Visual direction (2026-10-20)
+More open workspace, fewer cards. The task page sections are now divided by lines instead of cards. The create form leads with name, next action, assigned, due, priority and next-step owner; notes, approver, type, project and "Starts after" are under More details.

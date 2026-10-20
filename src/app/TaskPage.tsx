@@ -1,5 +1,5 @@
 // A task, full screen: identity and the four everyday fields (status, assigned, priority,
-// due) up top; the brief and the conversation on the left; quick actions, people and
+// due) up top; the conversation first, then the brief, on the left; quick actions, people and
 // watchers on the right. The quick actions are the engine's authorized offers
 // (TaskSituation), never invented here, and every edit is an engine action.
 import { useEffect, useRef, useState } from 'react';
@@ -98,26 +98,6 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
 
       <div className="tp-grid">
         <div className="tp-col">
-          <section className="tp-card" aria-labelledby="tp-brief">
-            <h2 id="tp-brief" className="ctx-label">Brief</h2>
-            {task.status !== 'done' && (
-              <label className="field"><span>Next action</span>
-                <ReferenceInput referenceDocument={task.references?.nextAction} value={nextAction} maxLength={200} readOnly={!editable} placeholder="The next physical step, in one line"
-                  onChange={event => setNextAction(event.target.value)} onBlur={() => saveText('nextAction', nextAction)} onKeyDown={event => { if (event.key === 'Enter') (event.target as HTMLInputElement).blur(); }} />
-              </label>
-            )}
-            <label className="field"><span>Notes</span>
-              <ReferenceTextarea referenceDocument={task.references?.description} rows={4} value={description} maxLength={1000} readOnly={!editable} placeholder={editable ? 'Context, @people and #tags' : 'No notes'}
-                onChange={event => setDescription(event.target.value)} onBlur={() => saveText('description', description)} />
-            </label>
-            {(editable || task.waitingOn) && (
-              <label className="field"><span>Waiting on (outside Task-HQ)</span>
-                <ReferenceInput value={waitingOn} maxLength={120} readOnly={!editable} placeholder="e.g. City permit office" onChange={event => setWaitingOn(event.target.value)} onBlur={() => saveText('waitingOn', waitingOn)} />
-              </label>
-            )}
-            {lead && <div className="callout"><b>Lead</b> {lead.name} · {lead.phone} · {lead.address}</div>}
-          </section>
-
           <section className="tp-card tp-talk" aria-label="Comments and activity">
             <div className="tp-tabs" role="tablist" aria-label="Comments and activity">
               <button type="button" role="tab" aria-selected={tab === 'comments'} onClick={() => setTab('comments')}>Comments <span>{comments.length}</span></button>
@@ -136,6 +116,26 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
                   <li key={event.id} className={event.undone ? 'is-undone' : ''}><time>{when(event.at)}</time><p><ReferencedText text={event.text} document={event.references?.text} /></p></li>
                 ))}</ol>
               )}
+          </section>
+
+          <section className="tp-card" aria-labelledby="tp-brief">
+            <h2 id="tp-brief" className="ctx-label">Brief</h2>
+            {task.status !== 'done' && (
+              <label className="field"><span>Next action</span>
+                <ReferenceInput referenceDocument={task.references?.nextAction} value={nextAction} maxLength={200} readOnly={!editable} placeholder="The next physical step, in one line"
+                  onChange={event => setNextAction(event.target.value)} onBlur={() => saveText('nextAction', nextAction)} onKeyDown={event => { if (event.key === 'Enter') (event.target as HTMLInputElement).blur(); }} />
+              </label>
+            )}
+            <label className="field"><span>Notes</span>
+              <ReferenceTextarea referenceDocument={task.references?.description} rows={4} value={description} maxLength={1000} readOnly={!editable} placeholder={editable ? 'Context, @people and #tags' : 'No notes'}
+                onChange={event => setDescription(event.target.value)} onBlur={() => saveText('description', description)} />
+            </label>
+            {(editable || task.waitingOn) && (
+              <label className="field"><span>Waiting on (outside Task-HQ)</span>
+                <ReferenceInput value={waitingOn} maxLength={120} readOnly={!editable} placeholder="e.g. City permit office" onChange={event => setWaitingOn(event.target.value)} onBlur={() => saveText('waitingOn', waitingOn)} />
+              </label>
+            )}
+            {lead && <div className="callout"><b>Lead</b> {lead.name} · {lead.phone} · {lead.address}</div>}
           </section>
         </div>
 
