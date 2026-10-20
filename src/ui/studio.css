@@ -45,7 +45,7 @@
 :root[data-look="studio"] .people-row { padding: 14px 8px; gap: 14px; }
 :root[data-look="studio"] .people-row.is-head { background: var(--surface-2); color: var(--muted); padding-block: 10px; }
 :root[data-look="studio"] .person-cell small { white-space: normal; overflow-wrap: anywhere; }
-:root[data-look="studio"] .msg-composer { padding: 18px; margin: 12px 0; border: 1px solid var(--accent-line); border-left: 4px solid var(--accent); border-radius: var(--radius); box-shadow: var(--active-depth); background: var(--card); gap: 12px; }
+:root[data-look="studio"] .msg-composer { padding: 18px; margin: 12px 0; border: 1px solid var(--accent-line); --bar: var(--accent); border-radius: var(--radius); box-shadow: var(--active-depth); background: var(--card); gap: 12px; }
 :root[data-look="studio"] .thread-post { padding: 12px; gap: 12px; border-color: var(--hair-2); box-shadow: var(--shadow-lift); }
 :root[data-look="studio"] .thread-post:focus-within { border-color: var(--accent); box-shadow: var(--active-depth); }
 :root[data-look="studio"] .thread-post textarea { flex: 1 1 240px; min-height: 42px; padding: 10px; border: 1px solid var(--line-2); }
