@@ -963,9 +963,16 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .relationship-choice.is-selected { outline: 2px solid var(--ink); }
 .vault-search { width: 100%; }
 /* An open search line: no box, a short rule beneath, and the caret showing where to type. */
-:root:root:root input.vault-search { width: min(100%, 440px); min-height: 40px; padding: 8px 2px; border: 0; border-bottom: 1px solid var(--hair-2); border-radius: 0; background: transparent; box-shadow: none; outline: none; caret-color: var(--accent); font-size: 15px; }
-:root:root:root input.vault-search:hover { border-bottom-color: var(--line-2); }
-:root:root:root input.vault-search:focus { border-bottom-color: var(--ink-2); box-shadow: none; outline: none; }
+:root:root:root input.vault-search {
+  --vault-line: rgb(0 0 0 / 22%);
+  width: min(100%, 440px); min-height: 40px; padding: 8px 2px; border: 0; border-radius: 0; box-shadow: none; outline: none; caret-color: var(--accent); font-size: 15px;
+  /* A rule that fades out to the right, over a faint shade for depth. */
+  background:
+    linear-gradient(to right, var(--vault-line), transparent) left bottom / 100% 1px no-repeat,
+    radial-gradient(70% 10px at 0 100%, rgb(0 0 0 / 5%), transparent) left bottom / 100% 10px no-repeat;
+}
+:root:root:root input.vault-search:hover { --vault-line: rgb(0 0 0 / 34%); }
+:root:root:root input.vault-search:focus { --vault-line: rgb(0 0 0 / 55%); box-shadow: none; outline: none; }
 .relationship-panel progress { width: 100px; margin: 0 10px; }
 
 /* Inline task controls (All Tasks rows, task page): quiet until hovered, the status keeps its colored pill. */
