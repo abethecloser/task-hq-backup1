@@ -9,7 +9,7 @@ import type { Task } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
 import { dailySignal } from '../core/executive.ts';
 import type { Lens, RegistryQuery } from '../core/registry.ts';
-import { digest, dueOn, heatGrid, systemInsights } from '../core/dashboard.ts';
+import { digest, dueOn, heatGrid, systemInsights, teamActivity } from '../core/dashboard.ts';
 import type { SystemInsight } from '../core/dashboard.ts';
 import { firstName, isOpen, isOverdue } from '../core/selectors.ts';
 import { localDate } from '../core/time.ts';
@@ -90,6 +90,47 @@ export function Signals({ quest, notifications, company, section, onSection, doc
       </div>
     </aside>
   );
+}
+
+/** Shared right sidebar: existing calendar followed by authorized notification/activity projections. */
+export function CalendarSidebar({ quest, notifications, company, docked, onOpenNotification, onOpenTask, onClose, onExpandCalendar, onCreate }: {
+  quest: Quest; notifications: Notification[]; company: boolean; docked: boolean;
+  onOpenNotification: (note: Notification) => void; onOpenTask: (id: string) => void; onClose: () => void;
+  onExpandCalendar: () => void; onCreate?: (due: string) => void;
+}) {
+  const [date, setDate] = useState(() => localDate(quest.now));
+  const panel = useRef<HTMLElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  const activity = teamActivity(quest.state, quest.actor, company, 8);
+  useEffect(() => {
+    if (docked) return;
+    returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    panel.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    return () => { returnFocus.current?.focus(); };
+  }, [docked]);
+  return <aside ref={panel} className={`context context-signals calendar-activity ${docked ? 'is-docked' : 'is-drawer'}`}
+    role={docked ? 'complementary' : 'dialog'} aria-modal={docked ? undefined : true} aria-label="Calendar and activity"
+    onKeyDown={event => {
+      if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
+      if (!docked && event.key === 'Tab') {
+        const controls = [...(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), [tabindex="0"]') ?? [])].filter(el => el.getClientRects().length > 0);
+        const first = controls[0], last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
+    }}>
+    <header className="context-head"><span className="context-label">Calendar</span><button type="button" className="icon-btn" aria-label="Close calendar and activity" onClick={onClose}>×</button></header>
+    <div className="context-body signals-body">
+      <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={false} onExpand={onExpandCalendar} onCreate={onCreate} />
+      <section className="sig" aria-label="Notifications and activity"><h2 className="ctx-label">Notifications / Activity</h2>
+        {notifications.length > 0 && <ul className="sig-list">{notifications.slice(0, 8).map(note => <li key={note.id}><button type="button" className="sig-item" onClick={() => onOpenNotification(note)}><small>{NOTIFICATION_LABELS[note.kind]}</small>{note.title}</button></li>)}</ul>}
+        {activity.length > 0 && <ol className="ctx-history">{activity.map(event => <li key={event.id}><time>{new Date(event.at).toLocaleString()}</time>{event.taskId
+          ? <button type="button" className="sig-item" onClick={() => onOpenTask(event.taskId!)}>{event.text}</button>
+          : <p>{event.text}</p>}</li>)}</ol>}
+        {!notifications.length && !activity.length && <p className="sig-note">No notifications or recent activity in your available work.</p>}
+      </section>
+    </div>
+  </aside>;
 }
 
 /** Month or week of due dates, shaded by due-date load from records, with the chosen day's work below.

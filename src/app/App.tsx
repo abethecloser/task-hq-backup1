@@ -21,7 +21,7 @@ import type { Quest } from '../ui/useQuest.ts';
 import { AllTasks, useRegistryPrefs } from './AllTasks.tsx';
 import type { RegistryPreset } from './AllTasks.tsx';
 import { CompanyWork } from './CompanyWork.tsx';
-import { CalendarPage, Signals, hasSignals } from './ContextPanel.tsx';
+import { CalendarPage, CalendarSidebar } from './ContextPanel.tsx';
 import { TaskPage } from './TaskPage.tsx';
 import type { DeckSection } from './ContextPanel.tsx';
 import { CreateTask } from './CreateTask.tsx';
@@ -157,7 +157,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const collapseSidebar = sidebar.collapse;
   const width = useViewportWidth();
   const [contextPref, setContextPref] = useContextPref(actor);
-  const [deckSection, setDeckSection] = useDeckSection(actor);
   /** The deck as a drawer, when it was asked for but can't dock beside the canvas. */
   const [deckDrawer, setDeckDrawer] = useState(false);
 
@@ -221,11 +220,11 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const snoozeKey = sidebar.snoozes.map(item => `${item.id}:${item.until}`).join(',');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const awareAttention = useMemo(() => attentionFor(state, minute * 60000, actor, sidebar.snoozes), [state, minute, actor, snoozeKey]);
-  // Authenticated workspaces expose the application navigation; demo access remains closed by default.
+  // The server's temporary navigation restrictions also apply to authenticated workspaces.
   const access = live?.navigation ?? CLOSED;
-  // Manage pages remain role-gated independently of navigation visibility.
+  // Work / Manage remains a role permission, separate from temporary navigation restrictions.
   const manager = canManage(live ? live.role : me.role === 'manager' ? 'owner' : me.role === 'coordinator' ? 'supervisor' : me.role);
-  const open = (next: View) => (manager || !isManageView(next)) && canNavigate(access, next) && (next !== 'feedback' || feedbackOn);
+  const open = (next: View) => (manager || !isManageView(next)) && (next !== 'tools' || me.role !== 'reviewer') && (next !== 'executive' || hasDesk) && canNavigate(access, next) && (next !== 'feedback' || feedbackOn);
   const underConstruction = () => quest.say(UNDER_CONSTRUCTION);
   const view: View = allowed(requested) && open(requested) && (requested !== 'executive' || hasDesk) ? requested : 'home';
 
@@ -317,12 +316,15 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   }
 
   const navigation: { id: View; label: string; count?: number; hot?: boolean; icon: ReactNode }[] = [
+    { id: 'home', label: 'Home', icon: <Icon d="M3 11l9-8 9 8M5 10v11h14V10M10 21v-7h4v7" /> },
+    { id: 'all-tasks', label: 'All Tasks', count: counts.all, icon: <Icon d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v2H4z" /> },
+    { id: 'calendar', label: 'Calendar', icon: <Icon d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4" /> },
     { id: 'inbox', label: 'Inbox', count: inboxUnread, hot: inboxUnread > 0, icon: <Icon d="M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z" /> },
     { id: 'workbook', label: 'Operations Workbook · Preview', icon: <Icon d="M3 4h18v16H3zM3 9h18M8 4v16M14 4v16" /> },
-    ...(me.role !== 'reviewer' ? [{ id: 'tools' as View, label: 'Estimates & Proposals', count: tools?.estimates.filter(item => item.status !== 'approved').length, icon: <Icon d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h5" /> }] : []),
+    { id: 'tools' as View, label: 'Estimates & Proposals', count: tools?.estimates.filter(item => item.status !== 'approved').length, icon: <Icon d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h5" /> },
     { id: 'needs-attention', label: 'Needs Attention', count: attention.length, hot: myAttention > 0, icon: <Icon d="M12 4 21 20H3zM12 10v4M12 17v.5" /> },
     { id: 'leads', label: 'First Response', count: leadAttention, hot: leadAttention > 0, icon: <Icon d="M13 3 5 14h6l-1 7 8-11h-6z" /> },
-    ...(hasDesk ? [{ id: 'executive' as View, label: 'Executive Desk', count: decisions, hot: decisions > 0, icon: <Icon d="M4 20V9l8-5 8 5v11M9 20v-6h6v6" /> }] : []),
+    { id: 'executive' as View, label: 'Executive Desk', count: decisions, hot: decisions > 0, icon: <Icon d="M4 20V9l8-5 8 5v11M9 20v-6h6v6" /> },
     { id: 'company-work', label: 'Projects', count: openCompany.length, icon: <Icon d="M3 8h18v12H3zM8 8V5h8v3M3 13h18" /> },
     { id: 'relationships', label: 'Relationship Vault', icon: <Icon d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h4" /> },
     { id: 'people', label: 'Team', count: state.people.length, icon: <Icon d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" /> },
@@ -333,14 +335,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     ...(state.policy.agentPilot ? [{ id: 'agents' as View, label: 'Agent pilot', icon: <Icon d="M12 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM5 21a7 7 0 0 1 14 0" /> }] : []),
   ];
 
-  const primaryIds: View[] = ['company-work', 'people', 'reports'];
-  const primary = primaryIds.flatMap(id => navigation.filter(item => item.id === id));
-  const nav = navigation.filter(item => !primaryIds.includes(item.id));
-  const mode: 'work' | 'manage' = manager && isManageView(view) ? 'manage' : 'work';
-  // Manage opens on its first section this account can use today; none means it is still under construction.
-  const manageEntry = navigation.find(item => isManageView(item.id) && open(item.id) && allowed(item.id))?.id;
-  const inMode = (id: View) => (mode === 'manage') === isManageView(id);
-
   const selected = taskId ? taskById(state, taskId) : undefined;
   const contextAllowed = selected && (!focused || selected.id === state.focus?.taskId || !!grant);
 
@@ -348,16 +342,15 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   // Short on room, the left panel narrows first; a right panel that still can't dock becomes a drawer.
   const geometry = (rightOpen: boolean, rightWidth: number) => panelLayout({ viewport: width, mobile: sidebar.isMobile, leftOpen: sidebar.open, leftWidth: sidebar.width, leftMin: PANEL_MIN, rightOpen, rightWidth, minCanvas: MIN_CANVAS, minCanvasBoth: MIN_CANVAS_BOTH });
   // The deck shows team-wide counts, so Home needs the same access as Company Work.
-  const deckAllowed = SIGNAL_VIEWS.includes(view) && !focused && me.role !== 'reviewer' && (view !== 'home' || company);
+  const deckAllowed = SIGNAL_VIEWS.includes(view) && !focused;
   const signalsWanted = !selected && deckAllowed
-    && (contextPref === 'open' || (contextPref === 'auto' && hasSignals(quest, notifications)));
+    && contextPref !== 'closed';
   const signalsFit = geometry(true, SIGNAL_PANEL).right === 'docked';
   const showSignals = signalsWanted && signalsFit;
   // A deck opened from the seam stays open: where it can't dock on desktop it shows as a drawer.
   const showDeckDrawer = !selected && deckAllowed && !signalsFit && (deckDrawer || (contextPref === 'open' && !sidebar.isMobile));
   /** Home's Calendar and Insights buttons: open the deck on that section, docked or as a drawer. */
   function openDeck(section: DeckSection) {
-    setDeckSection(section);
     if (signalsFit) setContextPref('open'); else setDeckDrawer(true);
   }
   // An open task is a full page in the canvas, so only the deck ever takes the right side.
@@ -386,7 +379,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
           onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
-        items={nav.filter(item => inMode(item.id)).map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, locked: !allowed(item.id), restricted: !open(item.id), info: info[item.id] }))}
+        items={navigation.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, locked: !allowed(item.id), restricted: !open(item.id), info: info[item.id] }))}
         onSelect={id => go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
@@ -402,19 +395,17 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
       <main className="main">
         <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen}
-          mode={manager ? { current: mode, entry: !!manageEntry, onChange: next => go(next === 'work' ? 'home' : manageEntry ?? 'home') } : undefined}
-          tabs={mode === 'manage' ? primary.map(item => ({ id: item.id, label: item.label, count: item.count, hot: false, active: view === item.id, allowed: allowed(item.id), restricted: !open(item.id) })) : [...LENSES.map(lens => ({ id: lens, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && registryView.lens === lens, allowed: allowed('all-tasks') }))]}
+          tabs={LENSES.map(lens => ({ id: lens, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && registryView.lens === lens, allowed: allowed('all-tasks') }))}
           onTab={id => { if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} open={canNavigate(access, 'search')} onOpen={openSearchResult} onBlocked={underConstruction} />} onAsk={() => setAskOpen(value => !value)} onBell={() => sidebar.showTab('inbox')}
           onMenu={sidebar.openMobile} menuOpen={sidebar.mobileOpen} />
 
-        <FeedbackBar quest={quest} preferences={feedbackOn}><CompanySignals quest={quest} onOpen={openTask} /></FeedbackBar>
+        {quest.feedback.cue && <FeedbackBar quest={quest} preferences={feedbackOn} />}
         {focused && grant && <GrantBar quest={quest} grant={grant} onReturn={() => { closeTask(); go('home'); }} />}
 
         <section className={`content view-${selected && contextAllowed ? 'task' : view}`}>
           {selected && contextAllowed ? <TaskPage key={selected.id} quest={quest} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)} />
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
-            : view === 'home' && me.role === 'reviewer' ? <ReviewerWelcome quest={quest} onOpenFeedback={() => setReviewRequest(value => value + 1)} go={next => go(next as View)} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
                 unseen={{ count: inboxUnread, latest: inbox.items.find(item => !sidebar.read.has(item.id))?.title }} onUnseen={() => sidebar.showTab('inbox')}
                 mentions={mentions} read={sidebar.read}
@@ -443,7 +434,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           {[
             { id: 'home' as View, label: 'Home', hot: false, icon: <Icon d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" /> },
             { id: 'all-tasks' as View, label: 'Tasks', hot: false, icon: <Icon d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v2H4z" /> },
-            ...(['inbox', 'needs-attention', 'leads'] as View[]).map(id => nav.find(item => item.id === id)).filter(item => !!item),
+            ...(['inbox', 'needs-attention', 'leads'] as View[]).map(id => navigation.find(item => item.id === id)).filter(item => !!item),
           ].map(item => {
             const restricted = !open(item.id);
             return (
@@ -462,18 +453,16 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       )}
       {(showSignals || showDeckDrawer) && <>
         {showDeckDrawer && <button className="scrim" aria-label="Close instrument deck" onClick={closeDeck} />}
-        <Signals quest={quest} notifications={notifications} company={company} section={deckSection} onSection={setDeckSection} docked={showSignals}
+        <CalendarSidebar quest={quest} notifications={notifications} company={company} docked={showSignals}
           onOpenNotification={note => { setDeckDrawer(false); openNotification(note); }} onOpenTask={id => { setDeckDrawer(false); openTask(id); }}
-          onClose={closeDeck}
-          onExpandCalendar={() => { setDeckDrawer(false); go('calendar'); }} onCreate={canCreate ? due => { setDeckDrawer(false); createOn(due); } : undefined}
-          onRegistry={(lens, changes) => { setDeckDrawer(false); openRegistry(lens, changes); }}
-          onLens={(lens, filter) => { setDeckDrawer(false); openRegistry(lens, { scope: 'company', ...(filter === 'blocked' ? { status: 'blocked' } : filter === 'unowned' ? { owner: 'none' } : {}) }); }} />
+          onClose={closeDeck} onExpandCalendar={() => { setDeckDrawer(false); go('calendar'); }}
+          onCreate={canCreate ? due => { setDeckDrawer(false); createOn(due); } : undefined} />
       </>}
       {signalSeam && (
         <button type="button" className={`seam-toggle is-right ${showSignals ? '' : 'is-tab'}`} onClick={() => (deckOpen ? closeDeck() : setContextPref('open'))} aria-expanded={deckOpen}
-          aria-label={deckOpen ? 'Collapse instrument deck' : `Show instrument deck${notifications.length ? `, ${notifications.length} need you` : ''}`} title={deckOpen ? 'Collapse instrument deck' : 'Show instrument deck'}>
+          aria-label={deckOpen ? 'Collapse calendar and activity' : `Show instrument deck${notifications.length ? `, ${notifications.length} need you` : ''}`} title={deckOpen ? 'Collapse calendar and activity' : 'Show instrument deck'}>
           <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={deckOpen ? 'M10 7l5 5-5 5' : 'M14 7l-5 5 5 5'} /></svg>
-          {!showSignals && <span className="seam-tab-label">Deck</span>}
+          {!showSignals && <span className="seam-tab-label">Calendar</span>}
           {!showSignals && notifications.length > 0 && <span className="seam-tab-count">{notifications.length > 9 ? '9+' : notifications.length}</span>}
         </button>
       )}
