@@ -963,6 +963,10 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .relationship-choice { display: grid; gap: 6px; padding: 14px; text-align: left; color: inherit; cursor: pointer; }
 .relationship-choice.is-selected { outline: 2px solid var(--ink); }
 .vault-search { width: 100%; }
+/* An open search line: no box, a short rule beneath, and the caret showing where to type. */
+:root:root:root input.vault-search { width: min(100%, 440px); min-height: 40px; padding: 8px 2px; border: 0; border-bottom: 1px solid var(--hair-2); border-radius: 0; background: transparent; box-shadow: none; outline: none; caret-color: var(--accent); font-size: 15px; }
+:root:root:root input.vault-search:hover { border-bottom-color: var(--line-2); }
+:root:root:root input.vault-search:focus { border-bottom-color: var(--ink-2); box-shadow: none; outline: none; }
 .relationship-panel progress { width: 100px; margin: 0 10px; }
 
 /* Inline task controls (All Tasks rows, task page): quiet until hovered, the status keeps its colored pill. */
