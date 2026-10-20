@@ -102,6 +102,10 @@ export const ReferenceTextarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAtt
   const editor = useReferenceEditor<HTMLTextAreaElement>(props, ref);
   return <><textarea {...native} ref={editor.ref} {...editor.handlers} />{editor.menu}</>;
 });
+/** @person and #tag links ask the top-bar search to open on that reference. */
+export const SEARCH_EVENT = 'tmhq-search';
+export interface SearchRequest { workspace?: string; person?: string; tag?: string }
+export function requestSearch(request: SearchRequest) { window.dispatchEvent(new CustomEvent<SearchRequest>(SEARCH_EVENT, { detail: request })); }
 export function ReferencedText({ text, document: saved, scope: explicit }: { text: string; document?: ReferenceDocument; scope?: ReferenceScope }) {
   const env = useContext(Context), scope = explicit ?? env?.scope;
   if (!scope) return <>{text}</>;
@@ -109,8 +113,8 @@ export function ReferencedText({ text, document: saved, scope: explicit }: { tex
   let at = 0; const parts: ReactNode[] = [];
   for (const span of doc.spans) {
     parts.push(text.slice(at, span.start));
-    const params = new URLSearchParams({ workspace: span.workspaceId, [span.kind === 'person' ? 'person' : 'tag']: span.id });
-    parts.push(<a className="reference-link" key={`${span.start}:${span.id}`} href={`#/search?${params}`} onClick={e => e.stopPropagation()}>{text.slice(span.start, span.end)}</a>); at = span.end;
+    const request = { workspace: span.workspaceId, [span.kind === 'person' ? 'person' : 'tag']: span.id };
+    parts.push(<a className="reference-link" key={`${span.start}:${span.id}`} href={`#/search?${new URLSearchParams(request)}`} onClick={e => { e.stopPropagation(); e.preventDefault(); requestSearch(request); }}>{text.slice(span.start, span.end)}</a>); at = span.end;
   }
   parts.push(text.slice(at)); return <>{parts}</>;
 }

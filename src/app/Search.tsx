@@ -1,5 +1,4 @@
-import { Select } from '../ui/Select.tsx';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Quest } from '../ui/useQuest.ts';
 import type { InboxData } from './Inbox.tsx';
 import { toolIndex } from '../core/tools/references.ts';
@@ -9,24 +8,28 @@ import { referenceScope } from '../core/references.ts';
 import type { ReferenceDocument } from '../core/references.ts';
 import { searchReferences, workspaceIndex } from '../core/reference-index.ts';
 import type { SearchKind, SearchQuery, SearchResult } from '../core/reference-index.ts';
-import { ReferenceInput } from '../ui/ReferenceEditor.tsx';
+import { UNDER_CONSTRUCTION } from '../core/navigation.ts';
+import { ReferenceInput, SEARCH_EVENT } from '../ui/ReferenceEditor.tsx';
+import type { SearchRequest } from '../ui/ReferenceEditor.tsx';
+import { useDropdown } from '../ui/useDropdown.tsx';
 import { useLive } from './LiveContext.tsx';
 const GROUPS: { id: SearchKind; label: string }[] = [{ id: 'tasks', label: 'Tasks' }, { id: 'messages', label: 'Messages' }, { id: 'relationships', label: 'Leads & relationships' }, { id: 'notes', label: 'Notes & comments' }, { id: 'activity', label: 'Activity & handoffs' }, { id: 'tools', label: 'Estimates & proposals' }];
-function params() { return new URLSearchParams(location.hash.split('?')[1] ?? ''); }
+/** Rows shown per group in the top-bar results; the heading keeps the full count. */
+const PER_GROUP = 6;
 function Highlight({ text, ranges }: { text: string; ranges: [number, number][] }) {
   let at = 0; const out = [];
   for (const [a, b] of ranges) { if (a < at || b > text.length) continue; out.push(text.slice(at, a), <mark key={`${a}:${b}`}>{text.slice(a, b)}</mark>); at = b; }
   out.push(text.slice(at)); return <>{out}</>;
 }
-export function Search({ quest, data, tools, onOpen }: { quest: Quest; data: InboxData; tools?: ToolsState | null; onOpen: (result: SearchResult) => void }) {
-  const live = useLive(), initial = params();
-  const [text, setText] = useState(initial.get('q') ?? '');
-  const [workspace, setWorkspace] = useState(initial.get('workspace') ?? '');
-  const [person, setPerson] = useState(initial.get('person') ?? '');
-  const [tag, setTag] = useState(initial.get('tag') ?? '');
-  const [kind, setKind] = useState<SearchKind | ''>('');
+/** One search for the whole app, in the top bar: results drop down under the field and open in place. */
+export function TopSearch({ quest, data, tools, open: allowed, onOpen, onBlocked }: { quest: Quest; data: InboxData; tools?: ToolsState | null; open: boolean; onOpen: (result: SearchResult) => void; onBlocked: () => void }) {
+  const live = useLive();
+  const [text, setText] = useState('');
+  const [reference, setReference] = useState<SearchRequest>({});
   const [document, setDocument] = useState<ReferenceDocument>({ text: '', spans: [] });
   const [remote, setRemote] = useState<SearchResult[]>([]), [status, setStatus] = useState('');
+  const [shown, setShown] = useState(false), [active, setActive] = useState(0);
+  const root = useRef<HTMLFormElement>(null), input = useRef<HTMLInputElement>(null), panel = useRef<HTMLDivElement>(null);
   const index = useMemo(() => {
     const tasks = workspaceIndex(quest.state, quest.actor, quest.now);
     if (quest.state.focus?.employee === quest.actor) return tasks;
@@ -38,20 +41,24 @@ export function Search({ quest, data, tools, onOpen }: { quest: Quest; data: Inb
     return { records: [...tasks.records, ...messages.records], scopes: [...scopes.values()] };
   }, [quest.state, quest.actor, Math.floor(quest.now / 60000), data.messaging, data.current.id, tools]);
   const selectedPerson = document.text === text ? document.spans.find(s => s.kind === 'person')?.id : undefined;
-  const query: SearchQuery = { text, kind, workspaceId: workspace || undefined, personId: person || selectedPerson, tag: tag || undefined, limit: 200 };
+  const query: SearchQuery = { text, kind: '', workspaceId: reference.workspace || undefined, personId: reference.person || selectedPerson, tag: reference.tag || undefined, limit: 200 };
   const signature = JSON.stringify(query);
   useEffect(() => {
-    const change = () => { const p = params(); setText(p.get('q') ?? ''); setWorkspace(p.get('workspace') ?? ''); setPerson(p.get('person') ?? ''); setTag(p.get('tag') ?? ''); setDocument({ text: '', spans: [] }); };
-    window.addEventListener('hashchange', change); return () => window.removeEventListener('hashchange', change);
+    const take = (request: SearchRequest) => { setText(''); setDocument({ text: '', spans: [] }); setReference(request); setShown(true); setActive(0); input.current?.focus(); };
+    const onRequest = (event: Event) => take((event as CustomEvent<SearchRequest>).detail ?? {});
+    window.addEventListener(SEARCH_EVENT, onRequest);
+    // Old #/search links (bookmarks, shared URLs) open here; the page itself no longer exists.
+    if (location.hash.startsWith('#/search')) { const p = new URLSearchParams(location.hash.split('?')[1] ?? ''); setText(p.get('q') ?? ''); setReference({ workspace: p.get('workspace') ?? undefined, person: p.get('person') ?? undefined, tag: p.get('tag') ?? undefined }); setShown(true); }
+    return () => window.removeEventListener(SEARCH_EVENT, onRequest);
   }, []);
   useEffect(() => {
     setRemote([]);
-    if (!live || (!text.trim() && !person && !tag)) { setStatus(''); return; }
+    if (!live || (!text.trim() && !reference.person && !reference.tag)) { setStatus(''); return; }
     let alive = true;
     const timer = setTimeout(async () => {
       setStatus('Searching authorized workspaces…');
       const orgs = live.searchOrgs ?? [live.org];
-      const replies = await Promise.all(orgs.filter(o => !workspace || o.id === workspace).map(async org => {
+      const replies = await Promise.all(orgs.filter(o => !reference.workspace || o.id === reference.workspace).map(async org => {
         try { const r = await live.client.functions.invoke('dispatch', { body: { op: 'search', orgId: org.id, query: JSON.parse(signature) } });
           if (r.error || !r.data?.ok || !Array.isArray(r.data.results)) return { results: [] as SearchResult[], failed: true };
           return { results: (r.data.results as SearchResult[]).filter(r => r.workspaceId === org.id), failed: false };
@@ -59,27 +66,58 @@ export function Search({ quest, data, tools, onOpen }: { quest: Quest; data: Inb
       }));
       if (!alive) return;
       setRemote(replies.flatMap(r => r.results));
-      setStatus(replies.some(r => r.failed) ? 'Some shared sources are unavailable. Cross-workspace search needs the candidate server release; unavailable results are not counted.' : 'Current membership checked by each workspace server.');
+      setStatus(replies.some(r => r.failed) ? 'Some shared sources are unavailable; their results are not counted.' : '');
     }, 250);
     return () => { alive = false; clearTimeout(timer); };
   }, [live, signature]);
-  const local = searchReferences(index, query);
+  const searching = allowed && (!!text.trim() || !!reference.person || !!reference.tag);
+  const local = searching ? searchReferences(index, query) : [];
   const results = [...new Map([...local, ...remote].map(r => [`${r.workspaceId}:${r.id}`, r])).values()].sort((a, b) => b.updatedAt - a.updatedAt);
-  const names = new Map<string, string>([[quest.state.workspace.tenantId, quest.state.workspace.name]]);
-  for (const r of index.records) names.set(r.workspaceId, r.workspaceName);
-  for (const o of live?.searchOrgs ?? []) names.set(o.id, o.name);
+  const groups = GROUPS.map(g => { const all = results.filter(r => r.kind === g.id); return { ...g, total: all.length, rows: all.slice(0, PER_GROUP) }; }).filter(g => g.total);
+  const flat = groups.flatMap(g => g.rows);
   const scope = { ...referenceScope(quest.state, quest.actor), people: [...new Map(index.scopes.flatMap(s => s.people).map(p => [p.id, p])).values()] };
-  const searching = !!text.trim() || !!person || !!tag;
-  return <div className="view global-search"><header className="view-head"><div><p className="eyebrow">Authorized workspaces · one search</p><h1>Search Task-HQ</h1><p className="lede">Find tasks, conversations, contacts and operational notes using words, @people or #tags.</p></div></header>
-    <div className="panel search-controls">
-      <ReferenceInput referenceScope={{ ...scope, canCreateTags: false }} type="text" autoFocus aria-label="Search authorized content" placeholder="Search words, @Abraham or #MapleAve" value={text} onChange={e => setText(e.target.value)} onReferencesChange={setDocument} />
-      <div className="search-filters"><label>Workspace<Select aria-label="Search workspace" value={workspace} onChange={e => setWorkspace(e.target.value)}><option value="">All authorized workspaces</option>{[...names].map(([id, name]) => <option key={id} value={id}>{name}</option>)}</Select></label>
-        <label>Content<Select aria-label="Search content type" value={kind} onChange={e => setKind(e.target.value as SearchKind | '')}><option value="">All types</option>{GROUPS.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}</Select></label>
-        {(person || tag) && <button className="btn btn-sm" onClick={() => { setPerson(''); setTag(''); }}>Clear reference filter {tag ? `#${tag}` : scope.people.find(p => p.id === person)?.name ?? ''}</button>}
-      </div>
-    </div>
-    <p className="boundary">{live ? status || 'Searches only current memberships. Messaging is unavailable until connected.' : 'Synthetic local search. Private channels are excluded before matching, counts and snippets.'}</p>
-    <p role="status" className="search-status">{searching ? `${results.length}${results.length >= 200 ? '+' : ''} matching records available` : 'Enter a phrase, person or tag to search.'}</p>
-    {searching && GROUPS.map(g => { const rows = results.filter(r => r.kind === g.id); return rows.length ? <section className="search-group" key={g.id}><h2>{g.label} <small>{rows.length}</small></h2><ul>{rows.map(r => <li key={`${r.workspaceId}:${r.id}`}><button className="search-result" onClick={() => onOpen(r)}><span className="search-result-meta">{r.workspaceName} · {new Date(r.updatedAt).toLocaleDateString()}</span><strong>{r.title}</strong><span><Highlight text={r.snippet} ranges={r.highlights} /></span></button></li>)}</ul></section> : null; })}
-  </div>;
+  const label = reference.tag ? `#${reference.tag}` : reference.person ? `@${scope.people.find(p => p.id === reference.person)?.name ?? 'person'}` : '';
+  const close = () => setShown(false);
+  useDropdown({ open: shown && searching, onClose: close, trigger: () => input.current, content: () => panel.current, region: () => root.current });
+  function pick(result: SearchResult | undefined) {
+    if (!result) return;
+    setShown(false); setText(''); setReference({}); setDocument({ text: '', spans: [] }); input.current?.blur();
+    onOpen(result);
+  }
+  return (
+    <form ref={root} className={`search-field top-search ${allowed ? '' : 'is-restricted'} ${label ? 'has-reference' : ''}`} role="search" title={allowed ? undefined : UNDER_CONSTRUCTION}
+      onSubmit={event => { event.preventDefault(); if (!allowed) onBlocked(); else pick(flat[active] ?? flat[0]); }}>
+      <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 16l5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg>
+      {label && <button type="button" className="top-search-ref" aria-label={`Remove ${label}`} onClick={() => { setReference({}); input.current?.focus(); }}>{label} <span aria-hidden="true">×</span></button>}
+      <ReferenceInput ref={input} referenceScope={{ ...scope, canCreateTags: false }} type="text" value={text} readOnly={!allowed}
+        placeholder={allowed ? 'Search tasks, people, projects' : 'Search · under construction :)'} aria-label={allowed ? 'Search' : 'Search, under construction'}
+        role="combobox" aria-expanded={shown && searching} aria-controls="top-search-results" aria-autocomplete="list" aria-activedescendant={shown && flat[active] ? `top-search-${active}` : undefined}
+        onReferencesChange={setDocument} onFocus={() => { if (allowed) setShown(true); }} onClick={() => { if (!allowed) onBlocked(); }}
+        onChange={event => { setText(event.target.value); setShown(true); setActive(0); }}
+        onKeyDown={event => {
+          if (event.key === 'Escape') { if (shown && searching) { event.preventDefault(); close(); } else input.current?.blur(); }
+          else if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && flat.length) { event.preventDefault(); setShown(true); setActive(current => (current + (event.key === 'ArrowDown' ? 1 : flat.length - 1)) % flat.length); }
+          else if (event.key === 'Backspace' && !text && label) setReference({});
+        }} />
+      {shown && searching && (
+        <div ref={panel} className="top-search-results" id="top-search-results" role="listbox" aria-label="Search results">
+          {groups.length === 0 && <p className="top-search-none">No matches{label ? ` for ${label}` : ''}.</p>}
+          {groups.map(g => (
+            <section className="top-search-group" key={g.id} aria-label={g.label}>
+              <h2>{g.label} <small>{g.total}</small></h2>
+              {g.rows.map(r => { const at = flat.indexOf(r); return (
+                <button type="button" key={`${r.workspaceId}:${r.id}`} id={`top-search-${at}`} role="option" aria-selected={at === active} className={`search-result ${at === active ? 'is-active' : ''}`}
+                  onPointerEnter={() => setActive(at)} onClick={() => pick(r)}>
+                  <span className="search-result-meta">{r.workspaceName} · {new Date(r.updatedAt).toLocaleDateString()}</span>
+                  <strong>{r.title}</strong>
+                  <span><Highlight text={r.snippet} ranges={r.highlights} /></span>
+                </button>
+              ); })}
+            </section>
+          ))}
+          {status && <p className="top-search-note">{status}</p>}
+        </div>
+      )}
+    </form>
+  );
 }

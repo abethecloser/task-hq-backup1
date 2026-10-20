@@ -33,7 +33,7 @@ import { AccountMark, AccountMenu, TopBar } from './TopBar.tsx';
 import { NeedsAttention } from './NeedsAttention.tsx';
 import { People } from './People.tsx';
 import { FeedbackProvider, FeedbackBar } from '../ui/Feedback.tsx';
-import { Search } from './Search.tsx';
+import { TopSearch } from './Search.tsx';
 import type { SearchResult } from '../core/reference-index.ts';
 import { ReferenceProvider } from '../ui/ReferenceEditor.tsx';
 import { referenceScope } from '../core/references.ts';
@@ -60,16 +60,16 @@ import type { Notification } from './notifications.ts';
 // Product feedback is archived: hidden for every account. Stored feedback is kept.
 const FEEDBACK_ON = false;
 
-export type View = 'home' | 'reports' | 'all-tasks' | 'inbox' | 'tools' | 'company-work' | 'needs-attention' | 'leads' | 'executive' | 'people' | 'feedback' | 'activity' | 'settings' | 'agents' | 'relationships' | 'search' | 'calendar';
+export type View = 'home' | 'reports' | 'all-tasks' | 'inbox' | 'tools' | 'company-work' | 'needs-attention' | 'leads' | 'executive' | 'people' | 'feedback' | 'activity' | 'settings' | 'agents' | 'relationships' | 'calendar';
 
 // All Tasks shows company-wide work, so Critical Focus gates it exactly like Company Work.
 const VIEW_SECTION: Record<View, Section | 'my-work' | 'never'> = {
-  home: 'my-work', calendar: 'my-work', reports: 'never', search: 'never', relationships: 'leads', 'all-tasks': 'company-work', inbox: 'never', tools: 'never', 'company-work': 'company-work', 'needs-attention': 'needs-attention', leads: 'leads', feedback: 'my-work',
+  home: 'my-work', calendar: 'my-work', reports: 'never', relationships: 'leads', 'all-tasks': 'company-work', inbox: 'never', tools: 'never', 'company-work': 'company-work', 'needs-attention': 'needs-attention', leads: 'leads', feedback: 'my-work',
   executive: 'never', people: 'never', activity: 'never', settings: 'never', agents: 'never',
 };
 
 const VIEW_LABELS: Record<View, string> = {
-  home: 'Home', calendar: 'Calendar', reports: 'Reports', search: 'Search', relationships: 'Relationship Vault', 'all-tasks': 'All Tasks', inbox: 'Inbox', tools: 'Estimates & Proposals', 'company-work': 'Projects', 'needs-attention': 'Needs Attention', leads: 'First Response',
+  home: 'Home', calendar: 'Calendar', reports: 'Reports', relationships: 'Relationship Vault', 'all-tasks': 'All Tasks', inbox: 'Inbox', tools: 'Estimates & Proposals', 'company-work': 'Projects', 'needs-attention': 'Needs Attention', leads: 'First Response',
   executive: 'Executive Desk', people: 'Team', feedback: 'Feedback', activity: 'Activity', settings: 'Policy & data', agents: 'Agent pilot',
 };
 
@@ -147,7 +147,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   // Which task view and scope All Tasks is showing, for the top-bar tabs.
   const registry = useRegistryPrefs(state.workspace.tenantId, actor);
   const registryView = registry.prefs.query;
-  const [searchNonce, setSearchNonce] = useState(0);
   const [feedbackId, setFeedbackId] = useState<string | null>(initial.feedbackId);
   const [reviewRequest, setReviewRequest] = useState(0);
   // A plain view address (#/all-tasks/urgent) only picks the view; old addresses carry their filters.
@@ -277,11 +276,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     else { setRequested((t.view === 'inbox' ? 'inbox' : t.view === 'feedback' ? 'feedback' : t.view === 'tools' ? 'tools' : 'activity')); if (t.view === 'feedback') setFeedbackId(t.id); }
   }
 
-  function openSearch(text: string) {
-    if (!open('search')) { underConstruction(); return; }
-    setRequested('search'); setTaskId(null); setSearchNonce(value => value + 1);
-    history.replaceState(null, '', `#/search?q=${encodeURIComponent(text)}`);
-  }
   // Top-bar task views: each opens All Tasks on that view and changes nothing else.
   function openLens(lens: Lens) {
     if (!allowed('all-tasks')) return;
@@ -322,7 +316,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   }
 
   const navigation: { id: View; label: string; count?: number; hot?: boolean; icon: ReactNode }[] = [
-    { id: 'search', label: 'Search', icon: <Icon d="M16 16l5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /> },
     { id: 'inbox', label: 'Inbox', count: inboxUnread, hot: inboxUnread > 0, icon: <Icon d="M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z" /> },
     ...(me.role !== 'reviewer' ? [{ id: 'tools' as View, label: 'Estimates & Proposals', count: tools?.estimates.filter(item => item.status !== 'approved').length, icon: <Icon d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h5" /> }] : []),
     { id: 'needs-attention', label: 'Needs Attention', count: attention.length, hot: myAttention > 0, icon: <Icon d="M12 4 21 20H3zM12 10v4M12 17v.5" /> },
@@ -409,7 +402,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen}
           mode={manager ? { current: mode, entry: !!manageEntry, onChange: next => go(next === 'work' ? 'home' : manageEntry ?? 'home') } : undefined}
           tabs={mode === 'manage' ? primary.map(item => ({ id: item.id, label: item.label, count: item.count, hot: false, active: view === item.id, allowed: allowed(item.id), restricted: !open(item.id) })) : [...LENSES.map(lens => ({ id: lens, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && registryView.lens === lens, allowed: allowed('all-tasks') }))]}
-          onTab={id => { if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} onSearch={openSearch} searchOpen={open('search')} onAsk={() => setAskOpen(value => !value)} onBell={() => sidebar.showTab('inbox')}
+          onTab={id => { if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} open={canNavigate(access, 'search')} onOpen={openSearchResult} onBlocked={underConstruction} />} onAsk={() => setAskOpen(value => !value)} onBell={() => sidebar.showTab('inbox')}
           onMenu={sidebar.openMobile} menuOpen={sidebar.mobileOpen} />
 
         <FeedbackBar quest={quest} preferences={feedbackOn}><CompanySignals quest={quest} onOpen={openTask} /></FeedbackBar>
@@ -428,7 +421,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
                 onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} onActivity={() => go('activity')} />
             : view === 'all-tasks' ? <AllTasks quest={quest} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} registry={registry} />
             : view === 'reports' ? (hasDesk ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} /> : <Activity quest={quest} onOpen={openTask} />)
-            : view === 'search' ? <Search key={searchNonce} quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />
             : view === 'inbox' ? <Inbox quest={quest} data={inboxData} notes={notifications} read={sidebar.read} markRead={sidebar.markRead} onOpenTask={openTask} onOpenLead={openLead} />
             : view === 'tools' ? <Tools quest={quest} store={toolsStore} tools={tools} onOpenTask={openTask} />
             : view === 'executive' ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} />

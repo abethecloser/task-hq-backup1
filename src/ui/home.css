@@ -1,18 +1,9 @@
 /* Home dashboard, Ask your tasks and the top bar — from the Claude Design "Dashboard Full" redesign.
-   The redesign uses the warmer Quest palette (accent #e8590c, tinted icon tiles, blue/green
-   status), so Home and the Ask panel carry those tokens locally under the Studio look.
-   The rest of the app keeps Studio's tokens. */
-:root[data-look="studio"] :is(.home-dash, .ask-panel, .top-icon.is-on) {
-  --ink: #111214; --ink-2: #393b41; --muted: #6c6f76; --faint: #9b9da4;
-  --line: #e7e7ea; --line-2: #d6d6db; --hair: rgb(17 18 20 / 4%); --hair-2: rgb(17 18 20 / 11%);
-  --sunk: #f6f6f7; --surface-2: #f7f7f7; --surface-3: #efefef;
-  --accent: #e8590c; --accent-ink: #b5440a; --accent-pale: #fff1e7; --accent-line: #ffd4b8;
-  --act: #2563eb; --act-ink: #1d4ed8; --act-soft: #eef3fe;
+   Home now uses the same Studio tokens as every other page, so an action looks the same everywhere.
+   Only the status tones Studio doesn't define stay local. */
+:root[data-look="studio"] :is(.home-dash, .ask-panel) {
   --ok: #16a34a; --ok-ink: #15803d; --ok-soft: #edf7f0;
   --stop: #d42a20; --stop-ink: #b4231a; --stop-soft: #fdeeec;
-  --danger: #b42318; --danger-pale: #fdeceb; --info: #1d4ed8; --info-pale: #eef3fe; --done-pale: #f2f2f4; --warn-pale: #fff5d9;
-  --shadow: 0 1px 1px rgb(17 18 20 / 3%), 0 4px 14px rgb(17 18 20 / 4%);
-  --shadow-lift: 0 1px 2px rgb(17 18 20 / 5%), 0 10px 28px rgb(17 18 20 / 8%);
 }
 
 /* ── Home ──────────────────────────────────────────────────────────────── */
@@ -346,7 +337,16 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .top-link:disabled { opacity: .4; }
 .icon.icon-sm { width: 14px; height: 14px; }
 .topbar .topbar-right { flex: none; margin-left: 0; gap: 10px; }
-.top-search { flex: 0 1 260px; min-width: 160px; }
+/* Search lives in the top bar: an open line like every wide field, results drop down beneath it. */
+.top-search { flex: 0 1 300px; min-width: 200px; transition: flex-basis .2s var(--ease-out), min-width .2s var(--ease-out); }
+.top-search.has-reference input { padding-left: 8px; }
+.top-search-ref { flex: none; margin-left: 32px; padding: 2px 8px; border: 1px solid var(--accent-line); border-radius: 999px; background: var(--card); color: var(--accent-ink); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.top-search-results { position: absolute; top: calc(100% + 8px); right: 0; z-index: 70; display: grid; gap: 6px; width: min(460px, calc(100vw - 24px)); max-height: 70vh; padding: 8px; overflow-y: auto; border: 1px solid var(--hair-2); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-lg); }
+.top-search-group { display: grid; gap: 1px; }
+.top-search-group h2 { padding: 6px 10px 2px; color: var(--faint); font-size: 10px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+.top-search-group h2 small { margin-left: 4px; font-size: 10px; letter-spacing: 0; }
+.top-search-none, .top-search-note { padding: 10px; color: var(--muted); font-size: 12.5px; }
+.top-search-note { padding-top: 4px; border-top: 1px solid var(--hair); font-size: 11.5px; }
 .top-clock { gap: 8px; }
 /* Placeholder until time tracking exists: looks like the design, but can't be pressed. */
 :root .btn.top-clock:disabled { opacity: 1; border-color: var(--hair-2); background: var(--card); color: var(--ink-2); box-shadow: none; }
@@ -385,7 +385,8 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .user-chip-text small { max-width: 140px; overflow: hidden; color: var(--muted); font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
 /* Shed detail by the bar's own width, which shrinks with the sidebar and docked panels, not just the viewport. */
 .topbar { container: topbar / inline-size; }
-@container topbar (max-width: 1520px) { .top-search { display: none; } }
+/* Narrow bars fold search to its magnifier; focusing it opens the field again. */
+@container topbar (max-width: 1100px) { .top-search { flex-basis: 38px; min-width: 38px; } .top-search:not(:focus-within) input::placeholder { color: transparent; } .top-search:focus-within, .top-search.has-reference { flex-basis: 240px; min-width: 200px; } }
 @container topbar (max-width: 1340px) { .workspace-chip { display: none; } }
 @container topbar (max-width: 1220px) { .clock-label, .demo-flag { display: none; } }
 @container topbar (max-width: 1000px) { .top-clock { display: none; } .top-tab { padding: 0 9px; } .topbar-right { gap: 6px; } }
@@ -406,8 +407,7 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .filter-section .filter-group { gap: 10px; }
 .filter-section .filter-group-head { min-height: 24px; align-items: center; }
 .filter-section .filter-options { gap: 10px; }
-.filter-section .filter-option { height: 37px; min-height: 37px; padding: 0 14px; border-radius: 11px; }
-.filter-section .filter-option.is-on { border-color: #e7ad81; background: #fff2e7; color: #9b4815; box-shadow: none; }
+.filter-section .filter-option { height: 34px; min-height: 34px; padding: 0 14px; }
 .filter-section .filter-find input { min-height: 37px; }
 .filter-selector .filter-person.is-highlighted { outline: 1px solid var(--accent-line); outline-offset: -1px; }
 
@@ -416,7 +416,7 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .top-tab.is-active { background: var(--accent-pale); }
 .filter-selector-popover { position: fixed; z-index: 120; box-sizing: border-box; margin: 0; padding: 5px; background: #fff; color: var(--ink); box-shadow: var(--shadow-lift); overflow-y: auto; overscroll-behavior: contain; }
 .filter-selector-popover .filter-person { min-height: 37px; border-radius: 10px; }
-.filter-selector-popover .filter-person.is-on { background: #fff2e7; color: #9b4815; }
+.filter-selector-popover .filter-person.is-on { background: var(--sunk) linear-gradient(var(--accent-mark), var(--accent-mark)) left center / 2px calc(100% - 14px) no-repeat; color: var(--ink); }
 .filter-selector-popover .filter-person.is-highlighted { outline: 1px solid var(--accent-line); outline-offset: -1px; }
 .feedback-bar { flex-wrap: wrap; }
 .company-signals { display: flex; flex: 1 1 360px; align-items: center; gap: 16px; min-width: 0; font-size: 12px; }

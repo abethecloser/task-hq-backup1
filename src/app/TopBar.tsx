@@ -11,14 +11,13 @@ import { ROLE_LABELS, useLive } from './LiveContext.tsx';
 // Task tabs reuse the registry lenses; other destinations keep their existing routes.
 export interface TopTab { id: string; label: string; count?: number; hot: boolean; active: boolean; allowed: boolean; restricted?: boolean }
 
-export function TopBar({ quest, demo, focused, unread, askOpen, mode, tabs, onTab, onSearch, searchOpen = true, onAsk, onBell, onMenu, menuOpen }: {
+export function TopBar({ quest, demo, focused, unread, askOpen, mode, tabs, onTab, search, onAsk, onBell, onMenu, menuOpen }: {
   quest: Quest; demo: boolean; focused: boolean; unread: number;
   askOpen: boolean; tabs: TopTab[];
   /** Work / Manage switch, only for accounts with the Manage permission. `entry` is false while every Manage section is under construction. */
   mode?: { current: 'work' | 'manage'; entry: boolean; onChange: (next: 'work' | 'manage') => void };
-  onTab: (id: string) => void; onSearch: (text: string) => void; /** False while Search is under construction for this account. */ searchOpen?: boolean; onAsk: () => void; onBell: () => void; onMenu: () => void; menuOpen: boolean;
+  onTab: (id: string) => void; /** The app-wide search field (TopSearch). */ search: ReactNode; onAsk: () => void; onBell: () => void; onMenu: () => void; menuOpen: boolean;
 }) {
-  const [query, setQuery] = useState('');
   return (
     <header className="topbar">
       <button type="button" className="icon-btn menu-btn" aria-label="Open navigation" aria-controls="quest-sidebar" aria-expanded={menuOpen} onClick={onMenu}><TopIcon d="M4 6h16M4 12h16M4 18h16" /></button>
@@ -40,10 +39,7 @@ export function TopBar({ quest, demo, focused, unread, askOpen, mode, tabs, onTa
       </nav>
       <div className="topbar-right">
         {focused && <span className="focus-chip">Critical Focus</span>}
-        <form className={`search-field top-search ${searchOpen ? '' : 'is-restricted'}`} role="search" title={searchOpen ? undefined : UNDER_CONSTRUCTION} onSubmit={event => { event.preventDefault(); if (query.trim()) { onSearch(query.trim()); setQuery(''); } }}>
-          <TopIcon d="M16 16l5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" />
-          <input value={query} onChange={event => setQuery(event.target.value)} placeholder={searchOpen ? 'Search tasks, people, projects' : 'Search · under construction :)'} aria-label={searchOpen ? 'Search' : 'Search, under construction'} />
-        </form>
+        {search}
         {!focused && <button type="button" className={`top-icon ${askOpen ? 'is-on' : ''}`} aria-label="Ask your tasks" aria-expanded={askOpen} onClick={onAsk}><TopIcon d={SPARK} /></button>}
         <button type="button" className="top-icon" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'} onClick={onBell}>
           <TopIcon d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0" />

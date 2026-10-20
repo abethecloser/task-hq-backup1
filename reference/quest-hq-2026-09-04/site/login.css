@@ -1,0 +1,573 @@
+/* Hallmark · macrostructure: Inset-Diptych · tone: warm-flat · anchor hue: orange #ED4E0D
+ * genre: utilitarian · design-system: design.md · designed-as-app
+ * Auth surface for Quest HQ, restyled to the boss's inset-login reference:
+ * one floating rounded card on a washed backdrop — animated mesh-gradient
+ * brand panel left (always dark, js/login-fx.js), auth column right (themed
+ * via tokens.css). Hanken Grotesk display · IBM Plex Mono details.
+ * Focus rings + reduced-motion inherited from tokens.css; mesh honors
+ * prefers-reduced-motion in JS (static frame).
+ */
+
+.login-body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+/* Boss call: plain white behind the card in light mode — no cream. */
+[data-theme="light"] .login-body { background: #fff; }
+
+/* ---------- backdrop washes ---------- */
+.login-backdrop {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 10% 10%, color-mix(in srgb, #ED4E0D 9%, transparent), transparent 65%),
+    radial-gradient(50% 50% at 90% 100%, color-mix(in srgb, var(--ink) 6%, transparent), transparent 65%);
+}
+/* Light mode: drop the warm wash (reads as cream); keep a faint neutral one. */
+[data-theme="light"] .login-backdrop {
+  background:
+    radial-gradient(50% 50% at 90% 100%, color-mix(in srgb, var(--ink) 4%, transparent), transparent 65%);
+}
+
+/* ---------- inset frame + card ---------- */
+.inset-frame {
+  position: relative;
+  max-width: 1440px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: stretch;
+  padding: 14px;
+}
+.inset-card {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 25px 60px -12px rgba(24, 12, 4, 0.20),
+    0 8px 20px rgba(24, 12, 4, 0.08);
+}
+[data-theme="dark"] .inset-card {
+  box-shadow:
+    0 25px 60px -12px rgba(0, 0, 0, 0.65),
+    0 8px 20px rgba(0, 0, 0, 0.45);
+}
+/* Light mode: pure white card too — the warm token surface reads cream. */
+[data-theme="light"] .inset-card,
+[data-theme="light"] .login-main { background: #fff; }
+
+/* ---------- LEFT · mesh-gradient brand panel (desktop only) ---------- */
+.mesh-panel {
+  position: relative;
+  display: none;
+  overflow: hidden;
+  background: #0a0a0c;
+}
+/* Static stand-in when WebGL is unavailable (login-fx.js adds the class). */
+.mesh-panel.mesh-fallback {
+  background:
+    radial-gradient(80% 70% at 25% 25%, #9e4218 0%, transparent 62%),
+    radial-gradient(70% 60% at 78% 72%, #732810 0%, transparent 65%),
+    #170b06;
+}
+.mesh-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mesh-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 80% at 50% 50%, transparent 35%, rgba(0, 0, 0, 0.55) 100%);
+}
+.mesh-content {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(32px, 3.5vw, 48px);
+}
+.mesh-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.mesh-brandchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.75);
+}
+.mesh-brandchip i {
+  font-size: 14px;
+  color: #ff7a45;
+}
+.mesh-shuffle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.30);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: rgba(255, 255, 255, 0.75);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              background var(--dur-fast) var(--ease-out);
+}
+.mesh-shuffle i {
+  font-size: 13px;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.mesh-shuffle:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.20);
+  background: rgba(0, 0, 0, 0.40);
+}
+.mesh-shuffle:hover i { transform: rotate(12deg); }
+.mesh-shuffle:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.mesh-copy { max-width: 28rem; }
+.mesh-headline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(1.85rem, 2.6vw, 2.5rem);
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  text-shadow: 0 1px 24px rgba(0, 0, 0, 0.55);
+}
+.mesh-headline .hl  { color: #ffffff; }
+.mesh-headline .hl:last-child { white-space: nowrap; }
+.mesh-headline .dim { color: rgba(255, 255, 255, 0.55); }
+.mesh-lede {
+  margin: 20px 0 0;
+  max-width: 24rem;
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.65);
+  text-shadow: 0 1px 16px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- RIGHT · auth column ---------- */
+.login-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface);
+  overflow-y: auto;
+}
+.login-shell {
+  width: 100%;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: clamp(28px, 5vh, 56px) 24px clamp(24px, 4vh, 40px);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Brand mark: always-dark chip so the orange bolt reads in both themes. */
+.login-brandmark {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: radial-gradient(120% 120% at 50% 12%, #2b2018 0%, #100c09 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 4px 12px rgba(16, 9, 4, 0.35);
+}
+.login-brandmark i {
+  font-size: 24px;
+  color: #ff7a45;
+}
+
+/* The "cards" are sections of the panel, not boxed chrome. */
+.login-card { display: block; }
+
+.login-head { margin-top: 44px; }
+.login-title {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.login-sub {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+
+#signInMode,
+#signUpMode,
+#resetRequestMode { margin-top: 24px; }
+
+/* ---------- magic-link CTA (outline button, doubles as sub-tab) ---------- */
+.magic-cta-row { display: block; }
+.magic-cta {
+  width: 100%;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.magic-cta i { font-size: 16px; color: var(--ink-3); }
+.magic-cta:hover { background: var(--bg-2); }
+
+/* Hide the CTA + separator while the magic form is open. */
+#signInMode:has(#magicForm:not(.hidden)) .magic-cta-row,
+#signInMode:has(#magicForm:not(.hidden)) .or-sep { display: none; }
+
+.or-sep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 22px 0;
+}
+.or-sep span { flex: 1; height: 1px; background: var(--border); }
+.or-sep em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+/* ---------- form panels ---------- */
+.auth-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.auth-label {
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.auth-panel > .auth-label:first-child { margin-top: 0; }
+.auth-label b {
+  font-weight: 400;
+  color: var(--ink-3);
+}
+.auth-panel input {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  font-size: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+}
+[data-theme="dark"] .auth-panel input { background: var(--bg-2); }
+[data-theme="light"] .auth-panel input { background: #fff; }
+.auth-panel input::placeholder { color: var(--ink-3); opacity: 0.75; }
+.auth-panel input:focus {
+  border-color: #ED4E0D;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #ED4E0D 16%, transparent);
+}
+
+/* password + reveal toggle */
+.pw-group { position: relative; }
+.pw-group input { padding-right: 44px; }
+.pw-reveal {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.pw-reveal:hover { color: var(--ink); }
+.pw-reveal i { font-size: 17px; }
+
+.auth-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+/* Inline text-button link, e.g. "Back to sign in" / "Use a password instead". */
+.auth-linkbtn {
+  display: block;
+  width: 100%;
+  margin: 10px 0 0;
+  padding: 6px;
+  background: none;
+  border: 0;
+  color: var(--ink-3);
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+  min-height: 32px;
+}
+.auth-linkbtn:hover { color: var(--ink); text-decoration: underline; }
+
+.auth-error,
+.auth-info {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.auth-error {
+  background: var(--rust-bg);
+  color: var(--rust-ink);
+}
+.auth-info {
+  background: var(--green-bg);
+  color: var(--green-ink);
+}
+
+/* ---------- footer links ---------- */
+.auth-footer {
+  margin-top: 20px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.auth-modes { min-width: 0; }
+.auth-modes .auth-tab {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  color: var(--ink-3);
+  text-align: left;
+  cursor: pointer;
+}
+.auth-modes .auth-tab b { color: var(--ink); font-weight: 600; }
+.auth-modes .auth-tab:hover b { text-decoration: underline; }
+/* Only the "switch to the other mode" link shows. */
+#modeTabs .auth-tab.active { display: none; }
+
+.auth-footer .foot-link {
+  display: inline;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* While the reset-request panel is up, footer links would fight it. */
+#signedOutCard:has(#resetRequestMode:not(.hidden)) .auth-footer { display: none; }
+
+.login-foot {
+  margin-top: 28px;
+  font-size: 11.5px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+/* ---------- signed-in / pending cards ---------- */
+.signed-in-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 40px 0 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.signed-in-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #ED4E0D;
+  color: #fff;
+  font-size: var(--text-md);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.signed-in-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.signed-in-meta { display: flex; flex-direction: column; min-width: 0; }
+.signed-in-name { font-size: var(--text-md); font-weight: 600; color: var(--ink); }
+.signed-in-email {
+  font-size: 13px;
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- wide buttons ---------- */
+.btn-primary-wide {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #ED4E0D;
+  color: #fff;
+  font-weight: 600;
+  font-size: 14.5px;
+  cursor: pointer;
+  transition: filter var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.btn-primary-wide:hover { filter: brightness(1.07); }
+.btn-primary-wide:active { transform: translateY(1px); }
+.btn-primary-wide i { font-size: 16px; }
+
+.btn-ghost-wide {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-2);
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.btn-ghost-wide:hover { background: var(--bg-2); color: var(--ink); }
+.btn-ghost-wide i { font-size: 16px; }
+
+/* ---------- pending banner ---------- */
+.pending-banner {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--amber-bg);
+  margin: 4px 0 4px;
+}
+.pending-banner i {
+  color: var(--amber-ink);
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.pending-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--amber-ink);
+  margin-bottom: 3px;
+}
+.pending-sub {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.hidden { display: none !important; }
+
+/* ---------- responsive: bring in the mesh panel on wide screens ---------- */
+@media (min-width: 768px) {
+  .inset-frame { padding: 40px; }
+}
+@media (min-width: 1024px) {
+  .inset-card { grid-template-columns: minmax(0, 1fr) minmax(440px, 560px); }
+  .mesh-panel { display: block; }
+  .login-main { min-height: 640px; }
+}
+@media (min-width: 1280px) {
+  .inset-frame { padding: 56px; }
+}
+
+/* ---------- mobile polish: touch targets + iOS zoom avoidance ---------- */
+@media (max-width: 720px) {
+  /* iOS Safari zooms inputs with font-size < 16px on focus. */
+  .auth-panel input { font-size: 16px; height: 48px; }
+  .magic-cta,
+  .btn-primary-wide,
+  .btn-ghost-wide { min-height: 48px; font-size: 15px; }
+  /* Honor iPhone safe area; dvh so the keyboard doesn't push content away. */
+  .login-body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .inset-frame { padding: 10px; }
+  .inset-card { border-radius: 18px; }
+  .login-shell { padding: 28px 18px 24px; }
+  .login-head { margin-top: 32px; }
+  .login-title { font-size: 22px; }
+  .auth-footer {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .magic-cta:hover,
+  .btn-ghost-wide:hover { background: transparent; }
+  .auth-linkbtn,
+  .auth-modes .auth-tab,
+  .login-card button { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+}

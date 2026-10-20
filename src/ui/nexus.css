@@ -36,8 +36,9 @@ body { background: var(--canvas); }
 
 /* ── Zones ─────────────────────────────────────────────────────────────── */
 .shell { background: var(--canvas); }
-.rail { background: var(--rail-bg); border-right: 1px solid var(--hair); box-shadow: none; }
-.workspace-panel { background: var(--sidebar-bg); border-right: 1px solid var(--hair); box-shadow: none; }
+/* No side lines: the rail and panel meet the canvas without an edge; the seam toggle marks the join. */
+.rail { background: var(--rail-bg); border-right: 0; box-shadow: none; }
+.workspace-panel { background: var(--sidebar-bg); border-right: 0; box-shadow: none; }
 .panel-head { border-bottom-color: var(--hair); }
 .panel-foot { background: var(--sidebar-bg); border-top-color: var(--hair); }
 .panel-section, .panel-notes { border-bottom-color: var(--hair); }
@@ -212,6 +213,8 @@ body { background: var(--canvas); }
 .content.view-all-tasks { max-width: none; }
 .registry-table { display: grid; margin-inline: calc(-1 * var(--bleed, 0px)); border-bottom: 1px solid var(--hair); background: var(--card); }
 .registry-table > .registry-row, .tools-table > .tools-row { padding-inline: var(--bleed, 16px); }
+/* With no tasks, the empty state takes the table's place at the same width: hairlines above and below, no side edges. */
+.registry > .empty { margin-inline: calc(-1 * var(--bleed, 0px)); border: 0; border-block: 1px solid var(--hair); border-radius: 0; background: var(--card); }
 .registry-row { display: grid; grid-template-columns: minmax(0, 1fr) 156px 168px 104px 142px; align-items: center; gap: 12px; min-height: 64px; padding: 9px 16px; border-top: 1px solid var(--hair); cursor: pointer; transition: background .12s; animation: rise .38s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 16ms); }
 .registry-row.is-head { min-height: 38px; border-top: 0; background: var(--surface-2); cursor: default; animation: none; color: var(--faint); font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .registry-row:not(.is-head):hover { background: var(--surface-2); }
