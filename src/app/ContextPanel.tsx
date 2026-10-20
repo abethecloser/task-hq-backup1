@@ -94,9 +94,11 @@ export function Signals({ quest, notifications, company, section, onSection, doc
 
 /** Month or week of due dates, shaded by due-date load from records, with the chosen day's work below.
  * Hovering a day with work shows what's due; right-click (or the context-menu key) adds work to the day or moves what's due. */
-export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connected, variant = 'deck', onExpand, onCreate }: {
+export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connected, variant = 'deck', onExpand, onCreate, day }: {
   quest: Quest; company: boolean; date: string; onDate: (date: string) => void; onOpenTask: (id: string) => void; connected: boolean;
   variant?: 'deck' | 'page'; onExpand?: () => void; onCreate?: (due: string) => void;
+  /** Page only: the chosen day's list beside the calendar, shown on request. */
+  day?: { open: boolean; setOpen: (open: boolean) => void };
 }) {
   const { state, actor, now } = quest;
   const [mode, setMode] = useState<'month' | 'week'>('month');
@@ -116,6 +118,8 @@ export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connect
   const due = (day: string) => dueOn(state, actor, now, company, day);
   const dayTasks = due(date);
   const page = variant === 'page';
+  // `day` is also the week loop's variable below.
+  const pickDay = day;
   const dayEvents = (day: string, count: number) => ({
     onMouseEnter: (event: MouseEvent<HTMLElement>) => { if (count && !menu) setPeek(place(day, event.currentTarget.getBoundingClientRect())); },
     onMouseLeave: () => setPeek(null),
@@ -140,6 +144,7 @@ export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connect
         </div>
         <span className="deck-cal-actions">
           {date !== today && <button type="button" className="link" onClick={() => onDate(today)}>Today</button>}
+          {day && <button type="button" className="btn btn-ghost btn-sm" aria-pressed={day.open} onClick={() => day.setOpen(!day.open)}>{day.open ? 'Hide day details' : 'Day details'}</button>}
           {onExpand && <button type="button" className="icon-btn deck-cal-expand" aria-label="Open the full calendar" title="Full calendar" onClick={onExpand}>
             <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
           </button>}
@@ -153,7 +158,7 @@ export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connect
               const work = page ? due(cell.date) : [];
               return <button key={cell.date} type="button" role="gridcell" className={`h${cell.heat} ${cell.today ? 'is-today' : ''} ${cell.overdue ? 'has-late' : ''}`} aria-selected={cell.date === date} aria-current={cell.today ? 'date' : undefined}
                 aria-label={`${dayLabel(cell.date, { weekday: 'long', month: 'long', day: 'numeric' })}: ${cell.due ? `${cell.due} due${cell.blocked ? `, ${cell.blocked} blocked` : ''}${cell.overdue ? `, ${cell.overdue} overdue` : ''}` : 'nothing due'}`}
-                onClick={() => onDate(cell.date)} {...dayEvents(cell.date, cell.due)}>
+                onClick={() => { onDate(cell.date); pickDay?.setOpen(true); }} {...dayEvents(cell.date, cell.due)}>
                 {page
                   ? <><span className="cal-num">{cell.day}</span>{work.slice(0, 3).map(task => <span key={task.id} className="cal-chip">{task.title}</span>)}{work.length > 3 && <small className="cal-more">+{work.length - 3} more</small>}</>
                   : cell.day}
@@ -163,14 +168,14 @@ export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connect
         : <ul className="deck-week">
             {week.map(day => {
               const work = due(day);
-              return <li key={day}><button type="button" className={`${day === date ? 'is-on' : ''} ${day === today ? 'is-today' : ''}`} aria-pressed={day === date} onClick={() => onDate(day)} {...dayEvents(day, work.length)}>
+              return <li key={day}><button type="button" className={`${day === date ? 'is-on' : ''} ${day === today ? 'is-today' : ''}`} aria-pressed={day === date} onClick={() => { onDate(day); pickDay?.setOpen(true); }} {...dayEvents(day, work.length)}>
                 <span>{dayLabel(day, { weekday: 'short' })} <b>{dayLabel(day, { day: 'numeric' })}</b></span><i style={{ ['--n' as string]: Math.min(work.length, 6) }} aria-hidden="true" /><small>{work.length ? `${work.length} due` : '—'}</small>
               </button></li>;
             })}
           </ul>}
       <p className="deck-cal-key"><span><i className="h1" /><i className="h2" /><i className="h3" /><i className="h4" /></span>Due-date load: open work due that day (blocked counts twice). Not a measure of anyone’s performance.</p>
     </section>
-    <section className="sig deck-cal-day">
+    {(!day || day.open) && <section className="sig deck-cal-day">
       <h4 className="ctx-label">{date === today ? 'Due today' : dayLabel(date, { weekday: 'long', month: 'short', day: 'numeric' })} <span>{dayTasks.length}</span></h4>
       {dayTasks.length === 0 ? <p className="sig-note">Nothing {company ? '' : 'of yours '}is due this day.</p> : (
         <ul className="sig-list">{dayTasks.slice(0, page ? 30 : 8).map(task => (
@@ -180,7 +185,7 @@ export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connect
         ))}</ul>
       )}
       <p className="sig-note">{connected ? 'Includes task due dates.' : 'Task due dates only. No calendar is connected, so meetings and events don’t appear yet.'}</p>
-    </section>
+    </section>}
     {peek && !menu && <DayPeek quest={quest} at={peek} tasks={due(peek.date)} />}
     {menu && <DayMenu quest={quest} at={menu} tasks={due(menu.date)} onClose={() => setMenu(null)} onOpenTask={onOpenTask} onCreate={onCreate} />}
   </>;
@@ -189,6 +194,7 @@ export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connect
 /** The calendar as its own page: the same records and actions as the deck, with room for titles. */
 export function CalendarPage({ quest, company, onOpenTask, onCreate }: { quest: Quest; company: boolean; onOpenTask: (id: string) => void; onCreate?: (due: string) => void }) {
   const [date, setDate] = useState(() => localDate(quest.now));
+  const [dayOpen, setDayOpen] = useState(false);
   const connected = dailySignal(quest.state, quest.now).sources.some(source => /calendar/i.test(source.label) && source.status === 'connected');
   return (
     <div className="view calendar-page">
@@ -199,8 +205,8 @@ export function CalendarPage({ quest, company, onOpenTask, onCreate }: { quest: 
         </div>
         <p className="lede">Hover a day to see what’s due. Right-click a day to add work or move what’s due.</p>
       </header>
-      <div className="calendar-layout">
-        <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={connected} variant="page" onCreate={onCreate} />
+      <div className={`calendar-layout ${dayOpen ? 'is-day-open' : ''}`}>
+        <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={connected} variant="page" onCreate={onCreate} day={{ open: dayOpen, setOpen: setDayOpen }} />
       </div>
     </div>
   );
