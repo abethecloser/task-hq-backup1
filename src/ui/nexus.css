@@ -570,7 +570,7 @@ i.sev.sev-high { background: var(--accent); }
 /* ── Universal inbox ───────────────────────────────────────────────────── */
 .inbox-view { container-type: inline-size; }
 .inbox-layout { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 40px; align-items: start; }
-.inbox-nav { position: sticky; top: 76px; display: grid; gap: 4px; padding: 10px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--card); }
+.inbox-nav { position: sticky; top: 76px; display: grid; gap: 4px; padding: 10px 0; border-block: 1px solid var(--hair); background: var(--card); }
 .inbox-ws { display: grid; gap: 2px; padding-top: 10px; border-top: 1px solid var(--hair); }
 .inbox-ws .section-label { padding: 0 8px 4px; }
 .inbox-nav-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 34px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font-size: 13px; font-weight: 600; text-align: left; }
@@ -582,9 +582,10 @@ i.sev.sev-high { background: var(--accent); }
 .inbox-filters .lens { min-height: 32px; border: 1px solid var(--hair); background: var(--card); }
 .inbox-filters .lens.is-active { border-color: var(--ink); background: var(--ink); color: #fff; }
 .inbox-filters select { min-height: 32px; margin-left: auto; }
-.inbox-feed { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.inbox-item { display: grid; gap: 6px; width: 100%; padding: 14px 18px; border: 1px solid var(--hair); border-radius: 12px; background: var(--card); text-align: left; transition: box-shadow .15s, transform .15s var(--ease-out); }
-.inbox-item:hover { box-shadow: var(--shadow-lift); }
+/* Like the tables: full-width rows divided by lines, no side edges. */
+.inbox-feed { display: grid; gap: 0; margin: 0; padding: 0; border-bottom: 1px solid var(--hair); list-style: none; }
+.inbox-item { display: grid; gap: 6px; width: 100%; padding: 14px 18px; border: 0; border-top: 1px solid var(--hair); border-radius: 0; background: var(--card); text-align: left; transition: box-shadow .15s, transform .15s var(--ease-out); }
+.inbox-item:hover { background-color: var(--sunk); }
 .inbox-item.is-unread { background-color: #fff; background-image: linear-gradient(var(--ink-mark), var(--ink-mark)); background-repeat: no-repeat; background-position: left center; background-size: 3px calc(100% - 16px); }
 .inbox-item.is-unread b { font-weight: 800; }
 .inbox-item.k-mention { background-image: linear-gradient(var(--accent-mark), var(--accent-mark)); background-repeat: no-repeat; background-position: left center; background-size: 3px calc(100% - 16px); }

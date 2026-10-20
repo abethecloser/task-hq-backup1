@@ -50,7 +50,7 @@
 :root[data-look="studio"] .thread-post:focus-within { border-color: var(--accent); box-shadow: var(--active-depth); }
 :root[data-look="studio"] .thread-post textarea { flex: 1 1 240px; min-height: 42px; padding: 10px; border: 1px solid var(--line-2); }
 :root[data-look="studio"] .thread-post .btn { align-self: flex-end; }
-:root[data-look="studio"] .inbox-item.k-mention.is-unread { background-color: var(--card); box-shadow: var(--shadow); }
+:root[data-look="studio"] .inbox-item.k-mention.is-unread { background-color: var(--card); }
 /* Selected marks are straight lines kept clear of the rounded corners, in a 45% accent. */
 :root[data-look="studio"] :is(.lens, .inbox-nav-item).is-active { background: var(--card) linear-gradient(var(--accent-mark), var(--accent-mark)) center bottom / calc(100% - 16px) 2px no-repeat; color: var(--accent-ink); box-shadow: none; }
 :root[data-look="studio"] .search-target { outline: 2px solid var(--accent); outline-offset: 5px; }
