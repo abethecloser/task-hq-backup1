@@ -67,13 +67,15 @@ export function AssigneeSelect({ quest, task, short = false }: { quest: Quest; t
   const { state, actor, dispatch } = quest;
   const editable = canEditTask(state, task, actor) && canAssignOthers(state, actor) && !lockedTaskFields(state, task, actor) && task.status !== 'done';
   const people = state.people.filter(item => item.role !== 'reviewer');
-  const label = (id: string) => { const who = people.find(item => item.id === id); return who ? (short ? who.name.split(' ')[0] : who.name) : ''; };
-  if (!editable) return <span className="assignee-text">{task.owner ? (task.owner === actor ? 'You' : label(task.owner) || 'Someone') : <em>Unassigned</em>}</span>;
+  const label = (id: string) => { const who = state.people.find(item => item.id === id); return who ? (short ? who.name.split(' ')[0] : who.name) : ''; };
+  const outside = !!task.owner && !people.some(item => item.id === task.owner); // a former member or an observer still holds it
+  if (!editable) return <span className="assignee-text">{task.owner ? (task.owner === actor ? 'You' : label(task.owner) || 'Former member') : <em>Unassigned</em>}</span>;
   return (
     <span {...stop}>
       <Select className="inline-select assignee-select" value={task.owner} aria-label="Assigned to"
         onChange={event => void dispatch({ type: 'task/update', id: task.id, changes: { owner: event.target.value } })}>
         <option value="">Unassigned</option>
+        {outside && <option value={task.owner} disabled>{label(task.owner) || 'Former member'}</option>}
         {people.map(item => <option key={item.id} value={item.id}>{item.id === actor ? `${label(item.id)} (you)` : label(item.id)}</option>)}
       </Select>
     </span>
