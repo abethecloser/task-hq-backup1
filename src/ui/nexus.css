@@ -19,6 +19,9 @@
   --sidebar-bg: #fff;
   --context-bg: #fff;
   --card: #ffffff;
+  /* Selected and urgent marks: straight bars clear of rounded corners, at 45% of the accent. */
+  --accent-mark: color-mix(in srgb, var(--accent) 45%, transparent);
+  --ink-mark: color-mix(in srgb, var(--ink) 45%, transparent);
   --hair: rgb(17 18 20 / 7%);
   --hair-2: rgb(17 18 20 / 11%);
   --ease-out: cubic-bezier(.22, 1, .36, 1);
@@ -48,7 +51,7 @@ body { background: var(--canvas); }
 .rail .nav-item.is-active .nav-pip, .rail .nav-item.is-active .rail-unread { box-shadow: 0 0 0 2px var(--card); }
 .rail .nav-item:hover:not(:disabled):not(.is-active) { background: rgb(255 255 255 / 70%); }
 .rail .nav-toggle { display: none; } /* replaced by the seam toggle */
-.panel-section-head.is-active { background: rgb(17 18 20 / 6%); color: var(--ink); box-shadow: inset 2px 0 0 var(--accent); }
+.panel-section-head.is-active { background-color: rgb(17 18 20 / 6%); color: var(--ink); background-image: linear-gradient(var(--accent-mark), var(--accent-mark)); background-repeat: no-repeat; background-position: left center; background-size: 3px calc(100% - 16px); }
 .panel-section-head.is-active .panel-count:not(.is-hot) { color: var(--muted); }
 .panel-section-head:not(.is-static):hover:not(:disabled), .panel-more button:hover:not(:disabled) { background: rgb(255 255 255 / 75%); }
 .panel-more button.is-active { background: rgb(17 18 20 / 6%); }
@@ -144,7 +147,7 @@ body { background: var(--canvas); }
 .job-picker-list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .job-picker-list li small { flex: none; min-width: 20px; padding: 1px 6px; border-radius: 999px; background: rgb(17 18 20 / 6%); color: var(--muted); font-size: 11px; font-weight: 750; text-align: center; font-variant-numeric: tabular-nums; }
 .job-picker-list li.is-active { background: var(--sunk); }
-.job-picker-list li.is-on { box-shadow: inset 3px 0 0 var(--accent); color: var(--accent-ink); }
+.job-picker-list li.is-on { color: var(--accent-ink); background-image: linear-gradient(var(--accent-mark), var(--accent-mark)); background-repeat: no-repeat; background-position: left center; background-size: 3px calc(100% - 16px); }
 .job-picker-list .job-picker-empty { color: var(--muted); cursor: default; }
 .job-picker-list .job-picker-section { padding: 8px 10px 4px; color: var(--faint); font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; cursor: default; }
 .job-picker-list .job-picker-section:not(:first-child) { margin-top: 4px; border-top: 1px solid var(--hair); }
@@ -199,7 +202,7 @@ body { background: var(--canvas); }
 .filter-person { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-size: 13px; font-weight: 600; text-align: left; }
 .filter-person small { color: var(--muted); font-size: 11.5px; font-weight: 500; }
 .filter-person:hover { background: var(--sunk); }
-.filter-person.is-on { background: var(--sunk); box-shadow: inset 3px 0 0 var(--accent); color: var(--accent-ink); }
+.filter-person.is-on { background-color: var(--sunk); color: var(--accent-ink); background-image: linear-gradient(var(--accent-mark), var(--accent-mark)); background-repeat: no-repeat; background-position: left center; background-size: 3px calc(100% - 16px); }
 .segmented { display: inline-flex; padding: 3px; border: 1px solid var(--hair-2); border-radius: 9px; background: var(--card); }
 .segmented button { min-height: 28px; padding: 0 11px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 700; }
 .segmented button.is-on { background: var(--sunk); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hair); }
@@ -581,12 +584,12 @@ i.sev.sev-high { background: var(--accent); }
 .inbox-filters .lens.is-active { border-color: var(--ink); background: var(--ink); color: #fff; }
 .inbox-filters select { min-height: 32px; margin-left: auto; }
 .inbox-feed { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
-.inbox-item { display: grid; gap: 6px; width: 100%; padding: 14px 18px; border: 1px solid var(--hair); border-left: 3px solid transparent; border-radius: 12px; background: var(--card); text-align: left; transition: box-shadow .15s, transform .15s var(--ease-out); }
+.inbox-item { display: grid; gap: 6px; width: 100%; padding: 14px 18px; border: 1px solid var(--hair); border-radius: 12px; background: var(--card); text-align: left; transition: box-shadow .15s, transform .15s var(--ease-out); }
 .inbox-item:hover { box-shadow: var(--shadow-lift); }
-.inbox-item.is-unread { border-left-color: var(--ink); background: #fff; }
+.inbox-item.is-unread { background-color: #fff; background-image: linear-gradient(var(--ink-mark), var(--ink-mark)); background-repeat: no-repeat; background-position: left center; background-size: 3px calc(100% - 16px); }
 .inbox-item.is-unread b { font-weight: 800; }
-.inbox-item.k-mention { border-left-color: var(--accent); }
-.inbox-item.k-mention.is-unread { background: var(--accent-pale); }
+.inbox-item.k-mention { background-image: linear-gradient(var(--accent-mark), var(--accent-mark)); background-repeat: no-repeat; background-position: left center; background-size: 3px calc(100% - 16px); }
+.inbox-item.k-mention.is-unread { background-color: var(--accent-pale); }
 .inbox-item-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
 .inbox-item-head b { font-size: 13.5px; font-weight: 650; }
 .inbox-item-head time { margin-left: auto; color: var(--faint); font-size: 11.5px; }
@@ -852,7 +855,7 @@ i.sev.sev-high { background: var(--accent); }
 .aware-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .aware-row { display: grid; gap: 6px; padding: 9px 10px; border: 1px solid var(--hair); border-radius: 10px; background: var(--card); }
 .aware-row.is-unread { border-color: var(--hair-2); box-shadow: inset 3px 0 0 var(--ink); }
-.aware-row.is-urgent.is-unread, .aware-row.sev-critical, .aware-row.sev-high { box-shadow: inset 3px 0 0 var(--accent); }
+.aware-row.is-urgent.is-unread, .aware-row.sev-critical, .aware-row.sev-high { background-image: linear-gradient(var(--accent-mark), var(--accent-mark)); background-repeat: no-repeat; background-position: left center; background-size: 3px calc(100% - 16px); }
 .aware-main { display: grid; gap: 2px; min-width: 0; padding: 0; border: 0; background: none; color: inherit; text-align: left; }
 .aware-main:disabled { cursor: default; }
 .aware-kind { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--muted); font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }

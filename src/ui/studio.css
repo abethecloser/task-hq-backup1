@@ -50,8 +50,9 @@
 :root[data-look="studio"] .thread-post:focus-within { border-color: var(--accent); box-shadow: var(--active-depth); }
 :root[data-look="studio"] .thread-post textarea { flex: 1 1 240px; min-height: 42px; padding: 10px; border: 1px solid var(--line-2); }
 :root[data-look="studio"] .thread-post .btn { align-self: flex-end; }
-:root[data-look="studio"] .inbox-item.k-mention.is-unread { background: var(--card); box-shadow: inset 3px 0 var(--accent), var(--shadow); }
-:root[data-look="studio"] :is(.lens, .inbox-nav-item).is-active { background: var(--card); color: var(--accent-ink); box-shadow: inset 0 -2px var(--accent); }
+:root[data-look="studio"] .inbox-item.k-mention.is-unread { background-color: var(--card); box-shadow: var(--shadow); }
+/* Selected marks are straight lines kept clear of the rounded corners, in a 45% accent. */
+:root[data-look="studio"] :is(.lens, .inbox-nav-item).is-active { background: var(--card) linear-gradient(var(--accent-mark), var(--accent-mark)) center bottom / calc(100% - 16px) 2px no-repeat; color: var(--accent-ink); box-shadow: none; }
 :root[data-look="studio"] .search-target { outline: 2px solid var(--accent); outline-offset: 5px; }
 @media (max-width: 600px) {
   :root[data-look="studio"] .form { padding: 16px; }
@@ -64,7 +65,7 @@
 .reference-popover { overflow: auto; padding: 5px; border: 1px solid var(--hair-2); border-radius: var(--radius); background: var(--card, #fff); box-shadow: var(--shadow-lift); color: var(--ink); }
 .reference-popover ul { list-style: none; margin: 0; padding: 0; }
 .reference-popover button { display: grid; gap: 3px; width: 100%; min-height: 48px; border: 0; border-radius: 6px; padding: 8px 10px; text-align: left; background: var(--card, #fff); color: var(--ink); }
-.reference-popover button.is-active { background: var(--sunk); box-shadow: inset 3px 0 var(--accent); }
+.reference-popover button.is-active { background: var(--sunk) linear-gradient(var(--accent-mark), var(--accent-mark)) left center / 2px calc(100% - 14px) no-repeat; }
 .reference-popover small { color: var(--muted); font-size: 11px; }
 .reference-link { color: var(--accent-ink); font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
 .search-controls { display: grid; gap: 14px; padding: 18px; }
