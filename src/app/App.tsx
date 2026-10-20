@@ -221,9 +221,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const snoozeKey = sidebar.snoozes.map(item => `${item.id}:${item.until}`).join(',');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const awareAttention = useMemo(() => attentionFor(state, minute * 60000, actor, sidebar.snoozes), [state, minute, actor, snoozeKey]);
-  // Temporary restricted navigation: the server decides (core/navigation.ts); demo and failures restrict.
+  // Authenticated workspaces expose the application navigation; demo access remains closed by default.
   const access = live?.navigation ?? CLOSED;
-  // Work / Manage: a permanent permission from organization role (demo: work role), separate from the temporary restriction.
+  // Manage pages remain role-gated independently of navigation visibility.
   const manager = canManage(live ? live.role : me.role === 'manager' ? 'owner' : me.role === 'coordinator' ? 'supervisor' : me.role);
   const open = (next: View) => (manager || !isManageView(next)) && canNavigate(access, next) && (next !== 'feedback' || feedbackOn);
   const underConstruction = () => quest.say(UNDER_CONSTRUCTION);

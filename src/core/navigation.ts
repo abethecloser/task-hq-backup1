@@ -1,8 +1,5 @@
-// Temporary restricted navigation. The server decides who may open which section
-// (public.my_navigation, backed by private.full_navigation_users and
-// private.restricted_sections); this module only applies that answer in the UI.
-// It fails closed: without a valid server answer, every restrictable section is restricted.
-// Reopen a section for everyone by deleting its row on the server; no client change needed.
+// Navigation controls which sections authenticated users can open in the client UI.
+// It is not an authorization boundary: data access and actions remain protected by the backend.
 
 export interface NavigationAccess {
   /** Allowlisted account: every section stays open. */
@@ -25,6 +22,7 @@ export const RESTRICTABLE: readonly string[] = [
 ];
 
 export const CLOSED: NavigationAccess = { full: false, restricted: [...RESTRICTABLE] };
+export const AUTHENTICATED_NAVIGATION: NavigationAccess = { full: true, restricted: [] };
 
 export function canNavigate(access: NavigationAccess, view: string): boolean {
   return ALWAYS_OPEN.includes(view) || access.full || !access.restricted.includes(view);

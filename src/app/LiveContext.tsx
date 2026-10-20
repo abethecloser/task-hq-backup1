@@ -19,7 +19,7 @@ export interface LiveAccount {
   onOpenWorkspace?: (id: string, hash: string) => void;
   /** Organizations this account administers (owner/admin); for choosing affiliation when staging people. */
   adminOrgs: { id: string; name: string }[];
-  /** Temporary restricted navigation, as decided by the server (public.my_navigation). */
+  /** Client-side navigation for the authenticated workspace; backend permissions remain authoritative. */
   navigation: NavigationAccess;
 }
 
