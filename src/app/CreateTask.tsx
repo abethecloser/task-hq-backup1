@@ -1,6 +1,6 @@
 import { Select } from '../ui/Select.tsx';
 import { ReferenceInput, ReferenceTextarea, ReferencedText } from '../ui/ReferenceEditor.tsx';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { NewTask } from '../core/contract.ts';
 import { localDate } from '../core/time.ts';
@@ -38,11 +38,18 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
   // Secondary fields stay folded until one of them holds something.
   const more = !!(draft.description || draft.approver || draft.type || draft.projectId || draft.dependsOn?.length || proposed.approver);
 
+  // One create per submit: a double tap or Enter while saving must not make a second task.
+  const saving = useRef(false);
+  const [busy, setBusy] = useState(false);
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const watchers = [...new Set([...(draft.watchers ?? []), ...(delegated && watch ? [actor] : [])])];
-    const result = await dispatch({ type: 'task/create', task: { ...draft, watchers } });
-    if (result.ok) onCreated(result.state.tasks[0]!.id);
+    if (saving.current) return;
+    saving.current = true; setBusy(true);
+    try {
+      const watchers = [...new Set([...(draft.watchers ?? []), ...(delegated && watch ? [actor] : [])])];
+      const result = await dispatch({ type: 'task/create', task: { ...draft, watchers } });
+      if (result.ok) onCreated(result.state.tasks[0]!.id);
+    } finally { saving.current = false; setBusy(false); }
   }
 
   return (
@@ -57,7 +64,7 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
           <div className="form-grid create-main">
             <label className="field"><span>Assigned to</span><small className="field-hint">{delegates ? 'Who moves this forward. You don’t have to own what you create.' : 'Accountable for moving this task forward.'}</small><PersonSelect state={owners} label="Assigned to" value={draft.owner ?? ''} emptyLabel={delegates ? 'Choose later (unassigned)' : 'Unassigned'} onChange={owner => set({ owner })} />
               {assigns && proposed.owner && draft.owner !== proposed.owner.id && <button type="button" className="proposal-chip" onClick={() => set({ owner: proposed.owner!.id })}>Proposed: {proposed.owner.name} · <b>Use</b></button>}</label>
-            <label className="field"><span>Due</span><span className="draft-when"><input type="date" value={draft.due} onChange={event => set({ due: event.target.value, ...(event.target.value ? {} : { dueTime: undefined }) })} />{taxonomyOk && <input type="time" value={draft.dueTime ?? ''} disabled={!draft.due} aria-label="Due time" onChange={event => set({ dueTime: event.target.value || undefined })} />}</span></label>
+            <label className="field"><span>Due</span><span className="draft-when"><input type="date" value={draft.due} onChange={event => set({ due: event.target.value, ...(event.target.value || !taxonomyOk ? {} : { dueTime: undefined }) })} />{taxonomyOk && <input type="time" value={draft.dueTime ?? ''} disabled={!draft.due} aria-label="Due time" onChange={event => set({ dueTime: event.target.value || undefined })} />}</span></label>
             <label className="field"><span>Priority</span><Select value={draft.priority} onChange={event => set({ priority: event.target.value as NewTask['priority'] })}><option value="normal">Normal</option><option value="high">High</option></Select></label>
             <label className="field"><span>Next-step owner</span><small className="field-hint">Receives the handoff when this work is ready to move on.</small><PersonSelect state={state} label="Next-step owner" value={draft.nextOwner ?? ''} onChange={nextOwner => set({ nextOwner })} /></label>
           </div>
@@ -78,7 +85,7 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
               </Select>
             </label>
           </details>
-          <footer className="form-actions"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={!draft.title.trim()}>Create task →</button></footer>
+          <footer className="form-actions"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={busy || !draft.title.trim()} aria-busy={busy}>{busy ? 'Creating…' : 'Create task →'}</button></footer>
         </form>
       </section>
     </>

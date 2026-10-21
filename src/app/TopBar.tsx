@@ -6,6 +6,7 @@ import { firstName, person } from '../core/selectors.ts';
 import type { Quest } from '../ui/useQuest.ts';
 import { SPARK } from './AskTasks.tsx';
 import { ROLE_LABELS, useLive } from './LiveContext.tsx';
+import { useWorkday } from '../shifts/Workday.tsx';
 
 // Primary destinations share one persistent, horizontally scrollable navigation.
 // Task tabs reuse the registry lenses; other destinations keep their existing routes.
@@ -59,12 +60,14 @@ export function AccountMark({ quest }: { quest: Quest }) {
 /** Live: who you are, password, workspace and sign-out. Demo: who you're working as. */
 export function AccountMenu({ quest, close }: { quest: Quest; close: () => void }) {
   const live = useLive();
+  const workday = useWorkday();
   const { state, actor, setActor } = quest;
   const me = person(state, actor);
   const role = live ? ROLE_LABELS[live.role] : me?.title ?? '';
   return live
     ? <>
         <p className="menu-note">{me?.name && me.name !== live.email ? <><b>{me.name}</b><br />{live.email}</> : live.email}<br />{role} of {live.org.name}</p>
+        {workday && <button type="button" role="menuitem" onClick={() => { close(); workday.open(); }}>{workday.shift ? <>Check out<small>On shift since {new Date(workday.shift.started_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</small></> : <>Check in<small>Not on shift</small></>}</button>}
         <button type="button" role="menuitem" onClick={() => { close(); location.hash = '#/auth/reset'; }}>Change password</button>
         {live.canSwitch && <button type="button" role="menuitem" onClick={() => { close(); live.onLeaveWorkspace(); }}>{live.isPlatformAdmin ? 'Platform console' : 'Switch workspace'}</button>}
         <button type="button" role="menuitem" onClick={() => { close(); live.onSignOut(); }}>Sign out</button>

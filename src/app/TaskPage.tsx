@@ -226,9 +226,9 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
   const finish = state.events.find(event => event.taskId === task.id && !event.undone && event.undo?.tasks[task.id] && event.undo.tasks[task.id]!.status !== 'done');
   const latest = state.events.find(event => event.taskId === task.id && !event.undone);
   const canUndo = !!finish && finish === latest && finish.actor === actor && !!finish.undo;
-  // The deployed live server predates `task/reopen`; until the staged dispatch
-  // function is released, live reopen is limited to undoing your own completion.
-  const reopenAvailable = backend.kind !== 'live';
+  // A live server older than dispatch v5 predates `task/reopen`; there, reopening
+  // is limited to undoing your own completion.
+  const reopenAvailable = backend.supports?.taskReopen !== false;
   const allowed = canReopenTask(state, task, actor);
 
   async function reopen(event: FormEvent) {

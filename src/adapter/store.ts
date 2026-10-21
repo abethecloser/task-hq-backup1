@@ -38,6 +38,19 @@ export interface KV {
  */
 export type Authority = 'local-demo' | 'server-verified';
 
+export interface BackendSupports {
+  /** Task types, tags and due times. */
+  taskTaxonomy: boolean;
+  /** `task/reopen` for completed work. */
+  taskReopen: boolean;
+  /** `lead/claim` and `lead/tags`. */
+  leadOwnership: boolean;
+  /** `roles/label` work-role descriptions. */
+  workLabels: boolean;
+  /** Mention/tag link ids travel with an action and are stored with its text. */
+  structuredReferences: boolean;
+}
+
 export interface QuestBackend {
   kind: 'extension' | 'browser' | 'live';
   authority: Authority;
@@ -53,7 +66,7 @@ export interface QuestBackend {
   subscribeActor(listener: (id: string) => void): () => void;
   outboxCount(): Promise<number>;
   /** Engine features the backend can persist. Absent = everything in this build. */
-  supports?: { taskTaxonomy: boolean };
+  supports?: BackendSupports;
 }
 
 // ── Shared, serialized read-modify-write ───────────────────────────────────

@@ -163,7 +163,7 @@ export function LeadCard({ quest, lead, onOpen, selected = false, onSelect }: { 
           {onSelect && <button type="button" className="link" aria-pressed={selected} onClick={() => onSelect(selected ? null : lead.id)}>{selected ? 'Close lead instruments ↑' : 'Open lead instruments ↑'}</button>}
         </div>
       </div>
-      {!lead.assignee && !closed && quest.backend?.kind !== 'live' && <button type="button" className="btn btn-primary btn-sm" onClick={() => void dispatch({ type: 'lead/claim', id: lead.id })}>Claim inquiry</button>}
+      {!lead.assignee && !closed && quest.backend?.supports?.leadOwnership !== false && <button type="button" className="btn btn-primary btn-sm" onClick={() => void dispatch({ type: 'lead/claim', id: lead.id })}>Claim inquiry</button>}
       <div className="lead-owner">
         <Avatar state={state} id={lead.assignee} size="sm" />
         <PersonSelect state={state} value={lead.assignee} label="Lead owner" emptyLabel="Assign an owner…" onChange={to => to && void dispatch({ type: 'lead/assign', id: lead.id, to })} disabled={closed} />
