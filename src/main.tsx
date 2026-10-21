@@ -88,14 +88,14 @@ function Root() {
     if (session.email || !badgeSignIn) {
       return <BadgeCheckIn code={badge} email={session.email} onContinue={() => { setBadge(null); history.replaceState(null, '', '#/home'); }}
         onSignIn={() => { setBadgeSignIn(true); go('sign-in'); }} onCancel={() => setBadge(null)}
-        onSwitch={() => { setBadgeSignIn(true); go('sign-in'); void client?.auth.signOut(); }} />;
+        onSwitch={() => { setBadgeSignIn(true); go('sign-in'); void client?.auth.signOut({ scope: 'local' }); }} />;
     }
     return <AuthScreen view={view} go={go} onDemo={enterDemo} notice={session.notice} />;
   }
   if (mode === 'demo') return <App onExitDemo={isExtensionContext() ? undefined : exitDemo} />;
   if (!session.ready) return null;
   if (session.email && client && view !== 'reset' && view !== 'set-password') {
-    return <LiveRoot key={session.email} client={client} onSignOut={() => { history.replaceState(null, '', '#/auth/sign-in'); void client.auth.signOut(); }} onDemo={enterDemo} />;
+    return <LiveRoot key={session.email} client={client} onSignOut={() => { history.replaceState(null, '', '#/auth/sign-in'); void client.auth.signOut({ scope: 'local' }); }} onDemo={enterDemo} />;
   }
   return <AuthScreen view={view} go={go} onDemo={enterDemo} notice={session.notice} />;
 }
