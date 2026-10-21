@@ -24,6 +24,12 @@ export const useWorkday = () => useContext(WorkdayContext);
 
 const OFF_SHIFT_ROLES: OrgRole[] = ['owner', 'admin', 'supervisor'];
 
+// "Continue without a shift" for off-shift roles, remembered for this tab and day only.
+// A per-tab convenience, never attendance: the server still says nobody is checked in.
+const skipKey = (org: string, user: string) => `tmhq.workday-skip:${org}:${user}:${new Date().toLocaleDateString('en-CA')}`;
+const skipped = (org: string, user: string) => { try { return sessionStorage.getItem(skipKey(org, user)) === '1'; } catch { return false; } };
+const rememberSkip = (org: string, user: string) => { try { sessionStorage.setItem(skipKey(org, user), '1'); } catch { /* this view only */ } };
+
 export function WorkdayGate({ client, org, userId, email, role, backend, onSignOut, children }: {
   client: SupabaseClient; org: string; userId: string; email: string; role: OrgRole; backend: QuestBackend; onSignOut: () => void; children: ReactNode;
 }) {
@@ -31,6 +37,7 @@ export function WorkdayGate({ client, org, userId, email, role, backend, onSignO
   const canCheckIn = role !== 'reviewer';
   const offShift = OFF_SHIFT_ROLES.includes(role);
   const [phase, setPhase] = useState<'checking' | 'gate' | 'work' | 'panel'>(canCheckIn ? 'checking' : 'work');
+  const continueOffShift = () => { rememberSkip(org, userId); setPhase('work'); };
   const [status, setStatus] = useState<ShiftStatus | null>(null);
   const [work, setWork] = useState<QuestState | null>(null);
   const [error, setError] = useState('');
@@ -45,9 +52,9 @@ export function WorkdayGate({ client, org, userId, email, role, backend, onSignO
       const open = snapshot.shifts.find(item => item.employee === userId && (item.state === 'active' || item.state === 'checkout_pending')) ?? null;
       setStatus({ open, lateEodDue: snapshot.late_eod_due ?? null, snapshot });
       wasOpen.current = !!open;
-      setPhase(open && !snapshot.late_eod_due ? 'work' : 'gate');
+      setPhase((open && !snapshot.late_eod_due) || (offShift && !open && skipped(org, userId)) ? 'work' : 'gate');
     }).catch(reason => setError(reason instanceof Error ? reason.message : String(reason)));
-  }, [phase, shifts, userId]);
+  }, [phase, shifts, userId, org, offShift]);
 
   const onStatus = useCallback((next: ShiftStatus) => {
     setStatus(next);
@@ -62,7 +69,8 @@ export function WorkdayGate({ client, org, userId, email, role, backend, onSignO
   };
   const workday = useMemo<Workday>(() => ({ shift: status?.open ?? null, open: () => setPhase('panel') }), [status?.open]);
 
-  if (error) return <WorkdayPage><div className="shift-alert" role="alert"><p>Couldn’t confirm your shift: {error}</p><button className="btn" type="button" onClick={() => { setError(''); setPhase('checking'); }}>Try again</button><button className="btn" type="button" onClick={onSignOut}>Sign out</button></div></WorkdayPage>;
+  // Shift status unavailable: never lock owners, admins or supervisors out of their work.
+  if (error) return <WorkdayPage><div className="shift-alert" role="alert"><p>Couldn’t confirm your shift: {error}</p><button className="btn" type="button" onClick={() => { setError(''); setPhase('checking'); }}>Try again</button>{offShift && <button className="btn" type="button" onClick={() => { setError(''); setPhase('work'); }}>Continue without a shift</button>}<button className="btn" type="button" onClick={onSignOut}>Sign out</button></div></WorkdayPage>;
   if (phase === 'checking') return <WorkdayPage><p role="status">Checking your shift… Signing in doesn’t start one.</p></WorkdayPage>;
   if (phase === 'gate' || phase === 'panel') {
     const onShift = !!status?.open && !status.lateEodDue;
@@ -72,7 +80,7 @@ export function WorkdayGate({ client, org, userId, email, role, backend, onSignO
       <ShiftModule backend={shifts} context={context} onStatus={onStatus}
         name={phase === 'panel' ? 'Your shift' : status?.lateEodDue ? 'Before today’s shift' : 'Start your day'}
         actions={<span className="workday-actions">
-          {back && <button type="button" className="btn btn-primary" onClick={() => setPhase('work')}>{onShift ? 'Back to My Work' : 'Continue without a shift'}</button>}
+          {back && <button type="button" className="btn btn-primary" onClick={onShift ? () => setPhase('work') : continueOffShift}>{onShift ? 'Back to My Work' : 'Continue without a shift'}</button>}
           <button type="button" className="btn" onClick={onSignOut}>Sign out</button>
         </span>} />
       <p className="workday-identity">Signed in as <b>{email}</b>. Not you? Sign out; a badge never switches accounts.</p>
