@@ -6,7 +6,7 @@ import type { Db } from './pg.ts';
 
 // The navigation migration allow-lists a real production account, so that account exists first.
 const ALLOWLISTED = 'f1cd1413-e5ee-424f-91b0-3fb109247e99';
-const AFTER = ['20261019140000_temporary_restricted_navigation.sql', '20261019160000_owner_people_access.sql', '20261020010000_badge_check_in.sql'];
+const AFTER = ['20261019140000_temporary_restricted_navigation.sql', '20261019160000_owner_people_access.sql', '20261020010000_badge_check_in.sql', '20261021232654_badge_identity_v2.sql'];
 const sha = (value: string) => createHash('sha256').update(value).digest('hex');
 const PHONE = sha('phone-key-1');
 const OTHER_PHONE = sha('phone-key-2');
@@ -103,4 +103,31 @@ test('a forgotten check-out: an "in" older than 16 hours starts a fresh day and 
   await db.pg.query(`update public.work_check_ins set at = now() - interval '20 hours' where user_id = $1`, [member]);
   const next = await scan(db, 'CODE-6', PHONE);
   assert.deepEqual([next.kind, next.note], ['in', 'Previous check-in had no check-out']);
+});
+
+/** badge-check-in v3's call: the verified signed-in user is passed in by the function. */
+async function verify(db: Db, code: string, device: string, user: string) {
+  return db.pg.transaction(async tx => {
+    await tx.exec("select set_config('request.jwt.claims', '{}', true)");
+    await tx.exec('set local role service_role');
+    return (await tx.query<{ v: Record<string, unknown> }>('select public.badge_verify($1, $2, $3) v', [sha(code), device, user])).rows[0]!.v;
+  });
+}
+
+test('badge_verify proves identity on the bound phone and records no attendance', async () => {
+  const { db, org, admin, member, other } = await setup();
+  await rpcAs(db, admin, 'badge_issue', { p_org: org, p_user: member, p_hash: sha('CODE-V') });
+  const count = async () => Number((await db.pg.query<{ n: number }>('select count(*)::int n from public.work_check_ins')).rows[0]!.n);
+  assert.equal((await verify(db, 'CODE-V', PHONE, other)).result, 'mismatch', 'another account is refused');
+  assert.equal((await db.pg.query<{ device_hash: string | null }>('select device_hash from public.work_badges')).rows[0]!.device_hash, null, 'a mismatch binds nothing');
+  const ok = await verify(db, 'CODE-V', PHONE, member);
+  assert.deepEqual([ok.result, ok.org_id], ['ok', org]);
+  assert.equal(JSON.stringify(ok).includes('member@test.invalid'), false);
+  assert.equal((await verify(db, 'CODE-V', PHONE, member)).result, 'ok', 'scanning again toggles nothing');
+  assert.equal(await count(), 0, 'no in/out rows: attendance lives in shifts');
+  assert.equal((await verify(db, 'CODE-V', OTHER_PHONE, member)).result, 'device-pending');
+  assert.equal(await count(), 1, 'only the new-phone approval request');
+  for (const role of ['authenticated', 'anon']) {
+    await assert.rejects(db.pg.transaction(async tx => { await tx.exec(`set local role ${role}`); await tx.query('select public.badge_verify($1, $2, $3)', [sha('CODE-V'), PHONE, member]); }), `${role} cannot call it directly`);
+  }
 });

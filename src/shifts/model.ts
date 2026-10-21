@@ -100,7 +100,7 @@ export function shiftInsights(shift: Shift, context: Pick<ShiftContext, 'tasks' 
   const ids = new Set(owned.map(task => task.id));
   return {
     elapsed: end >= start ? end - start : null,
-    missed: shift.state !== 'checked_out' && now - start > 16 * 3_600_000,
+    missed: (shift.state === 'active' || shift.state === 'checkout_pending') && now - start > 16 * 3_600_000,
     updates: new Set(context.events.filter(event => !event.undone && event.taskId && ids.has(event.taskId) && event.at >= start && event.at <= end).map(event => event.id)).size,
     completed: owned.filter(task => task.status === 'done' && task.completedAt !== null && task.completedAt >= start && task.completedAt <= end).length,
     blocked: owned.filter(task => task.status === 'blocked').length,

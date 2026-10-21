@@ -37,6 +37,7 @@ function Root() {
   const [mode, setMode] = useState(readMode);
   const [view, setView] = useState<AuthView>(authViewFromHash);
   const [badge, setBadge] = useState(LANDING_BADGE);
+  const [badgeSignIn, setBadgeSignIn] = useState(false);
   const session = useSession();
 
   useEffect(() => {
@@ -67,11 +68,20 @@ function Root() {
     setView(next);
   }
 
-  // A badge scan: check in (or out) on this phone, then continue into the workspace.
-  if (badge) return <BadgeCheckIn code={badge} onDone={() => { setBadge(null); go('sign-in'); }} />;
+  const client = supabase();
+  // A badge scan: the person signs in with their own account (the badge is kept in memory only),
+  // the server confirms that account owns the badge, then the workday gate takes SOD and check-in.
+  if (badge && mode !== 'demo') {
+    if (!session.ready) return null;
+    if (session.email || !badgeSignIn) {
+      return <BadgeCheckIn code={badge} email={session.email} onContinue={() => { setBadge(null); history.replaceState(null, '', '#/home'); }}
+        onSignIn={() => { setBadgeSignIn(true); go('sign-in'); }} onCancel={() => setBadge(null)}
+        onSwitch={() => { setBadgeSignIn(true); go('sign-in'); void client?.auth.signOut(); }} />;
+    }
+    return <AuthScreen view={view} go={go} onDemo={enterDemo} notice={session.notice} />;
+  }
   if (mode === 'demo') return <App onExitDemo={isExtensionContext() ? undefined : exitDemo} />;
   if (!session.ready) return null;
-  const client = supabase();
   if (session.email && client && view !== 'reset' && view !== 'set-password') {
     return <LiveRoot key={session.email} client={client} onSignOut={() => { history.replaceState(null, '', '#/auth/sign-in'); void client.auth.signOut(); }} onDemo={enterDemo} />;
   }

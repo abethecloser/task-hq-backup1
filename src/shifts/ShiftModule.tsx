@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { Shift, ShiftAction, ShiftBackend, ShiftCommand, ShiftContext, ShiftSnapshot } from './types.ts';
-import { STATE_LABELS, validateMedia } from './types.ts';
+import { STATE_LABELS, isOpenShift, validateMedia } from './types.ts';
 import { shiftInsights } from './model.ts';
 import { deviceGet, deviceKey, devicePut, deviceRemove, deviceTransaction } from './device.ts';
 import { pendingKey, retryShift, sendShift, resumeUpload, uploadKey } from './operations.ts';
@@ -12,12 +13,14 @@ import './shift.css';
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
 const stamp = (value: string | null) => value ? new Date(value).toLocaleString() : 'Not recorded';
 const duration = (ms: number | null) => ms === null ? 'Time unavailable' : `${Math.floor(ms / 3_600_000)}h ${Math.floor(ms / 60_000) % 60}m`;
-export interface ShiftModuleProps { backend: ShiftBackend; context: ShiftContext; name?: string }
+export interface ShiftStatus { open: Shift | null; lateEodDue: string | null; snapshot: ShiftSnapshot }
+export interface ShiftModuleProps { backend: ShiftBackend; context: ShiftContext; name?: string; actions?: ReactNode; onStatus?: (status: ShiftStatus) => void }
 /** Isolated module: receives existing authenticated/backend context. Mounting only READS. */
-export function ShiftModule({ backend, context, name = 'Your shift' }: ShiftModuleProps) {
-  return <ShiftBoundary key={JSON.stringify([backend.kind, backend.org, backend.actor])} backend={backend} context={context} name={name} />;
+export function ShiftModule({ backend, context, name = 'Your shift', actions, onStatus }: ShiftModuleProps) {
+  return <ShiftBoundary key={JSON.stringify([backend.kind, backend.org, backend.actor])} backend={backend} context={context} name={name} actions={actions} onStatus={onStatus} />;
 }
-function ShiftBoundary({ backend, context, name }: ShiftModuleProps) {
+function ShiftBoundary({ backend, context, name, actions, onStatus }: ShiftModuleProps) {
+  const status = useRef(onStatus); status.current = onStatus;
   const [snapshot, setSnapshot] = useState<ShiftSnapshot | null>(null), [error, setError] = useState(''), [team, setTeam] = useState(false);
   const [busy, setBusy] = useState(false), [pending, setPending] = useState<ShiftCommand | null>(null), [clock, setClock] = useState(Date.now());
   const [notice, setNotice] = useState(''); const offset = useRef(0), alive = useRef(true), working = useRef(false), requestSequence = useRef(0);
@@ -27,6 +30,7 @@ function ShiftBoundary({ backend, context, name }: ShiftModuleProps) {
       const result = await backend.load(team); if (!alive.current || sequence !== requestSequence.current) return;
       offset.current = Date.parse(result.server_now) - (before + Date.now()) / 2;
       setSnapshot(result); setError(''); setPending(await deviceGet<ShiftCommand>(pendingKey(backend)));
+      status.current?.({ open: result.shifts.find(item => item.employee === backend.actor && isOpenShift(item)) ?? null, lateEodDue: result.late_eod_due ?? null, snapshot: result });
     } catch (reason) { if (alive.current) setError(message(reason)); }
   }, [backend, team]);
   useEffect(() => {
@@ -43,10 +47,11 @@ function ShiftBoundary({ backend, context, name }: ShiftModuleProps) {
     finally { working.current = false; setBusy(false); }
   }
   const own = snapshot?.shifts.filter(item => item.employee === backend.actor) ?? [];
-  const shift = own.find(item => item.state !== 'checked_out') ?? null;
+  const shift = own.find(isOpenShift) ?? null;
+  const lateDue = snapshot?.late_eod_due ? own.find(item => item.id === snapshot.late_eod_due) ?? null : null;
   const now = clock + offset.current;
   return <section className="shift-module" aria-label="Shift and activity tracking">
-    <header className="shift-heading"><div><p className="eyebrow">Shift & activity · {backend.kind === 'demo' ? 'Synthetic demo · saved on this device' : 'Authenticated workspace'}</p><h1>{name}</h1></div><a className="btn" href="/">Task HQ</a></header>
+    <header className="shift-heading"><div><p className="eyebrow">Shift & activity · {backend.kind === 'demo' ? 'Synthetic demo · saved on this device' : 'Authenticated workspace'}</p><h1>{name}</h1></div>{actions ?? <a className="btn" href="/">Task HQ</a>}</header>
     <p className="shift-boundary-note">Signing in or opening Task HQ does not clock you in. Shift actions are explicit.</p>
     {error && <div className="shift-alert" role="alert"><p>{error}</p><button className="btn" type="button" onClick={() => void refresh()}>Refresh status</button></div>}
     {notice && <p role="status">{notice}</p>}
@@ -55,12 +60,13 @@ function ShiftBoundary({ backend, context, name }: ShiftModuleProps) {
       <button className="btn" disabled={busy} onClick={async () => { await deviceRemove(pendingKey(backend)); setPending(null); setNotice('Retry cleared. Drafts are retained. This does not undo any server action; refresh before proceeding.'); await refresh(); }}>Keep drafts; clear retry</button>
     </div>}
     {!snapshot ? <p>Loading confirmed shift status… No shift has been started.</p> : <>
-      <ShiftSession key={shift?.id ?? 'new-shift'} backend={backend} context={context} shift={shift} now={now} busy={busy || !!pending} run={run} refresh={refresh} />
+      {lateDue && <LateEod shift={lateDue} busy={busy || !!pending} run={run} />}
+      {!lateDue && <ShiftSession key={shift?.id ?? 'new-shift'} backend={backend} context={context} shift={shift} now={now} busy={busy || !!pending} run={run} refresh={refresh} />}
       <section className="shift-history"><h2>Recorded shifts</h2>
         {snapshot.can_manage && <label className="shift-check"><input type="checkbox" checked={team} onChange={event => setTeam(event.target.checked)} />Include team records for manager review</label>}
-        {(snapshot.shifts.filter(item => item.state === 'checked_out' || item.employee !== backend.actor)).map(item => <details className="shift-card" key={item.id}>
+        {(snapshot.shifts.filter(item => !isOpenShift(item) || item.employee !== backend.actor)).map(item => <details className="shift-card" key={item.id}>
           <summary>{item.employee === backend.actor ? 'Your shift' : item.employee_name || item.employee} · {stamp(item.started_at)} · {STATE_LABELS[item.state]}{item.review_required ? ' · Review required' : ''}</summary>
-          <p>Start: {stamp(item.started_at)}<br />End: {stamp(item.ended_at)}<br />Recorded interval: {duration(shiftInsights(item, context, now).elapsed)}{item.review_required ? ' · Unreviewed exception or correction request' : ''}</p>
+          <p>Start: {stamp(item.started_at)}<br />End: {item.state === 'auto_closed' && !item.ended_at ? `Unknown · closed automatically ${stamp(item.closed_at ?? null)}` : stamp(item.ended_at)}<br />Recorded interval: {duration(shiftInsights(item, context, now).elapsed)}{item.review_required ? ' · Unreviewed exception or correction request' : ''}</p>
           <RecordList shift={item} backend={backend} />
           <Correction actor={backend.actor} shift={item} manager={snapshot.can_manage} canRequest={item.employee === backend.actor} busy={busy || !!pending} run={run} />
         </details>)}
@@ -183,7 +189,20 @@ function Correction({actor,shift,manager,canRequest,busy,run}:{actor:string;shif
   <div className="shift-grid"><label>Reported start (optional)<input type="datetime-local" value={start} onChange={event=>{setStart(event.target.value);save({reason,start:event.target.value,end});}}/></label><label>Reported end (optional)<input type="datetime-local" value={end} onChange={event=>{setEnd(event.target.value);save({reason,start,end:event.target.value});}}/></label></div>
   {error&&<p role="alert">{error}</p>}
   {canRequest&&<button className="btn" disabled={busy||!reason.trim()} onClick={()=>void run('correction',shift.id,{text:reason,reported_start:start,reported_end:end})}>Request correction</button>}
-  {canRequest&&shift.state!=='checked_out'&&<button className="btn" disabled={busy||!reason.trim()} onClick={()=>void run('exception_checkout',shift.id,{text:reason,reported_start:start,reported_end:end})}>Record exception checkout · manager review required</button>}
+  {canRequest&&isOpenShift(shift)&&<button className="btn" disabled={busy||!reason.trim()} onClick={()=>void run('exception_checkout',shift.id,{text:reason,reported_start:start,reported_end:end})}>Record exception checkout · manager review required</button>}
   {manager&&<button className="btn btn-primary" disabled={busy||!reason.trim()||!start||!end} onClick={()=>void run('adjust',shift.id,{text:reason,started_at:new Date(start).toISOString(),ended_at:new Date(end).toISOString()})}>Approve recorded time adjustment</button>}
  </details>;
+}
+
+/** A shift the system closed (no checkout within the limit): the employee explains it before a new check-in.
+ * The end time stays unknown; this records what happened, it never sets hours. */
+function LateEod({ shift, busy, run }: { shift: Shift; busy: boolean; run: (action: ShiftAction, shift: string | null, data: Record<string, unknown>) => Promise<boolean | undefined> }) {
+  const [reason, setReason] = useState(''), [summary, setSummary] = useState('');
+  return <section className="shift-card" aria-label="Late end-of-day report">
+    <div className="shift-status"><h2>Your last shift wasn’t checked out</h2></div>
+    <p>Started {stamp(shift.started_at)}. It was closed automatically {stamp(shift.closed_at ?? null)} with no end time recorded. Add a short late EOD to start today’s shift. A manager reviews the time.</p>
+    <label>Why was checkout missed?<textarea value={reason} maxLength={5000} onChange={event => setReason(event.target.value)} placeholder="e.g. Phone died at the site" /></label>
+    <label>What did you get done?<textarea value={summary} maxLength={5000} onChange={event => setSummary(event.target.value)} placeholder="A short summary of the work" /></label>
+    <button type="button" className="btn btn-primary shift-primary" disabled={busy || !reason.trim() || !summary.trim()} onClick={() => void run('late_eod', shift.id, { text: reason, summary })}>Submit late EOD</button>
+  </section>;
 }

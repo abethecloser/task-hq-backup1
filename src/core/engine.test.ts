@@ -67,6 +67,20 @@ test('task execution: create → assign → start → help → resolve → compl
   assert.equal(nextActionable(h.state, 'riley', h.now)?.status === 'review' || !!nextActionable(h.state, 'riley', h.now), true);
 });
 
+test('task/update edits only editable fields; status, Ultra and identity fields are refused for everyone', () => {
+  const h = harness();
+  const id = h.act('riley', { type: 'task/create', task: { title: 'Patch the ridge', owner: 'riley' } }).event!.taskId!;
+  const before = task(h.state, id);
+  for (const actor of ['riley', 'maya']) {
+    for (const changes of [{ status: 'done' }, { ultra: true }, { completedAt: 1 }, { createdBy: 'maya' }, { id: 'hijack' }, { nextAction: 'ok', blocker: null }]) {
+      assert.match(h.refuse(actor, { type: 'task/update', id, changes } as unknown as Action), /can’t be edited/);
+    }
+  }
+  assert.deepEqual(task(h.state, id), before, 'nothing was written');
+  h.act('riley', { type: 'task/update', id, changes: { nextAction: 'Bring sealant', priority: 'high', due: '2026-10-25' } });
+  assert.equal(task(h.state, id).nextAction, 'Bring sealant');
+});
+
 test('approval: working → review with approver → approve unlocks and hands off', () => {
   const h = harness();
   h.refuse('riley', { type: 'task/advance', id: 'maple-estimate' });

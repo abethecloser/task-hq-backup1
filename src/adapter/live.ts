@@ -4,13 +4,38 @@
 // No task data is kept in browser storage in live mode.
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Action, QuestState } from '../core/contract.ts';
-import type { DispatchResult, QuestBackend } from './store.ts';
+import type { BackendSupports, DispatchResult, QuestBackend } from './store.ts';
 
-interface ServerReply { ok: boolean; state?: QuestState; rev?: number; message?: string; error?: string; eventId?: string | null; undoable?: boolean; conflict?: boolean }
+interface ServerReply { ok: boolean; state?: QuestState; rev?: number; message?: string; error?: string; eventId?: string | null; undoable?: boolean; conflict?: boolean; contract?: number }
+
+/** dispatch v5 is the first release that advertises a contract; v4 replies carry none. */
+const FULL_CONTRACT = 5;
+
+// dispatch v4 (verified against the deployed source on 2026-10-20) predates these
+// features; they are refused before sending until a reply advertises the v5 contract.
+// Never discard fields. Reference drafts are the exception: they are client-side
+// link hints, not fields. v4 ignores them and saves the text (@Name, #tag)
+// verbatim, so they are removed rather than blocking every later write.
+const withoutReferenceDrafts = (action: Action): Action => {
+  const { referenceDrafts: _drafts, ...rest } = action;
+  return rest as Action;
+};
+function unsupported(action: Action): string | null {
+  if (['task/reopen', 'roles/label', 'lead/tags', 'lead/claim', 'taxonomy/register-tags', 'taxonomy/update'].includes(action.type)) {
+    return 'This action is unavailable on the current shared server. Nothing was sent.';
+  }
+  const fields = action.type === 'task/create' ? action.task : action.type === 'task/update' ? action.changes : null;
+  if (fields && ['type', 'tags', 'dueTime'].some(key => Object.prototype.hasOwnProperty.call(fields, key))) {
+    return 'Task type, tags and time are unavailable on the current shared server. Nothing was sent.';
+  }
+  return null;
+}
 
 export function createLiveBackend(client: SupabaseClient, url: string, publishableKey: string, org: { id: string; name: string }, userId: string): QuestBackend {
   let latest: QuestState | null = null;
   let lastTick = 0;
+  // From the most recent server reply, so a rollback to v4 turns the gates back on.
+  let contract = 0;
 
   async function call(body: Record<string, unknown>): Promise<{ status: number; reply: ServerReply }> {
     try {
@@ -22,7 +47,10 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, apikey: publishableKey },
         body: JSON.stringify({ ...body, orgId: org.id }),
       });
-      const reply = await response.json().catch(() => ({ ok: false, error: 'Unexpected server response.' })) as ServerReply;
+      const reply = await response.json().catch(() => null) as ServerReply | null;
+      if (!reply) return { status: response.status, reply: { ok: false, error: 'Unexpected server response.' } };
+      // Gateway and runtime errors never carry a contract; only the function's own replies count.
+      if (response.ok) contract = typeof reply.contract === 'number' ? reply.contract : 0;
       return { status: response.status, reply };
     } catch {
       return { status: 0, reply: { ok: false, error: 'Task-HQ could not confirm the response. Reload the workspace before retrying.' } };
@@ -45,9 +73,12 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
       return remember(reply.state, reply.rev);
     },
     async dispatch(action: Action): Promise<DispatchResult> {
+      const full = contract >= FULL_CONTRACT;
+      const error = full ? null : unsupported(action);
+      if (error) return { ok: false, state: latest!, error };
       for (let attempt = 0; attempt < 2; attempt += 1) {
-        const { status, reply } = await call({ op: 'dispatch', action, expectedRev: latest?.rev });
-        if (reply.ok && reply.state) {
+        const { status, reply } = await call({ op: 'dispatch', action: full ? action : withoutReferenceDrafts(action), expectedRev: latest?.rev });
+        if (status >= 200 && status < 300 && reply.ok && reply.state) {
           return { ok: true, state: remember(reply.state, reply.rev), message: reply.message ?? 'Saved.', eventId: reply.eventId ?? null, undoable: !!reply.undoable };
         }
         if (status === 409 && attempt === 0) { if (reply.state) remember(reply.state, reply.rev); else await this.load(); continue; }
@@ -79,7 +110,9 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
     async setActor() { /* the signed-in account is the actor */ },
     subscribeActor() { return () => undefined; },
     async outboxCount() { return 0; },
-    // The deployed dispatch (v3) predates task types, tags and times; flip with the next dispatch deploy.
-    supports: { taskTaxonomy: false },
+    get supports(): BackendSupports {
+      const full = contract >= FULL_CONTRACT;
+      return { taskTaxonomy: full, taskReopen: full, leadOwnership: full, workLabels: full, structuredReferences: full };
+    },
   };
 }

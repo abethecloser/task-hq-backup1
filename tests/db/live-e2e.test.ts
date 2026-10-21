@@ -124,35 +124,25 @@ test('outcomes are inspectable: executed effects, denied and failed attempts lea
   } finally { await w.done(); }
 });
 
-test('command input: a reviewed plan is created through the server and seen by another user, with type, tags, time and the dependency', async () => {
+test('live command input refuses unsupported taxonomy and persists the supported task fields', async () => {
   const w = await world();
   try {
     const { parseCommand, newTaskFrom } = await import('../../src/core/command.ts');
     const owner = w.session('tok-owner', w.owner);
     const loaded = await owner.load();
-    const configured = await owner.dispatch({ type: 'taxonomy/update', taxonomy: { types: [{ id: 'meeting', label: 'Meeting', keywords: ['meeting'] }, { id: 'follow-up', label: 'Follow-up', keywords: ['follow-up'] }], tags: ['permits'] } }, w.owner);
-    assert.ok(configured.ok, configured.ok ? '' : configured.error);
-    const now = Date.now();
-    const drafts = parseCommand('Meeting with @Milo tomorrow at 9am about permits #permits !high, then assign the follow-up to Milo', configured.state, now);
-    assert.equal(drafts.length, 2);
-    assert.equal(drafts[0]!.owner, null, 'the mention is a watcher, not an owner');
-    const reviewed = drafts.map(draft => ({ ...draft, owner: draft.owner && { ...draft.owner, confirmed: true } }));
-    const ids: Record<string, string> = {};
-    for (const draft of reviewed) {
-      const res = await owner.dispatch({ type: 'task/create', task: newTaskFrom(draft, ids, { taxonomy: true }) }, w.owner);
-      assert.ok(res.ok, res.ok ? '' : res.error);
-      ids[draft.key] = res.state.events.find(event => event.id === res.eventId)!.taskId!;
-    }
-    // Another person, in a separate session, reads exactly what was approved.
-    const seen = await w.session('tok-member', w.member).load();
-    const meeting = seen.tasks.find(task => task.id === ids.d1)!;
-    const follow = seen.tasks.find(task => task.id === ids.d2)!;
-    assert.deepEqual([meeting.type, meeting.tags, meeting.dueTime, meeting.priority, meeting.owner, meeting.watchers], ['meeting', ['permits'], '09:00', 'high', '', [w.member]]);
-    assert.deepEqual([follow.type, follow.owner, follow.dependsOn], ['follow-up', w.member, [meeting.id]]);
-    assert.ok(loaded.rev < seen.rev);
-    // A member can't change the organization's task types.
-    const refused = await w.session('tok-member', w.member).dispatch({ type: 'taxonomy/update', taxonomy: { types: [], tags: [] } }, w.member);
+    const refused = await owner.dispatch({ type: 'taxonomy/update', taxonomy: { types: [], tags: [] } }, w.owner);
     assert.equal(refused.ok, false);
+    assert.equal((await owner.load()).rev, loaded.rev);
+    const draft = parseCommand('Review permits tomorrow at 9am #permits', loaded, Date.now())[0]!;
+    const created = await owner.dispatch({ type: 'task/create', task: newTaskFrom(draft, {}, { taxonomy: false }) }, w.owner);
+    assert.ok(created.ok, created.ok ? '' : created.error);
+    const seen = await w.session('tok-member', w.member).load();
+    const task = seen.tasks.find(task => task.id === created.state.tasks[0]!.id)!;
+    assert.equal(task.title, draft.title);
+    assert.equal(task.due, draft.due);
+    assert.equal(task.dueTime, undefined);
+    assert.equal(seen.rev, created.state.rev);
+    assert.equal(seen.events.find(event => event.id === (created.ok ? created.eventId : ''))?.actor, w.owner);
   } finally { await w.done(); }
 });
 

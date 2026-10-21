@@ -2,13 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createDb, PRODUCTION_BASELINE, addUser, addOrg, addMember, rpcAs, read } from '../../tests/db/pg.ts';
 import type { Shift, ShiftSnapshot } from './types.ts';
-const migration = '20261019113920_shift_activity_v1.sql';
+const migrations = ['20261019113920_shift_activity_v1.sql', '20261021232917_shift_attendance_v2.sql'];
 async function fixture() {
  const db = await createDb(PRODUCTION_BASELINE, { broadGrants: true });
  await db.pg.exec(`create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
  create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text unique,metadata jsonb,owner_id text); alter table storage.objects enable row level security;
  grant usage on schema storage to authenticated,anon; grant select,insert,update,delete on storage.objects to authenticated,anon;`);
- await db.pg.exec(read(`supabase/migrations/${migration}`));
+ for (const migration of migrations) await db.pg.exec(read(`supabase/migrations/${migration}`));
  const employee = await addUser(db,'field@example.test'), other = await addUser(db,'other@example.test'), manager = await addUser(db,'manager@example.test'), reviewer = await addUser(db,'review@example.test');
  const org = await addOrg(db,'shift-fixture','Shift fixture'), foreign = await addOrg(db,'other-fixture','Other fixture');
  await addMember(db,org,employee,'member','field'); await addMember(db,org,manager,'supervisor','manager'); await addMember(db,org,reviewer,'reviewer','reviewer'); await addMember(db,foreign,other,'owner','manager');
@@ -82,4 +82,33 @@ test('real SQL: a removed member can still finish an existing checkout and reque
  assert.equal((await f.call(f.employee,'checkout',shift.id)).error,null);
  assert.equal((await f.call(f.employee,'correction',shift.id,{text:'Please review the end time.'})).error,null);
  }finally{await f.db.close();}
+});
+
+test('real SQL: a forgotten checkout closes without an invented end time and the next check-in waits for a late EOD', async () => {
+ const f = await fixture(); try {
+ const shift = (await f.call(f.employee,'check_in',null,{focus:'Night pour'})).data as Shift;
+ // Still within the limit (an overnight shift is fine): nothing closes.
+ await f.db.pg.query(`update public.shift_sessions set started_at = clock_timestamp() - interval '10 hours' where id = $1`, [shift.id]);
+ assert.equal(((await rpcAs(f.db,f.employee,'shift_list',{p_org:f.org})).data as ShiftSnapshot).shifts[0]!.state, 'active');
+ // Past the 16 hour default: the next access closes it as the system, with the end unknown.
+ await f.db.pg.query(`update public.shift_sessions set started_at = clock_timestamp() - interval '17 hours' where id = $1`, [shift.id]);
+ const listed = (await rpcAs(f.db,f.employee,'shift_list',{p_org:f.org})).data as ShiftSnapshot & { late_eod_due: string | null; max_shift_hours: number };
+ const closed = listed.shifts[0]! as Shift & { closed_at: string | null };
+ assert.equal(closed.state, 'auto_closed'); assert.equal(closed.ended_at, null, 'actual end time stays unknown'); assert.ok(closed.closed_at);
+ assert.equal(closed.review_required, true); assert.equal(listed.late_eod_due, shift.id); assert.equal(listed.max_shift_hours, 16);
+ const auto = closed.records.find(r => r.kind === 'auto_close')!; assert.equal(auto.author, null, 'system closure, not an employee checkout'); assert.equal(auto.data.system, true);
+ assert.equal(closed.records.some(r => r.kind === 'checkout'), false);
+ // Sign-in alone never resumes it, and a new shift waits for the explanation.
+ assert.match((await f.call(f.employee,'check_in',null,{focus:'Next day'})).error!.message, /late EOD/);
+ assert.ok((await f.call(f.employee,'checkout',shift.id)).error);
+ assert.ok((await f.call(f.employee,'late_eod',shift.id,{text:'Phone died at the site'})).error, 'needs a work summary too');
+ assert.ok((await f.call(f.other,'late_eod',shift.id,{text:'x',summary:'y'})).error, 'only the employee');
+ const late = await f.call(f.employee,'late_eod',shift.id,{text:'Phone died at the site',summary:'Poured slab B, cleaned up by 2am'}); assert.equal(late.error,null,late.error?.message);
+ assert.equal((late.data as Shift).ended_at, null); assert.ok((await f.call(f.employee,'late_eod',shift.id,{text:'again',summary:'again'})).error);
+ const next = await f.call(f.employee,'check_in',null,{focus:'Next day'}); assert.equal(next.error,null,next.error?.message);
+ // Managers see the whole story; an admin can change the limit, a member cannot.
+ const team = (await rpcAs(f.db,f.manager,'shift_list',{p_org:f.org,p_team:true})).data as ShiftSnapshot;
+ assert.deepEqual(team.shifts.map(s => s.state).sort(), ['active','auto_closed']);
+ assert.ok((await rpcAs(f.db,f.employee,'shift_set_policy',{p_org:f.org,p_max_shift_hours:12})).error);
+ } finally { await f.db.close(); }
 });

@@ -25,6 +25,9 @@
     "supabase/functions/dispatch/automation/*.ts",
     "supabase/functions/dispatch/core/*.ts",
     "supabase/functions/dispatch/index.ts",
-    "supabase/functions/runtime.d.ts"
+    "supabase/functions/runtime.d.ts",
+    "deploy/dispatch-live/v5/index.ts",
+    "deploy/dispatch-live/v5/logic.ts",
+    "deploy/dispatch-live/v5/core/*.ts"
   ]
 }

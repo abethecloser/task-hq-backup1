@@ -12,6 +12,7 @@ import { PRODUCT } from '../core/workspace.ts';
 import { CLOSED, forOrg, parseNavigation } from '../core/navigation.ts';
 import type { NavigationAccess } from '../core/navigation.ts';
 import { PlatformConsole } from './PlatformConsole.tsx';
+import { WorkdayGate } from '../shifts/Workday.tsx';
 import './live.css';
 
 export interface MyContext {
@@ -103,7 +104,11 @@ function LiveWorkspace({ client, context, membership, navigation, onSignOut, onL
     navigation: forOrg(navigation, membership.org_id),
   }), [client, context, org, membership.role, navigation, onSignOut, onLeave, canLeave, onChoose]);
   useEffect(() => { document.title = `${org.name} — ${PRODUCT.name}`; }, [org.name]);
-  return <LiveContext.Provider value={account}><App backend={backend} /></LiveContext.Provider>;
+  return <LiveContext.Provider value={account}>
+    <WorkdayGate client={client} org={org.id} userId={context.user_id} email={context.email} role={membership.role} backend={backend} onSignOut={onSignOut}>
+      <App backend={backend} />
+    </WorkdayGate>
+  </LiveContext.Provider>;
 }
 
 function Invitations({ client, context, onAccepted, onSkip, onSignOut }: { client: SupabaseClient; context: MyContext; onAccepted: (org: string) => Promise<void>; onSkip: () => void; onSignOut: () => void }) {
