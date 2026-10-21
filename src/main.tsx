@@ -9,6 +9,7 @@ import { LiveRoot } from './live/LiveRoot.tsx';
 import type { AuthView } from './auth/AuthScreen.tsx';
 import { supabase } from './auth/client.ts';
 import { isExtensionContext } from './adapter/store.ts';
+import { entryMode, saveMode } from './auth/mode.ts';
 import { PRODUCT } from './core/workspace.ts';
 import './ui/quest.css';
 import './ui/nexus.css';
@@ -20,12 +21,10 @@ import { applyLook } from './ui/look.ts';
 
 // Entry: real sign-in by default on the web; the synthetic demo is a separate,
 // explicit mode with its own local data. The extension stays demo-only for now.
-const MODE_KEY = 'tmhq.mode';
 const AUTH_VIEWS: AuthView[] = ['sign-in', 'magic', 'sign-up', 'forgot', 'reset', 'set-password', 'request'];
 
 function readMode(): 'demo' | 'auth' {
-  if (isExtensionContext()) return 'demo';
-  try { return localStorage.getItem(MODE_KEY) === 'demo' ? 'demo' : 'auth'; } catch { return 'auth'; }
+  return entryMode(location.href, isExtensionContext(), !!LANDING_BADGE);
 }
 
 function authViewFromHash(): AuthView {
@@ -41,24 +40,37 @@ function Root() {
   const session = useSession();
 
   useEffect(() => {
-    const onHash = () => setView(authViewFromHash());
+    const onHash = () => {
+      setView(authViewFromHash());
+      if (!isExtensionContext() && location.hash.startsWith('#/auth/')) { saveMode('auth'); setMode('auth'); }
+    };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  useEffect(() => { if (session.recovery) setView('reset'); }, [session.recovery]);
+  useEffect(() => { if (session.recovery) { saveMode('auth'); setMode('auth'); setView('reset'); } }, [session.recovery]);
   // Signed in by magic link: offer (once, skippable) to set a password for next time.
-  useEffect(() => { if (session.offerPassword) { history.replaceState(null, '', '#/auth/set-password'); setView('set-password'); } }, [session.offerPassword]);
+  useEffect(() => { if (session.offerPassword) { saveMode('auth'); setMode('auth'); history.replaceState(null, '', '#/auth/set-password'); setView('set-password'); } }, [session.offerPassword]);
   // An email link that couldn't be used lands on the page it chose (sign-in or forgot), with its notice.
   useEffect(() => { if (session.notice) setView(authViewFromHash()); }, [session.notice]);
+  useEffect(() => {
+    if (mode !== 'demo' || isExtensionContext()) return;
+    const url = new URL(location.href);
+    if (url.searchParams.has('demo') || /^\/demo\/?$/.test(url.pathname) || url.hash === '#/demo') {
+      url.searchParams.delete('demo');
+      url.pathname = '/';
+      url.hash = '#/home';
+      history.replaceState(null, '', url);
+    }
+  }, [mode]);
   useEffect(() => { document.title = mode === 'demo' ? PRODUCT.demo : `Sign in — ${PRODUCT.name}`; }, [mode]);
 
   function enterDemo() {
-    try { localStorage.setItem(MODE_KEY, 'demo'); } catch { /* demo for this tab only */ }
+    saveMode('demo');
     history.replaceState(null, '', '#/home');
     setMode('demo');
   }
   function exitDemo() {
-    try { localStorage.removeItem(MODE_KEY); } catch { /* ignore */ }
+    saveMode('auth');
     history.replaceState(null, '', '#/auth/sign-in');
     setView('sign-in');
     setMode('auth');
