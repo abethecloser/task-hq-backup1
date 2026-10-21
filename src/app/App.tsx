@@ -48,6 +48,7 @@ import { Awareness } from './Awareness.tsx';
 import { attentionFor } from '../core/awareness.ts';
 import { Inbox, inboxFor } from './Inbox.tsx';
 import type { InboxData } from './Inbox.tsx';
+import { ShiftBridge } from '../shifts/ShiftBridge.tsx';
 import { demoMessaging } from '../adapter/messaging.ts';
 import { demoTools } from '../adapter/tools.ts';
 import { Tools } from './Tools.tsx';
@@ -141,6 +142,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const [taskId, setTaskId] = useState<string | null>(initial.taskId);
   const [leadId, setLeadId] = useState<string | null>(initial.leadId);
   const [creating, setCreating] = useState(false);
+  const [attendanceDemo, setAttendanceDemo] = useState(false);
   // A due date chosen from the calendar, for the next task created.
   const [createDue, setCreateDue] = useState<string | undefined>();
   const createOn = (due: string) => { setCreateDue(due); setCreating(true); };
@@ -372,7 +374,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           <div className="rail-settings-look"><LookSwitch /></div>
           {open('people') && allowed('people') && <button type="button" role="menuitem" onClick={() => { close(); go('people'); }}>People &amp; access</button>}
           {open('settings') && allowed('settings') && <button type="button" role="menuitem" onClick={() => { close(); go('settings'); }}>Workspace settings<small>Policy &amp; data</small></button>}
-          {!live && onExitDemo && <button type="button" role="menuitem" onClick={() => { close(); onExitDemo(); }}>Leave demo · sign in</button>}
+          {!live && onExitDemo && <button type="button" role="menuitem" onClick={() => { close(); onExitDemo(); }}>Sign in to Task HQ</button>}
         </>}
         account={{ label: me.name && !me.name.includes('@') ? me.name : live?.email ?? me.name, detail: live ? ROLE_LABELS[live.role] : me.title, mark: <AccountMark quest={quest} />, menu: close => <AccountMenu quest={quest} close={close} /> }}
         awareness={<Awareness quest={quest} control={sidebar} inbox={inbox} attention={awareAttention}
@@ -384,7 +386,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
           ? <><LookSwitch compact /><ModeChip quest={quest} /><p>Signed in as {me.name && !me.name.includes('@') ? me.name : live.email} · {ROLE_LABELS[live.role]}{live.isPlatformAdmin ? ' · platform admin (separate)' : ''}</p><button type="button" className="link exit-demo" onClick={live.onSignOut}>Sign out</button></>
-          : <><LookSwitch compact /><ModeChip quest={quest} /><p><b>Task-HQ Demo</b> · synthetic people and data. Changes stay on this device; teammates are not notified.</p>{onExitDemo && <button type="button" className="link exit-demo" onClick={onExitDemo}>Leave demo · sign in</button>}</>}
+          : <><LookSwitch compact /><ModeChip quest={quest} /><p><b>Task-HQ Demo</b> · synthetic people and data. Changes stay on this device; teammates are not notified.</p>{onExitDemo && <button type="button" className="link exit-demo" onClick={onExitDemo}>Sign in to Task HQ</button>}</>}
       />
       {!sidebar.isMobile && (
         <button type="button" className="seam-toggle is-left" onClick={sidebar.toggle} aria-controls="quest-sidebar" aria-expanded={sidebar.open}
@@ -394,6 +396,10 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       )}
 
       <main className="main">
+        {!live && onExitDemo && <aside className="demo-access" aria-label="Task HQ demo">
+          <div><strong>Task HQ Demo</strong><span>Sample data · changes stay on this device</span></div>
+          <button type="button" className="btn btn-primary" onClick={onExitDemo}>Sign in to Task HQ</button>
+        </aside>}
         <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen}
           tabs={LENSES.map(lens => ({ id: lens, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && registryView.lens === lens, allowed: allowed('all-tasks') }))}
           onTab={id => { if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} open={canNavigate(access, 'search')} onOpen={openSearchResult} onBlocked={underConstruction} />} onAsk={() => setAskOpen(value => !value)} onBell={() => sidebar.showTab('inbox')}
@@ -403,6 +409,11 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         {focused && grant && <GrantBar quest={quest} grant={grant} onReturn={() => { closeTask(); go('home'); }} />}
 
         <section className={`content view-${selected && contextAllowed ? 'task' : view}`}>
+          {!live && view === 'home' && !selected && <details className="demo-attendance" onToggle={event => setAttendanceDemo(event.currentTarget.open)}>
+            <summary>Try attendance · sample data</summary>
+            <p>Part of this demo. Use the account menu to try another demo person. No real attendance is recorded.</p>
+            {attendanceDemo && <ShiftBridge quest={quest} />}
+          </details>}
           {selected && contextAllowed ? <TaskPage key={selected.id} quest={quest} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)} />
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
