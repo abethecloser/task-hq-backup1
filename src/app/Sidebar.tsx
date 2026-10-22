@@ -121,9 +121,6 @@ export interface SidebarItem {
   count?: number;
   hot?: boolean;
   active: boolean;
-  locked: boolean;
-  /** Status or access label. The entry always stays visible and opens its page. */
-  tag?: 'Preview' | 'Unavailable' | 'Restricted';
   /** Short, role-appropriate line shown under the section in the panel. */
   info?: string;
 }
@@ -218,17 +215,15 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
         <nav className="nav" aria-label="Task-HQ sections">
           {items.map(item => {
             const unread = unreadIn(notifications, read, item.id);
-            const tag = item.locked ? undefined : item.tag;
-            const name = `${item.label}${tag ? `, ${tag.toLowerCase()}` : ''}${item.count ? `, ${item.count}${item.hot ? ' need attention' : ''}` : ''}${unread ? `, ${unread} unread` : ''}${item.locked ? ' — locked during Critical Focus' : ''}`;
+            const name = `${item.label}${item.count ? `, ${item.count}${item.hot ? ' need attention' : ''}` : ''}${unread ? `, ${unread} unread` : ''}`;
             return (
-              <button key={item.id} type="button" className={`nav-item ${item.active ? 'is-active' : ''} ${item.locked ? 'is-locked' : ''}`}
-                disabled={item.locked} aria-current={item.active ? 'page' : undefined} aria-label={name}
-                {...hintFor(item.label, item.locked ? 'Locked during Critical Focus' : [tag ?? '', item.info?.replace(/\.$/, ''), unread ? `${unread} unread` : ''].filter(Boolean).join(' · ') || undefined)}
+              <button key={item.id} type="button" className={`nav-item ${item.active ? 'is-active' : ''}`}
+                aria-current={item.active ? 'page' : undefined} aria-label={name}
+                {...hintFor(item.label, [item.info?.replace(/\.$/, ''), unread ? `${unread} unread` : ''].filter(Boolean).join(' · ') || undefined)}
                 onClick={() => { setHint(null); onSelect(item.id); control.afterNavigate(); }}>
                 <span className="nav-icon">
                   {item.icon}
-                  {item.locked ? <i className="nav-pip is-locked" aria-hidden="true" />
-                    : unread > 0 ? <span className="rail-unread" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>
+                  {unread > 0 ? <span className="rail-unread" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>
                     : item.hot && <i className="nav-pip" aria-hidden="true" />}
                 </span>
               </button>
@@ -263,11 +258,10 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
                 <span aria-hidden="true">+</span> New task
               </button>
               {items.map(item => (
-                <button key={item.id} type="button" className={`${item.active ? 'is-active' : ''}`} disabled={item.locked} aria-current={item.active ? 'page' : undefined}
+                <button key={item.id} type="button" className={item.active ? 'is-active' : ''} aria-current={item.active ? 'page' : undefined}
                   onClick={() => { onSelect(item.id); control.afterNavigate(); }}>
                   {item.icon}<span>{item.label}</span>
-                  {!item.locked && item.tag ? <small className="panel-soon">{item.tag}</small>
-                    : item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`}>{item.count}</span> : null}
+                  {item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`}>{item.count}</span> : null}
                 </button>
               ))}
             </nav>

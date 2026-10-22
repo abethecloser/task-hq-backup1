@@ -17,14 +17,13 @@ _Prepared 2026-10-19. No passwords, keys or setup codes in this document. Never 
 
 ## Finding your way around
 
-- **Work / Manage switch** (top bar). **Work** is daily tasks. **Manage** holds Projects, Team, Reports, Executive Desk, Activity, Feedback and Policy & data. Only Owner, Admin, Supervisor and Developer / Observer see Manage.
-- **People & Access:** Manage → **Team**. Add people, send setup links, link existing accounts, change roles, revoke links and invitations.
+- **Pages:** every signed-in workspace member sees the same page destinations. Pages marked **Preview** show the current interface or a clear preview state; they do not grant access to data or actions.
+- **People & Access:** open **Team**. Available controls still depend on your role and are authorized by the workspace server.
 - **Change password:** account menu (top right) → **Change password**.
 - **Left panel:** Inbox, Attention and Activity. Toggle it with the arrow on its edge.
 - **Right panel:** the Instrument Deck (Signals / Calendar / Insights), or the task you have open. Both panels can stay open together.
 - **Tasks:** open a task to comment (use **@Name** to mention someone), ask for help, report a blocker, hand it off or move it forward. History is kept on every task.
-- Sections marked **"Under construction :)"** reflect intentional staged feature restrictions, not a reported defect or a permission problem.
-- Home, All Tasks and Calendar remain available to authenticated team members. Other sections follow the existing server-managed navigation policy; page visibility does not grant data or action permissions.
+- Page visibility is consistent across Member and Admin accounts. Workspace data and mutations continue to follow server authorization.
 
 ## Who can do what
 
