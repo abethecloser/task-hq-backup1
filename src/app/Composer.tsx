@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { Action, QuestState } from '../core/contract.ts';
 import { apply } from '../core/engine.ts';
-import { dueLabel, newTaskFrom, parseCommand, suggestAt } from '../core/command.ts';
+import { dueLabel, newTaskFrom, parseCommand, parseTaskEntry, taskEntryScope, suggestAt } from '../core/command.ts';
 import type { Draft, PersonRef, StagedPerson, SuggestState } from '../core/command.ts';
 import { errorText } from '../live/LiveRoot.tsx';
 import type { Quest } from '../ui/useQuest.ts';
@@ -41,8 +41,9 @@ function useStaged(): { people: StagedPerson[]; canPlan: boolean; contactFor: (i
   return { people, canPlan: admin && people.length > 0, contactFor: id => (people.some(item => item.id === id) ? id : null) };
 }
 
-export function Composer({ quest, variant, onFill, initialText = '', single = false, onCreated }: {
-  quest: Quest; variant: Variant; onFill?: (draft: Draft) => void;
+export function Composer({ quest, variant, onFill, value, onTextChange, initialText = '', single = false, onCreated }: {
+  quest: Quest; variant: Variant; onFill?: (draft: Draft | undefined) => void;
+  value?: string; onTextChange?: (text: string) => void;
   /** Start with this text already reviewed (e.g. "Make a task" from a message). */
   initialText?: string;
   /** Read the text as one task instead of splitting it into clauses. */
@@ -53,7 +54,10 @@ export function Composer({ quest, variant, onFill, initialText = '', single = fa
   const live = useLive();
   const staged = useStaged();
   const taxonomyOk = backend.supports?.taskTaxonomy !== false;
-  const [text, setText] = useState(initialText);
+  const [localText, setLocalText] = useState(initialText);
+  const text = value ?? localText;
+  const setText = (next: string) => { setLocalText(next); onTextChange?.(next); };
+  const fillRef = useRef(onFill); fillRef.current = onFill;
   const [focused, setFocused] = useState(false);
   const [suggest, setSuggest] = useState<SuggestState | null>(null);
   const [cursor, setCursor] = useState(0);
@@ -65,7 +69,13 @@ export function Composer({ quest, variant, onFill, initialText = '', single = fa
   useDropdown({ open: !!suggest, onClose: () => setSuggest(null), trigger: () => input.current, content: () => popup.current });
   const reviewer = state.people.find(item => item.id === actor)?.role === 'reviewer';
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (initialText.trim()) setDrafts(parseCommand(initialText, state, now, staged.people, { single })); }, [initialText]);
+  useEffect(() => { if (variant !== 'form' && initialText.trim()) setDrafts(parseCommand(initialText, state, now, staged.people, { single })); }, [initialText]);
+
+  // Primary task entry stays live; other Composer surfaces keep explicit review.
+  // Reading reference drafts also preserves an identity explicitly chosen in autocomplete.
+  useEffect(() => {
+    if (variant === 'form') fillRef.current?.(parseTaskEntry(text, state, actor, now, quest.referenceDrafts.documents()));
+  }, [text, state, actor, variant]);
 
   function refreshSuggest(value: string, caret: number) {
     const next = suggestAt(value, caret, state, staged.people);
@@ -83,7 +93,7 @@ export function Composer({ quest, variant, onFill, initialText = '', single = fa
   function review() {
     if (!text.trim()) return;
     const parsed = parseCommand(text, state, now, staged.people, { single, documents: quest.referenceDrafts.documents() });
-    if (variant === 'form') { onFill?.(parsed[0]!); setText(''); return; }
+    if (variant === 'form') return;
     for (const d of parsed) if (d.references) quest.referenceDrafts.set(`composer-preview:${d.key}`, d.references);
     setDrafts(parsed); setResult(null); setSuggest(null);
   }
@@ -94,7 +104,7 @@ export function Composer({ quest, variant, onFill, initialText = '', single = fa
       if (event.key === 'Enter' || event.key === 'Tab') { event.preventDefault(); pick(cursor); return; }
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setSuggest(null); return; }
     }
-    if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); review(); return; }
+    if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (variant !== 'form') review(); return; }
     if (event.key === 'Escape') { event.stopPropagation(); if (drafts) setDrafts(null); else input.current?.blur(); }
   }
 
@@ -155,12 +165,12 @@ export function Composer({ quest, variant, onFill, initialText = '', single = fa
   return (
     <section className={`composer v-${variant} ${expanded ? 'is-open' : ''}`} aria-label="Command input">
       <div className="composer-box">
-        <ReferenceTextarea ref={input} rows={1} value={text} placeholder={PLACEHOLDER[variant]} aria-label="Describe what needs to happen"
+        <ReferenceTextarea referenceScope={variant === 'form' ? taskEntryScope(state, actor) : undefined} ref={input} rows={1} value={text} placeholder={PLACEHOLDER[variant]} aria-label="Describe what needs to happen"
           aria-autocomplete="list" aria-expanded={!!suggest} aria-controls="composer-suggest" aria-activedescendant={suggest ? `composer-opt-${cursor}` : undefined}
           onChange={event => { setText(event.target.value); refreshSuggest(event.target.value, event.target.selectionStart); }}
           onSelect={event => refreshSuggest(event.currentTarget.value, event.currentTarget.selectionStart)}
           onKeyDown={onKey} onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); setSuggest(null); }} />
-        <button type="button" className="btn btn-primary btn-sm composer-go" disabled={!text.trim()} onClick={review}>{variant === 'form' ? 'Fill form' : 'Review'} <kbd>↵</kbd></button>
+        {variant !== 'form' && <button type="button" className="btn btn-primary btn-sm composer-go" disabled={!text.trim()} onClick={review}>Review <kbd>↵</kbd></button>}
         {suggest && (
           <ul ref={popup} id="composer-suggest" className="composer-suggest" role="listbox" aria-label="Suggestions">
             {suggest.items.map((item, index) => (

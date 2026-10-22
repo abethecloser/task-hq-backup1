@@ -10,7 +10,7 @@ import type { Section } from '../core/contract.ts';
 import { SECTION_LABELS } from '../core/contract.ts';
 import { decisionDesk } from '../core/executive.ts';
 import type { Lens, RegistryQuery } from '../core/registry.ts';
-import { LEGACY_LENSES, LENSES, LENS_LABELS, lensCounts, queryTasks } from '../core/registry.ts';
+import { LEGACY_LENSES, LENSES, LENS_LABELS, completedQuery, isCompletedQuery, lensCounts, queryTasks } from '../core/registry.ts';
 import { canCreateTask } from '../core/permissions.ts';
 import { insights, insightsFor } from '../core/rules.ts';
 import { activeGrant, activeLeads, canEnter, inFocus, leadBucket, manages, myTasks, person, taskById } from '../core/selectors.ts';
@@ -187,7 +187,10 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
   const focused = inFocus(state, actor);
   const grant = activeGrant(state, actor, now);
+  // Demo pages are a shared preview: every demo persona can inspect the same workspace.
+  // Live workspaces retain Critical Focus navigation gates; commands remain engine/server-authorized.
   const allowed = (view: View) => {
+    if (!live) return true;
     const section = VIEW_SECTION[view];
     if (section === 'never') return !focused;
     return canEnter(state, actor, section, now);
@@ -226,9 +229,12 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   // The server's temporary navigation restrictions also apply to authenticated workspaces.
   // The Demo holds only synthetic data, so every page opens there; role rules below still apply.
   const access = live ? live.navigation ?? CLOSED : DEMO_ACCESS;
-  // Work / Manage remains a role permission, separate from temporary navigation restrictions.
-  const manager = canManage(live ? live.role : me.role === 'manager' ? 'owner' : me.role === 'coordinator' ? 'supervisor' : me.role);
-  const restrictionOf = (next: View) => restriction(next, { access, manager, reviewer: me.role === 'reviewer', hasDesk, feedbackOn, agentPilot: !!state.policy.agentPilot });
+  // Demo personas share the same page view. Live page and role restrictions remain in force.
+  const manager = !live || canManage(live.role);
+  const restrictionOf = (next: View) => restriction(next, {
+    access, manager, reviewer: !!live && live.role === 'reviewer', hasDesk: !live || hasDesk,
+    feedbackOn: !live || feedbackOn, agentPilot: !live || !!state.policy.agentPilot,
+  });
   const open = (next: View) => restrictionOf(next) === null;
   const underConstruction = () => quest.say(UNDER_CONSTRUCTION);
   const view: View = allowed(requested) ? requested : 'home';
@@ -250,7 +256,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   }
   function closeTask() {
     setTaskId(null);
-    history.replaceState(null, '', `#/${view}`);
+    history.replaceState(null, '', view === 'all-tasks' && isCompletedQuery(registryView) ? '#/all-tasks/completed' : `#/${view}`);
   }
   function openLead(id: string) {
     setLeadId(id); setRequested('leads'); setTaskId(null);
@@ -272,10 +278,19 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     else { setRequested((t.view === 'inbox' ? 'inbox' : t.view === 'feedback' ? 'feedback' : t.view === 'tools' ? 'tools' : 'activity')); if (t.view === 'feedback') setFeedbackId(t.id); }
   }
 
+  function openCompleted(scope = registryView.scope) {
+    if (!allowed('all-tasks') || !open('all-tasks')) return;
+    setPreset(current => ({ lens: 'all', changes: completedQuery(scope), nonce: (current?.nonce ?? 0) + 1 }));
+    setRequested('all-tasks'); setTaskId(null);
+    if (location.hash !== '#/all-tasks/completed') history.pushState(null, '', '#/all-tasks/completed');
+  }
+
   // Top-bar task views: each opens All Tasks on that view and changes nothing else.
   function openLens(lens: Lens) {
     if (!allowed('all-tasks')) return;
-    setPreset(current => ({ lens, keep: true, nonce: (current?.nonce ?? 0) + 1 }));
+    setPreset(current => isCompletedQuery(registryView)
+      ? { lens, changes: { ...registryView, lens, status: 'open' }, nonce: (current?.nonce ?? 0) + 1 }
+      : { lens, keep: true, nonce: (current?.nonce ?? 0) + 1 });
     setRequested('all-tasks'); setTaskId(null);
     if (location.hash !== `#/all-tasks/${lens}`) history.pushState(null, '', `#/all-tasks/${lens}`);
   }
@@ -288,7 +303,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const counts = useMemo(() => lensCounts(state, actor, minute * 60000), [state, actor, minute]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const topCounts = useMemo(() => Object.fromEntries(LENSES.map(lens => [lens, queryTasks(state, actor, minute * 60000, { ...registryView, lens }).length])) as Record<Lens, number>, [state, actor, minute, registryView]);
+  const topCounts = useMemo(() => Object.fromEntries(LENSES.map(lens => [lens, queryTasks(state, actor, minute * 60000, { ...registryView, lens, status: isCompletedQuery(registryView) ? 'open' : registryView.status }).length])) as Record<Lens, number>, [state, actor, minute, registryView]);
+  const taskTabs = LENSES.map(lens => ({ id: lens as string, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && !isCompletedQuery(registryView) && registryView.lens === lens, allowed: allowed('all-tasks') }));
+  taskTabs.splice(1, 0, { id: 'completed', label: 'Completed', count: queryTasks(state, actor, now, completedQuery(registryView.scope)).length, hot: false, active: view === 'all-tasks' && isCompletedQuery(registryView), allowed: allowed('all-tasks') });
   const openCompany = state.tasks.filter(task => task.status !== 'done');
   const info: Partial<Record<View, string>> = {
     home: mineCount ? `${mineCount} open ${mineCount === 1 ? 'task' : 'tasks'} on your plate.` : 'Nothing assigned right now.',
@@ -395,11 +412,11 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           <button type="button" className="btn btn-primary" onClick={onExitDemo}>Sign in to Task HQ</button>
         </aside>}
         <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen}
-          tabs={LENSES.map(lens => ({ id: lens, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && registryView.lens === lens, allowed: allowed('all-tasks') }))}
-          onTab={id => { if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} open={canNavigate(access, 'search')} onOpen={openSearchResult} onBlocked={underConstruction} />} onAsk={() => setAskOpen(value => !value)} onBell={() => sidebar.showTab('inbox')}
+          tabs={taskTabs}
+          onTab={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} open={canNavigate(access, 'search')} onOpen={openSearchResult} onBlocked={underConstruction} />} onAsk={() => setAskOpen(value => !value)} onBell={() => sidebar.showTab('inbox')}
           onMenu={sidebar.openMobile} menuOpen={sidebar.mobileOpen} />
 
-        {quest.feedback.cue && <FeedbackBar quest={quest} preferences={feedbackOn} />}
+        {quest.feedback.cue && <FeedbackBar quest={quest} preferences={feedbackOn} onViewCompleted={allowed('all-tasks') && open('all-tasks') ? () => { const task = state.tasks.find(task => task.id === quest.feedback.cue?.taskId); openCompleted(task?.owner === actor ? 'mine' : 'company'); } : undefined} />}
         {focused && grant && <GrantBar quest={quest} grant={grant} onReturn={() => { closeTask(); go('home'); }} />}
 
         <section className={`content view-${selected && contextAllowed ? 'task' : view}`}>

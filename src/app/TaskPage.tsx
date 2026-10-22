@@ -6,9 +6,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
 import type { EditableTaskFields, Task } from '../core/contract.ts';
 import { canEditTask, canReopenTask, lockedTaskFields } from '../core/permissions.ts';
-import { blockingDeps, dependents, firstName, isOpen, isOverdue, leadById, nameOf, projectName, taskById } from '../core/selectors.ts';
+import { blockingDeps, dependents, firstName, isOpen, isOverdue, leadById, moveForwardPlan, nameOf, projectName, taskById } from '../core/selectors.ts';
+import { completionDetails } from '../core/completed.ts';
 import { Avatar, PersonSelect, TaskTags } from '../ui/components.tsx';
-import { ResponsibilityCard } from '../ui/ResponsibilityCard.tsx';
 import { useFeedbackRecord } from '../ui/Feedback.tsx';
 import { ReferenceInput, ReferenceTextarea, ReferencedText } from '../ui/ReferenceEditor.tsx';
 import { Select } from '../ui/Select.tsx';
@@ -34,7 +34,6 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
   useEffect(() => { setTitle(task.title); setNextAction(task.nextAction); setDescription(task.description); setWaitingOn(task.waitingOn); }, [task.title, task.nextAction, task.description, task.waitingOn]);
   useEffect(() => { window.scrollTo(0, 0); back.current?.focus({ preventScroll: true }); }, [task.id]);
 
-  const completedByEvent = task.status === 'done' ? state.events.find(event => event.taskId === task.id && !event.undone && event.undo?.tasks[task.id] && event.undo.tasks[task.id]!.status !== 'done')?.actor ?? '' : '';
   const me = state.people.find(item => item.id === actor);
   const reviewer = me?.role === 'reviewer';
   const editable = canEditTask(state, task, actor);
@@ -90,9 +89,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
         <div className="ctx-tags"><TaskTags state={state} task={task} now={quest.now} /></div>
       </header>
 
-      <ResponsibilityCard state={state} task={task} actor={actor}>
-        {task.status === 'done' && <p><b>Completed</b>{task.completedAt ? ` ${when(task.completedAt)}` : ''}{(task.completedBy || completedByEvent) ? ` · ${nameOf(state, task.completedBy || completedByEvent, 'someone')}` : ''}{task.archivedAt ? ' · Archived' : ''}</p>}
-      </ResponsibilityCard>
+      <ResponsibilityCard quest={quest} task={task} onOpen={onOpen} />
 
       <dl className="tp-facts" aria-label="Status, assigned, priority and due date">
         <div><dt>Status</dt><dd><StatusMenu quest={quest} task={task} /></dd></div>
@@ -183,13 +180,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
           )}
         </div>
 
-        <aside className="tp-col tp-conversation" aria-label="Conversation and quick actions">
-          <section className="tp-card tp-actions" aria-labelledby="tp-actions">
-            <h2 id="tp-actions" className="ctx-label">Quick actions</h2>
-            {task.status === 'review' && <p className="ctx-review" role="status"><b>Submitted for review</b> · {task.approver ? `waiting for ${nameOf(state, task.approver, 'the approver')}` : 'waiting for approval'}. It is not complete until approved.</p>}
-            {task.status === 'done' ? <Completed quest={quest} task={task} /> : <TaskSituation quest={quest} taskId={task.id} onOpen={onOpen} />}
-          </section>
-
+        <aside className="tp-col tp-conversation" aria-label="Conversation">
           <section className="tp-card tp-talk" aria-label="Comments and activity">
             <div className="tp-tabs" role="tablist" aria-label="Comments, activity and history" onKeyDown={event => {
               const tabs = ['comments', 'activity', 'history'] as const;
@@ -231,6 +222,7 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
   const [note, setNote] = useState('');
   const [open, setOpen] = useState(false);
   const finish = state.events.find(event => event.taskId === task.id && !event.undone && event.undo?.tasks[task.id] && event.undo.tasks[task.id]!.status !== 'done');
+  const completion = completionDetails(state, task);
   const latest = state.events.find(event => event.taskId === task.id && !event.undone);
   const canUndo = !!finish && finish === latest && finish.actor === actor && !!finish.undo;
   // A live server older than dispatch v5 predates `task/reopen`; there, reopening
@@ -243,13 +235,13 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
     const result = await dispatch({ type: 'task/reopen', id: task.id, note });
     if (result.ok) { setNote(''); setOpen(false); }
   }
-  const by = task.completedBy || finish?.actor || '';
+  const by = completion.actor || finish?.actor || '';
   const approved = finish?.kind === 'approval';
   const archiveAvailable = backend.supports?.taskArchive !== false && allowed;
   return (
     <div className={`ctx-done ${task.archivedAt ? 'is-archived' : ''}`}>
       <p className="ctx-done-state" role="status"><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
-        <b>{approved ? 'Approved and completed' : 'Completed'}</b>{task.completedAt ? ` ${when(task.completedAt)}` : ''}{by ? ` · ${nameOf(state, by, 'someone')}` : ''}</p>
+        <b>{approved ? 'Approved and completed' : 'Completed'}</b>{completion.at !== null ? ` ${when(completion.at)}` : ''}{by ? ` · ${nameOf(state, by, 'Former member')}` : ' · Completion actor unavailable in retained history'}</p>
       {task.archivedAt ? <p className="muted">Archived {when(task.archivedAt)}{task.archivedBy ? ` · ${nameOf(state, task.archivedBy, 'someone')}` : ''}. Its history is kept.</p> : null}
       {canUndo && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void dispatch({ type: 'undo', eventId: finish!.id })}>Undo my completion</button>}
       {allowed && reopenAvailable && !open && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(true)}>Reopen…</button>}
@@ -263,4 +255,22 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
       {allowed && !reopenAvailable && !canUndo && <p className="muted">Reopening finished work arrives with the next server release. Until then, create a follow-up task.</p>}
     </div>
   );
+}
+
+/** One presentation of the existing lifecycle and its engine-authorized actions. */
+export function ResponsibilityCard({ quest, task, onOpen }: { quest: Quest; task: Task; onOpen: (id: string) => void }) {
+  const { state, actor } = quest;
+  const plan = moveForwardPlan(state, task, actor);
+  const dependency = blockingDeps(state, task)[0];
+  const responsible = dependency ? dependency.owner : task.status === 'review' ? task.approver : task.status === 'blocked' ? task.blocker?.helper || task.owner : task.owner;
+  const heading = task.status === 'done' ? 'Completed' : responsible === actor ? 'Your turn' : responsible ? `Waiting on ${nameOf(state, responsible, 'a former member')}` : task.status === 'review' ? 'Approver not assigned' : 'Responsibility not assigned';
+  const action = dependency ? plan.current : task.status === 'review' ? `Review the work${task.approver ? ` · Approver: ${nameOf(state, task.approver)}` : ''}` : task.status === 'blocked' ? `Resolve blocker: ${task.blocker?.note || 'Needs help'}` : task.nextAction || (task.status === 'ready' ? 'Start the work' : 'Finish the work');
+  const handoff = task.status !== 'review' && task.status !== 'done' && task.approver ? `Next: review by ${nameOf(state, task.approver)}` : task.nextOwner ? `Next handoff: ${nameOf(state, task.nextOwner)}` : 'Next handoff not assigned';
+  return <section className={`tp-story tp-actions ${task.status === 'done' ? 'is-done' : ''}`} aria-labelledby="tp-story-title">
+    <div className="tp-story-person">{responsible && task.status !== 'done' && <Avatar state={state} id={responsible} size="md" />}<div><p className="tp-story-label">Action story</p><h2 id="tp-story-title">{heading}</h2></div></div>
+    {task.status === 'done' ? <Completed quest={quest} task={task} /> : <><p className="tp-story-action">{action}</p>{task.waitingOn && <p>External wait: {task.waitingOn}</p>}<TaskSituation key={task.id} quest={quest} taskId={task.id} onOpen={onOpen} actionsOnly /></>}
+    <p className="tp-story-handoff">{handoff}</p>
+    <ol className="tp-journey" aria-label="Lifecycle reference, not a record of visited states">{(['ready', 'working', 'review', 'done'] as const).map(status => <li key={status} aria-current={task.status === status ? 'step' : undefined}>{({ ready: 'Ready', working: 'Working', review: 'In Review', done: 'Done' })[status]}{status === 'review' && <small>{task.approver ? 'When approval is required' : 'Optional · no approver set'}</small>}</li>)}</ol>
+    <p className="tp-story-note">{task.status === 'blocked' ? 'Currently blocked. ' : ''}Lifecycle reference only; steps may be skipped. See History for actual transitions.</p>
+  </section>;
 }

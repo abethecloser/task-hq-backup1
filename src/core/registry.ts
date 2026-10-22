@@ -24,7 +24,7 @@ export const LENS_HINTS: Record<Lens, string> = {
 };
 /** Older saved filters and links used other lens names; map them onto scope + lens. */
 export const LEGACY_LENSES: Record<string, Partial<RegistryQuery>> = {
-  mine: { scope: 'mine', lens: 'all' }, team: { scope: 'company', lens: 'all' }, attention: { lens: 'all' }, completed: { lens: 'all', status: 'done' },
+  mine: { scope: 'mine', lens: 'all' }, team: { scope: 'company', lens: 'all' }, attention: { lens: 'all' }, completed: { lens: 'all', status: 'done', sort: 'urgency' },
 };
 
 export type StatusFilter = TaskStatus | 'open' | 'any' | 'archived';
@@ -53,6 +53,14 @@ export interface RegistryQuery {
 }
 
 export const DEFAULT_QUERY: RegistryQuery = { scope: 'company', lens: 'all', search: '', status: 'open', owner: '', project: '', company: '', due: 'any', priority: 'any', sort: 'urgency' };
+
+/** The existing Done filter, exposed as a named navigation destination. */
+export function isCompletedQuery(query: RegistryQuery): boolean {
+  return query.lens === 'all' && asList(query.status).length === 1 && asList(query.status)[0] === 'done';
+}
+export function completedQuery(scope: Scope): RegistryQuery {
+  return { ...DEFAULT_QUERY, scope, status: 'done' };
+}
 
 /** Task ids flagged by the shared attention rules (the same ones Needs Attention uses). */
 export function attentionIds(state: QuestState, now: number): Set<string> {

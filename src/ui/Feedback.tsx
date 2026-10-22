@@ -12,7 +12,7 @@ export function feedbackAttributes(cue?: FeedbackCue) {
 }
 export function useFeedbackRecord(id?: string) { const feedback = useContext(Context); return id ? feedbackAttributes(feedback?.record(id)) : {}; }
 export function RecordCue({ id }: { id: string }) { const f = useContext(Context), cue = f?.record(id); return cue ? <small className="record-cue" key={cue.id} data-feedback={cue.signature}>{cue.phase === 'processing' || cue.phase === 'acknowledged' ? 'Saving…' : `${cue.passive ? 'Incoming · ' : ''}${FEEDBACK[cue.signature].label}`}</small> : null; }
-export function FeedbackBar({ quest, preferences = true, children }: { quest: Quest; preferences?: boolean; children?: ReactNode }) {
+export function FeedbackBar({ quest, preferences = true, children, onViewCompleted }: { quest: Quest; preferences?: boolean; children?: ReactNode; onViewCompleted?: () => void }) {
   const { cue } = quest.feedback;
   const [sound, setSound] = useSoundPreference();
   const [haptics, setHaptics] = useState(false);
@@ -30,15 +30,17 @@ export function FeedbackBar({ quest, preferences = true, children }: { quest: Qu
     if (policy.haptic && typeof navigator.vibrate === 'function') navigator.vibrate(FEEDBACK[cue.signature].urgent ? [30, 40, 30] : 18);
   }, [cue, haptics, sound]);
   const pending = cue?.phase === 'processing' || cue?.phase === 'acknowledged';
+  const completed = cue?.phase === 'confirmed' && !cue.passive && ['task-completed', 'approval-decided'].includes(cue.signature) && quest.state.tasks.some(task => task.id === cue.taskId && task.status === 'done' && !task.archivedAt);
   const undo = quest.toast?.undoId && cue?.id === quest.toast.undoId ? quest.toast.undoId : null;
-  return <section className={`feedback-bar ${cue ? 'has-result' : ''}`} {...feedbackAttributes(cue ?? undefined)} aria-label="Operational feedback">
+  return <section className={`feedback-bar ${cue ? 'has-result' : ''} ${completed ? 'is-completion' : ''}`} {...feedbackAttributes(cue ?? undefined)} aria-label="Operational feedback">
     {children}
     {cue && <div className="feedback-result" key={cue?.id ?? 'ready'}>
       <span className="feedback-symbol" aria-hidden="true">{pending ? '◌' : def?.icon ?? '·'}</span>
-      <div><strong>{pending ? cue?.phase === 'acknowledged' ? 'Action received' : 'Checking and saving' : cue ? `${cue.passive ? 'Incoming · ' : ''}${def?.label}${cue.count > 1 ? ` · ${cue.count}` : ''}` : ''}</strong>
+      <div><div className="feedback-message-line"><strong>{completed ? (onViewCompleted ? 'Completed —' : 'Completed') : pending ? cue?.phase === 'acknowledged' ? 'Action received' : 'Checking and saving' : cue ? `${cue.passive ? 'Incoming · ' : ''}${def?.label}${cue.count > 1 ? ` · ${cue.count}` : ''}` : ''}</strong>
+        {completed && onViewCompleted && <button type="button" className="btn btn-sm" onClick={onViewCompleted}>View in Completed</button>}</div>
         {cue && <span className="feedback-detail" title={cue.text}>{cue.text}</span>}
       </div>
-      <span className="sr-only" role={cue?.phase === 'denied' || cue?.phase === 'failed' ? 'alert' : 'status'} aria-live={cue?.phase === 'denied' || cue?.phase === 'failed' ? 'assertive' : 'polite'}>{cue ? `${cue.phase}. ${cue.text}` : ''}</span>
+      <span className="sr-only" role={cue?.phase === 'denied' || cue?.phase === 'failed' ? 'alert' : 'status'} aria-live={cue?.phase === 'denied' || cue?.phase === 'failed' ? 'assertive' : 'polite'}>{cue ? `${cue.phase}. ${cue.text}${completed && onViewCompleted ? ' View in Completed is available.' : ''}` : ''}</span>
     </div>}
     <div className="feedback-controls">
       {undo && <button type="button" className="btn btn-sm" onClick={() => void quest.dispatch({ type: 'undo', eventId: undo })}>Undo ↶</button>}

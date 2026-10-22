@@ -4,7 +4,6 @@ import { useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { NewTask, QuestState } from '../core/contract.ts';
 import { apply } from '../core/engine.ts';
-import { parseCommand } from '../core/command.ts';
 import { nameOf, projectName } from '../core/selectors.ts';
 import { ResponsibilityCard } from '../ui/ResponsibilityCard.tsx';
 import { localDate } from '../core/time.ts';
@@ -23,17 +22,30 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
   const assigns = canAssignOthers(state, actor);
   const owners = assigns ? state : { ...state, people: state.people.filter(item => item.id === actor) };
   const [draft, setDraft] = useState<NewTask>({ title: '', owner: delegates ? '' : actor, due: due ?? localDate(now), priority: 'normal', nextAction: '', approver: '', nextOwner: '', projectId: '', dependsOn: [] });
-  const set = (changes: Partial<NewTask>) => setDraft(current => ({ ...current, ...changes }));
+  const manual = useRef(new Set<keyof NewTask>());
+  const set = (changes: Partial<NewTask>) => {
+    for (const key of Object.keys(changes) as (keyof NewTask)[]) manual.current.add(key);
+    setDraft(current => ({ ...current, ...changes }));
+  };
+  const [entryText, setEntryText] = useState('');
   const taxonomyOk = quest.backend.supports?.taskTaxonomy !== false;
   const types = state.taxonomy?.types ?? [];
-  // Proposed people from the one-line description are suggestions until chosen.
+  // Live inference updates untouched fields only. A manual choice (including
+  // Unassigned) remains authoritative when primary text changes or is removed.
   const [proposed, setProposed] = useState<{ owner?: { id: string; name: string }; approver?: { id: string; name: string } }>({});
-  function fill(parsed: Draft) {
+  function fill(parsed: Draft | undefined) {
     const member = (p: Draft['owner']) => (p && p.ref.kind === 'member' ? { id: p.ref.id, name: p.ref.name } : undefined);
-    set({ title: parsed.title, priority: parsed.priority, ...(parsed.due ? { due: parsed.due } : {}),
-      ...(taxonomyOk ? { type: parsed.type || undefined, tags: parsed.tags.map(item => item.tag), dueTime: parsed.dueTime || undefined } : {}),
-      watchers: [] });
-    setProposed({ owner: member(parsed.owner), approver: member(parsed.approver) });
+    const inferred = parsed?.owner?.confirmed ? member(parsed.owner) : undefined;
+    const changes: Partial<NewTask> = {
+      title: parsed?.title ?? '', priority: parsed?.priority ?? 'normal',
+      due: parsed?.due || due || localDate(now), owner: inferred?.id ?? (delegates ? '' : actor),
+      ...(taxonomyOk ? { type: parsed?.type || undefined, tags: parsed?.tags.map(item => item.tag) ?? [], dueTime: parsed?.dueTime || undefined } : {}),
+    };
+    setDraft(current => {
+      const untouched = Object.fromEntries(Object.entries(changes).filter(([key]) => !manual.current.has(key as keyof NewTask)));
+      return { ...current, ...untouched };
+    });
+    setProposed({ owner: parsed?.owner && !parsed.owner.confirmed ? member(parsed.owner) : undefined, approver: parsed ? member(parsed.approver) : undefined });
   }
 
   // Assigning work to someone else keeps you posted by default: you watch it.
@@ -70,7 +82,7 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
     if (!Recognition || listening) return;
     const recognition = new Recognition();
     recognition.lang = 'en-US';
-    recognition.onresult = event => { const text = event.results[0]?.[0]?.transcript?.trim(); if (text) fill(parseCommand(text, state, now, [], { single: true })[0]!); };
+    recognition.onresult = event => { const text = event.results[0]?.[0]?.transcript?.trim(); if (text) setEntryText(text); };
     recognition.onend = () => setListening(false);
     recognition.onerror = () => setListening(false);
     setListening(true); recognition.start();
@@ -95,7 +107,7 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
           <div className="cx-form">
             <section className="cx-card cx-hero" aria-label="Describe the task">
               <div className="cx-hero-row">
-                <div className="cx-hero-input create-composer"><Composer quest={quest} variant="form" onFill={fill} /></div>
+                <div className="cx-hero-input create-composer"><Composer quest={quest} variant="form" value={entryText} onTextChange={setEntryText} onFill={fill} /></div>
                 {Recognition && <button type="button" className={`cx-mic ${listening ? 'is-on' : ''}`} aria-label={listening ? 'Listening…' : 'Dictate the task'} aria-pressed={listening} onClick={listen}>
                   <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zM6 11v1a6 6 0 0 0 12 0v-1M12 18v3" /></svg>
                 </button>}
