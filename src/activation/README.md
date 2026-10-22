@@ -1,5 +1,7 @@
 # Employee activation (isolated module)
 
+> **Identity v1 (2026-10-20, local, not deployed):** links last 7 days; the employee proves their email with a six-digit Supabase code and the endpoint's `activate` action redeems the link for that account (`employee_activation_redeem`). The account-creating `redeem` action below is retired (410), and `?admin=1` points to People & access → Invite. See `docs/identity-v1-release.md`. The sections below describe the v1 flow as deployed on 2026-10-19.
+
 This module adds no shared routing, navigation, auth-screen, dispatch or core edits.
 
 ## Entry points

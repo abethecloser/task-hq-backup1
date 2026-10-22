@@ -43,11 +43,10 @@ export function AuthScreen({ view, go, onDemo, notice = null }: { view: AuthView
             {notice && view !== 'reset' && view !== 'set-password' && <Notice notice={{ tone: 'error', text: notice }} />}
             {view === 'sign-in' && <SignIn go={go} />}
             {view === 'magic' && <MagicLink go={go} />}
-            {view === 'sign-up' && <SignUp go={go} />}
+            {(view === 'sign-up' || view === 'request') && <NewHere go={go} />}
             {view === 'forgot' && <Forgot go={go} />}
             {view === 'reset' && <Reset go={go} />}
             {view === 'set-password' && <Reset go={go} optional />}
-            {view === 'request' && <RequestAccess go={go} />}
             <p className="auth-foot">Access is limited to what your role permits.</p>
             <button type="button" className="auth-demo" onClick={onDemo}>Explore the Task-HQ Demo</button>
           </div>
@@ -141,7 +140,7 @@ function SignIn({ go }: { go: (view: AuthView) => void }) {
       <Notice notice={form.notice} />
       <button className="auth-primary" disabled={form.busy}>{form.busy ? 'Signing in…' : 'Sign in'}</button>
       <div className="auth-links">
-        <span>Don't have an account? <button type="button" onClick={() => go('sign-up')}>Sign up</button></span>
+        <span>New here? <button type="button" onClick={() => go('sign-up')}>Get set up</button></span>
         <button type="button" onClick={() => go('forgot')}>Forgot password?</button>
       </div>
     </form>
@@ -170,31 +169,16 @@ function MagicLink({ go }: { go: (view: AuthView) => void }) {
   );
 }
 
-function SignUp({ go }: { go: (view: AuthView) => void }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const form = useForm();
-  if (form.sent) return <Sent sent={form.sent} go={go} />;
+// Identity v1: accounts start from a manager's personal setup link, never open sign-up.
+// ('sign-up' and 'request' stay valid views so older links land here.)
+function NewHere({ go }: { go: (view: AuthView) => void }) {
   return (
-    <form noValidate onSubmit={event => void form.submit(event,
-      () => { const e: Errors = {}; if (!name.trim()) e.name = 'Enter your name.'; const m = emailError(email); if (m) e.email = m; if (password.length < 8) e.password = 'Use at least 8 characters.'; return e; },
-      async client => {
-        const { error } = await client.auth.signUp({ email: email.trim(), password, options: { data: { full_name: name.trim() }, emailRedirectTo: redirectUrl('#/') } });
-        if (error) throw error;
-        form.setSent({ title: 'Confirm your email', text: `We sent a confirmation link to ${email.trim()}. Open it to finish creating your account.` });
-      })}>
-      <Heading title="Create your account" subtitle="Start with your work email." />
-      <Field id="name" label="Full name" value={name} onChange={setName} placeholder="Enter your name" autoComplete="name" error={form.errors.name} />
-      <Field id="email" label="Email" type="email" value={email} onChange={setEmail} placeholder="Enter your email" autoComplete="email" error={form.errors.email} />
-      <Field id="password" label="Password" type="password" value={password} onChange={setPassword} placeholder="At least 8 characters" autoComplete="new-password" error={form.errors.password} />
-      <Notice notice={form.notice} />
-      <button className="auth-primary" disabled={form.busy}>{form.busy ? 'Creating account…' : 'Create account'}</button>
-      <div className="auth-links">
-        <span>Have an account? <button type="button" onClick={() => go('sign-in')}>Sign in</button></span>
-        <button type="button" onClick={() => go('request')}>Request access</button>
-      </div>
-    </form>
+    <div>
+      <Heading title="Getting set up" subtitle="Your manager sends you a personal setup link or QR code." />
+      <p className="auth-notice is-info">Open it on your phone, confirm it’s you, and enter the six-digit code we email you. That’s all — your workspace and role are already chosen.</p>
+      <p className="auth-notice">No link yet? Ask your manager. If it expired, they can send a new one in a few seconds.</p>
+      <div className="auth-links"><span>Already set up? <button type="button" onClick={() => go('sign-in')}>Sign in</button></span></div>
+    </div>
   );
 }
 
@@ -244,34 +228,6 @@ function Reset({ go, optional = false }: { go: (view: AuthView) => void; optiona
       <Notice notice={form.notice} />
       <button className="auth-primary" disabled={form.busy}>{form.busy ? 'Saving…' : optional ? 'Save password' : 'Update password'}</button>
       <div className="auth-links"><button type="button" onClick={() => go('sign-in')}>{optional ? 'Skip for now' : 'Back to sign in'}</button></div>
-    </form>
-  );
-}
-
-function RequestAccess({ go }: { go: (view: AuthView) => void }) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [workspace, setWorkspace] = useState('');
-  const [password, setPassword] = useState('');
-  const form = useForm();
-  if (form.sent) return <Sent sent={form.sent} go={go} />;
-  return (
-    <form noValidate onSubmit={event => void form.submit(event,
-      () => { const e: Errors = {}; if (!name.trim()) e.name = 'Enter your name.'; const m = emailError(email); if (m) e.email = m; if (!workspace.trim()) e.workspace = 'Enter the workspace you need.'; if (password.length < 8) e.password = 'Use at least 8 characters.'; return e; },
-      async client => {
-        // The account is created first; the request reaches the workspace's owners only after the email is confirmed.
-        const { error } = await client.auth.signUp({ email: email.trim(), password, options: { data: { full_name: name.trim(), requested_workspace: workspace.trim() }, emailRedirectTo: redirectUrl('#/') } });
-        if (error) throw error;
-        form.setSent({ title: 'Confirm your email', text: `Open the link we sent to ${email.trim()}. Your request then goes to the owners of ${workspace.trim()}.` });
-      })}>
-      <Heading title="Request access" subtitle="Ask a workspace owner to let you in." />
-      <Field id="name" label="Full name" value={name} onChange={setName} placeholder="Enter your name" autoComplete="name" error={form.errors.name} />
-      <Field id="email" label="Work email" type="email" value={email} onChange={setEmail} placeholder="Enter your email" autoComplete="email" error={form.errors.email} />
-      <Field id="workspace" label="Workspace" value={workspace} onChange={setWorkspace} placeholder="e.g. Quest Roofing" autoComplete="organization" error={form.errors.workspace} />
-      <Field id="password" label="Password" type="password" value={password} onChange={setPassword} placeholder="At least 8 characters" autoComplete="new-password" error={form.errors.password} />
-      <Notice notice={form.notice} />
-      <button className="auth-primary" disabled={form.busy}>{form.busy ? 'Sending request…' : 'Request access'}</button>
-      <div className="auth-links"><span>Already have access? <button type="button" onClick={() => go('sign-in')}>Sign in</button></span></div>
     </form>
   );
 }
