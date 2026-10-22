@@ -4,9 +4,10 @@
 export interface VerifiedUser { id:string; emailConfirmed:boolean; /** Seconds since epoch of the email-code sign-in that issued this session, if any. */ emailCodeAt:number|null }
 export interface ActivationDependencies {
  rpc(name:string,args:Record<string,unknown>):Promise<unknown>;
- admin(authorization:string,org:string,action:string,employee?:string,hash?:string):Promise<unknown>;
+ admin(authorization:string,org:string,action:string,employee?:string,hash?:string,replaceLink?:boolean):Promise<unknown>;
  /** The signed-in caller, validated by Supabase Auth; null without a valid session. */
  verifiedUser(authorization:string):Promise<VerifiedUser|null>;
+ sendInvitationEmail?(to:string,name:string,organization:string,link:string):Promise<void>;
  now?:()=>number;
 }
 /** A session counts as proof only if it came from an email code in the last 15 minutes. */
@@ -31,11 +32,27 @@ export async function handleActivation(req:Request,deps:ActivationDependencies):
   if(Number(req.headers.get('content-length')||0)>8192)return reply(413,{error:'Request too large.'});
   const raw=await req.text();if(raw.length>8192)return reply(413,{error:'Request too large.'});
   const b=JSON.parse(raw);
+  if(b.action==='delivery-status'){
+   if(!uuid(b.org))return reply(400,{error:'Select a workspace.'});
+   const data=await deps.admin(req.headers.get('authorization')||'',b.org,'delivery-list');
+   return reply(200,{data});
+  }
   if(['list','generate','revoke'].includes(b.action)){
    if(!uuid(b.org)|| (b.action!=='list'&&!uuid(b.employee)))return reply(400,{error:'Select an employee and workspace.'});
    const code=b.action==='generate'?newCode():undefined;
    const data=await deps.admin(req.headers.get('authorization')||'',b.org,b.action,b.employee,code?await hashCode(normalizeCode(code)):undefined);
    return reply(200,{data,...(code?{code}:{})});
+  }
+  if(['invite','resend'].includes(b.action)){
+   if(!uuid(b.org)||!uuid(b.employee))return reply(400,{error:'Select an employee and workspace.'});
+   const authorization=req.headers.get('authorization')||'';
+   const code=b.action==='invite'?newCode():normalizeCode(typeof b.code==='string'?b.code:'');
+   if(!/^[0-9a-f]{48}$/.test(normalizeCode(code)))return reply(400,{error:'The setup link is unavailable. Select the employee and try again.'});
+   if(b.action==='invite'){
+    await deps.admin(authorization,b.org,'issue',b.employee,await hashCode(normalizeCode(code)),b.replace===true);
+   }
+   const result=await sendInvitation(req,deps,authorization,b.org,b.employee,code);
+   return reply(200,{data:result.data,delivery:result.delivery,...(b.action==='invite'?{code}:{})});
   }
   // The previous flow created a confirmed account for whatever email was typed. Retired.
   if(b.action==='redeem')return reply(410,{error:'This setup page was updated. Open the link from your manager again to continue.'});
@@ -60,4 +77,38 @@ export async function handleActivation(req:Request,deps:ActivationDependencies):
   const [status,error]=REDEEM_REPLIES[result?.result??'unavailable']??REDEEM_REPLIES.unavailable!;
   return reply(status,{error});
  }catch{return reply(400,{error:'Activation request could not complete. Check your access or try again.'});}
+}
+
+async function sendInvitation(
+ req:Request,
+ deps:ActivationDependencies,
+ authorization:string,
+ org:string,
+ employee:string,
+ code:string,
+):Promise<{data:unknown;delivery:{status:'sent'|'failed'|'pending';message:string}}>{
+ const hash=await hashCode(normalizeCode(code));
+ const data=await deps.admin(authorization,org,'delivery-prepare',employee,hash) as {id:string;email:string;name:string;organization:string;expires_at:string};
+ if(!data||!data.id||!data.email||!data.name||!data.organization)throw new Error('Invitation delivery details are unavailable.');
+ const link=`https://task.questroofing.com/activate/index.html#code=${encodeURIComponent(code)}`;
+ let status:'sent'|'failed'|'pending'='sent';
+ let message='Invitation email sent.';
+ try{
+  if(!deps.sendInvitationEmail)throw new Error('Email delivery is not configured.');
+  await deps.sendInvitationEmail(data.email,data.name,data.organization,link);
+ }catch(error){
+  status='failed';
+  message=error instanceof Error&&error.message==='delivery-not-configured'
+   ? 'Email delivery is not configured. Add RESEND_API_KEY and RESEND_FROM_EMAIL to the employee-activation Edge Function.'
+   : error instanceof Error&&error.message==='delivery-provider-rejected'
+    ? 'Resend rejected the message. Check the verified sender and employee email, then retry.'
+    : 'Email delivery failed. You can retry this invitation without replacing its setup link.';
+ }
+ try{
+  await deps.rpc('employee_activation_delivery',{p_action:'record',p_activation:data.id,p_status:status});
+ }catch{
+  status='pending';
+  message='Email delivery status could not be confirmed. Check the delivery status before retrying.';
+ }
+ return {data,delivery:{status,message}};
 }

@@ -30,7 +30,8 @@ interface Overview {
 }
 
 /** A freshly issued setup link: shown once, never stored on this device. */
-interface Issued { id: string; name: string; email: string; link: string; code: string; message: string; expiresAt: string; svg: string }
+type DeliveryStatus = 'not-requested' | 'pending' | 'sent' | 'failed';
+interface Issued { id: string; name: string; email: string; link: string; code: string; message: string; expiresAt: string; svg: string; deliveryStatus: Exclude<DeliveryStatus, 'not-requested'>; deliveryMessage: string }
 
 /** The employee-activation function's error text, when it sent one. */
 async function functionError(error: unknown) {
@@ -90,6 +91,7 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
   const [access, setAccess] = useState<PersonAccess[] | null>(null);
   // Setup messages from the last provisioning run: shown once, never stored on this device.
   const [issued, setIssued] = useState<Issued[]>([]);
+  const [deliveryStatus, setDeliveryStatus] = useState<Record<string, DeliveryStatus>>({});
   const [confirmAdmin, setConfirmAdmin] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [provisioning, setProvisioning] = useState<string[]>([]);
@@ -98,14 +100,20 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
 
   const load = useCallback(async () => {
     if (!isAdmin) return;
-    const [{ data: overview, error }, staging, people] = await Promise.all([
+    const [{ data: overview, error }, staging, people, delivery] = await Promise.all([
       live.client.rpc('org_admin_overview', { p_org: live.org.id }),
       live.client.rpc('org_staging_overview', { p_org: live.org.id }),
       live.client.rpc('org_people_access', { p_org: live.org.id }),
+      live.client.functions.invoke('employee-activation', { body: { action: 'delivery-status', org: live.org.id } }),
     ]);
     const fresh = people.error ? null : (people.data as PersonAccess[]);
     setAccess(fresh);
     if (error) setNotice({ tone: 'error', text: errorText(error) }); else setData(overview as Overview);
+    if (delivery.error) setNotice({ tone: 'error', text: `Email delivery status unavailable: ${await functionError(delivery.error)}` });
+    else {
+      const records = Array.isArray(delivery.data?.data) ? delivery.data.data as { employee_id: string; status: DeliveryStatus }[] : [];
+      setDeliveryStatus(Object.fromEntries(records.map(item => [item.employee_id, item.status])));
+    }
     // Staging is optional: a database without the staging migration simply shows no staged people.
     setStaged(staging.error ? null : (staging.data as Staged[]));
     return fresh;
@@ -129,22 +137,43 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
       const { error } = await live.client.rpc('confirm_staged_affiliation', { p_contact: person.id, p_confirmed: true });
       if (error) return `${person.name}: ${errorText(error)}`;
     }
-    const { data: result, error } = await live.client.functions.invoke('employee-activation', { body: { action: 'generate', org: live.org.id, employee: person.id } });
-    if (error || !result?.code) return `${person.name}: ${error ? await functionError(error) : 'No setup link was created.'}`;
-    const code = result.code as string, expiresAt = (result.data as { expires_at: string }).expires_at;
+    const reusable = person.activation?.state === 'valid' ? issued.find(item => item.id === person.id) : undefined;
+    const replace = !reusable && (person.activation?.state === 'valid' || person.activation?.state === 'invalidated');
+    setDeliveryStatus(current => ({ ...current, [person.id]: 'pending' }));
+    const { data: result, error } = await live.client.functions.invoke('employee-activation', {
+      body: reusable
+        ? { action: 'resend', org: live.org.id, employee: person.id, code: reusable.code }
+        : { action: 'invite', org: live.org.id, employee: person.id, replace },
+    });
+    if (error || !result?.delivery) return `${person.name}: ${error ? await functionError(error) : 'Email delivery status was not returned.'}`;
+    const code = reusable?.code ?? result.code;
+    if (!code) return `${person.name}: No setup link was created.`;
+    const expiresAt = (result.data as { expires_at: string }).expires_at;
     const link = activationLink(PRODUCTION_ORIGIN, code);
-    return { id: person.id, name: person.name, email: person.email ?? '', code, expiresAt, link, svg: qrSvg(link),
-      message: activationMessage(person.name, live.org.name, PRODUCTION_ORIGIN, code, expiresAt) };
+    const deliveryStatus: Issued['deliveryStatus'] = result.delivery.status === 'sent' || result.delivery.status === 'failed' || result.delivery.status === 'pending' ? result.delivery.status : 'pending';
+    setDeliveryStatus(current => ({ ...current, [person.id]: deliveryStatus }));
+    return {
+      id: person.id, name: person.name, email: person.email ?? '', code, expiresAt, link, deliveryStatus, svg: qrSvg(link),
+      deliveryMessage: typeof result.delivery.message === 'string' ? result.delivery.message : 'Delivery status was not provided.',
+      message: activationMessage(person.name, live.org.name, PRODUCTION_ORIGIN, code, expiresAt),
+    };
   }
   async function provision(people: PersonAccess[]) {
-    setBusy(true); setNotice(null); setIssued([]); setConfirmAdmin(null); setConfirmBulk(false);
+    setBusy(true); setNotice(null); setConfirmAdmin(null); setConfirmBulk(false);
     setProvisioning(people.map(person => person.id));
+    setDeliveryStatus(current => ({ ...current, ...Object.fromEntries(people.map(person => [person.id, 'pending' as const])) }));
     const done: Issued[] = [], failed: string[] = [];
     for (const person of people) { const result = await provisionOne(person); if (typeof result === 'string') failed.push(result); else done.push(result); }
-    setProvisioning([]); setPicked([]); setBusy(false); setIssued(done);
-    const summary = done.length ? `${done.length} setup link${done.length === 1 ? '' : 's'} created` : '';
-    setNotice(failed.length ? { tone: 'error', text: `${summary ? summary + '. ' : ''}Not provisioned — ${failed.join(' · ')}` }
-      : { tone: 'info', text: `${summary}. Share each one privately below — links are shown only once. Nothing was sent.` });
+    setProvisioning([]); setPicked([]); setBusy(false);
+    setIssued(current => [...current.filter(item => !people.some(person => person.id === item.id)), ...done]);
+    const sent = done.filter(item => item.deliveryStatus === 'sent').length;
+    const emailFailed = done.filter(item => item.deliveryStatus === 'failed').length;
+    const pendingDelivery = done.filter(item => item.deliveryStatus === 'pending').length;
+    const summary = done.length ? `${done.length} setup link${done.length === 1 ? '' : 's'} created; ${sent} email${sent === 1 ? '' : 's'} sent${emailFailed ? `, ${emailFailed} failed` : ''}${pendingDelivery ? `, ${pendingDelivery} pending confirmation` : ''}` : '';
+    const hasDeliveryProblem = emailFailed > 0 || pendingDelivery > 0;
+    setNotice(failed.length || hasDeliveryProblem
+      ? { tone: 'error', text: `${summary ? summary + '. ' : ''}${failed.length ? `Not provisioned — ${failed.join(' · ')}` : 'Review the delivery status below before retrying.'}` }
+      : { tone: 'info', text: `${summary}. Each invitation is bound to the existing employee and will be verified with a six-digit email code.` });
     await load();
   }
   async function revokeLink(person: PersonAccess) {
@@ -207,10 +236,10 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
       {notice && <p className={`console-notice is-${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
       {issued.length > 0 && (
         <section className="prepared issued-link" aria-labelledby="issued-title">
-          <p id="issued-title"><b>Setup links ({issued.length})</b> · each is personal, works once and expires in 7 days. The person confirms their email with a six-digit code before it does anything. Task-HQ doesn’t send anything — share each one privately, one person at a time. They won’t be shown again.</p>
+          <p id="issued-title"><b>Invitations ({issued.length})</b> · each setup link is personal, works once and expires in 7 days. Email is attempted automatically; delivery status appears below. If an email fails, use the private fallback message. Links remain in this tab only and are cleared when you choose Done.</p>
           {issued.map(item => (
             <div key={item.id} className="issued-item">
-              <p><b>{item.name}</b>{item.email ? ` · ${item.email}` : ''} · expires {new Date(item.expiresAt).toLocaleString()}</p>
+              <p><b>{item.name}</b>{item.email ? ` · ${item.email}` : ''} · expires {new Date(item.expiresAt).toLocaleString()} · email {item.deliveryStatus}: {item.deliveryMessage}</p>
               <div className="issued-share">
                 <div className="badge-qr" role="img" aria-label={`QR code of ${item.name}’s setup link. Scan it with their phone.`} dangerouslySetInnerHTML={{ __html: item.svg }} />
                 <textarea readOnly rows={4} value={item.message} onFocus={event => event.currentTarget.select()} aria-label={`Setup message for ${item.name}`} />
@@ -273,8 +302,11 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
             const reportsTo = stagedName(item.reports_to_contact) ?? (() => { const m = memberName(item.reports_to_user); return m ? m.full_name || m.email : undefined; })();
             const person = accessOf(item.id);
             const next = person ? nextAction(person, live.role) : null;
-            const label = provisioning.includes(item.id) ? 'Provisioning…' : person ? STATUS_LABEL[person.status] : 'Loading…';
+            const label = provisioning.includes(item.id) ? 'Sending invitation…' : person ? STATUS_LABEL[person.status] : 'Loading…';
             const tone = person?.status === 'link-sent' || person?.status === 'invited' ? 'invited' : person?.status === 'link-invalid' || person?.status === 'link-expired' || person?.status === 'invite-expired' ? 'expired' : 'not-invited';
+            const emailStatus = deliveryStatus[item.id] ?? 'not-requested';
+            const emailLabel = emailStatus === 'not-requested' ? 'Not sent' : `Email ${emailStatus}`;
+            const hasCurrentCode = issued.some(link => link.id === item.id);
             return (
               <div key={item.id} className="people-row is-staged" role="row">
                 <span role="cell" className="person-cell">
@@ -286,7 +318,7 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
                   <span><b>{item.full_name}</b><small>{[item.title, item.email ?? 'no email yet', item.phone].filter(Boolean).join(' · ')}</small><small>Reports to: {reportsTo ?? 'not set'}</small></span></span>
                 <span role="cell"><span className={`role-chip role-${item.provisional_role}`} title="Applied when they activate.">{ROLE_LABELS[item.provisional_role]}</span></span>
                 <span role="cell"><span className="role-chip" title="Applied when they activate.">{WORK_LABELS[item.provisional_work_role] ?? item.provisional_work_role}</span></span>
-                <span role="cell"><span className={`status-chip is-${tone}`}>{label}</span>{next?.detail && <small className="muted access-detail">{next.detail}</small>}</span>
+                <span role="cell"><span className={`status-chip is-${tone}`}>{label}</span><small className={`muted delivery-state delivery-${emailStatus}`}>{emailLabel}</small>{next?.detail && <small className="muted access-detail">{next.detail}</small>}</span>
                 <span role="cell">Not assignable until active</span>
                 <span role="cell" className="num"><button type="button" className="link" onClick={() => setPlanning(item.id)} title="Planned — not assigned">{item.planned.length ? `${item.planned.length} planned` : 'Plan work'}</button></span>
                 <span role="cell" className="people-actions">
@@ -299,7 +331,7 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmAdmin(null)}>Cancel</button>
                       </span>
                     : <>
-                      {person && next && (next.primary === 'send-link' || next.primary === 'new-link') && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(person, 'send')}>{next.label}</button>}
+                      {person && next && (next.primary === 'send-link' || next.primary === 'new-link') && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(person, 'send')}>{next.primary === 'new-link' ? person.status === 'link-sent' && hasCurrentCode ? 'Resend invitation' : 'Replace link & resend' : 'Send invitation'}</button>}
                       {next?.primary === 'owner-only' && <small className="muted" title="Admin access can only be granted by an owner.">Owner sends Admin links</small>}
                       {next?.primary === 'add-email' && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => setEditing(item)}>Add email</button>}
                       {person && next?.secondary.includes('revoke-link') && <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => act(person, 'revoke-link')}>Revoke link</button>}
