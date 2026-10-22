@@ -125,6 +125,8 @@ export interface SidebarItem {
   locked: boolean;
   /** Temporarily under construction for this account: shown muted, stays focusable, never navigates. */
   restricted?: boolean;
+  /** Open, but unfinished: labelled Preview. */
+  preview?: boolean;
   /** Short, role-appropriate line shown under the section in the panel. */
   info?: string;
 }
@@ -221,11 +223,12 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
             const unread = unreadIn(notifications, read, item.id);
             // Critical Focus locking takes precedence over the temporary under-construction state.
             const muted = !item.locked && !!item.restricted;
-            const name = muted ? `${item.label}, under construction` : `${item.label}${item.count ? `, ${item.count}${item.hot ? ' need attention' : ''}` : ''}${unread ? `, ${unread} unread` : ''}${item.locked ? ' — locked during Critical Focus' : ''}`;
+            const preview = !item.locked && !muted && !!item.preview;
+            const name = muted ? `${item.label}, under construction` : `${item.label}${preview ? ', preview' : ''}${item.count ? `, ${item.count}${item.hot ? ' need attention' : ''}` : ''}${unread ? `, ${unread} unread` : ''}${item.locked ? ' — locked during Critical Focus' : ''}`;
             return (
               <button key={item.id} type="button" className={`nav-item ${item.active ? 'is-active' : ''} ${item.locked ? 'is-locked' : ''} ${muted ? 'is-restricted' : ''}`}
                 disabled={item.locked} aria-disabled={muted || undefined} aria-current={item.active ? 'page' : undefined} aria-label={name}
-                {...hintFor(item.label, item.locked ? 'Locked during Critical Focus' : muted ? UNDER_CONSTRUCTION : [item.info?.replace(/\.$/, ''), unread ? `${unread} unread` : ''].filter(Boolean).join(' · ') || undefined)}
+                {...hintFor(item.label, item.locked ? 'Locked during Critical Focus' : muted ? UNDER_CONSTRUCTION : [preview ? 'Preview' : '', item.info?.replace(/\.$/, ''), unread ? `${unread} unread` : ''].filter(Boolean).join(' · ') || undefined)}
                 onClick={() => { setHint(null); onSelect(item.id); control.afterNavigate(); }}>
                 <span className="nav-icon">
                   {item.icon}
@@ -271,6 +274,7 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
                   onClick={() => { onSelect(item.id); if (!item.restricted) control.afterNavigate(); }}>
                   {item.icon}<span>{item.label}</span>
                   {!item.locked && item.restricted ? <small className="panel-soon">Under construction :)</small>
+                    : item.preview ? <small className="panel-soon">Preview</small>
                     : item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`}>{item.count}</span> : null}
                 </button>
               ))}

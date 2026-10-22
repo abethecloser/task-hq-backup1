@@ -55,6 +55,7 @@ import { Tools } from './Tools.tsx';
 import { OperationsWorkbook } from './OperationsWorkbook.tsx';
 import { CompanySignals } from './CompanySignals.tsx';
 import { notificationsFor } from './notifications.ts';
+import { PREVIEW_VIEWS, PreviewNotice } from './PreviewNotice.tsx';
 import { CLOSED, UNDER_CONSTRUCTION, canManage, canNavigate, isManageView } from '../core/navigation.ts';
 import { panelLayout } from '../core/layout.ts';
 import type { Notification } from './notifications.ts';
@@ -381,7 +382,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
           onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
-        items={navigation.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, locked: !allowed(item.id), restricted: !open(item.id), info: info[item.id] }))}
+        items={navigation.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, locked: !allowed(item.id), restricted: !open(item.id), preview: PREVIEW_VIEWS.includes(item.id), info: info[item.id] }))}
         onSelect={id => go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
@@ -414,6 +415,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             <p>Part of this demo. Use the account menu to try another demo person. No real attendance is recorded.</p>
             {attendanceDemo && <ShiftBridge quest={quest} />}
           </details>}
+          {!(selected && contextAllowed) && PREVIEW_VIEWS.includes(view) && <PreviewNotice view={view} live={!!live} />}
           {selected && contextAllowed ? <TaskPage key={selected.id} quest={quest} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)} />
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
