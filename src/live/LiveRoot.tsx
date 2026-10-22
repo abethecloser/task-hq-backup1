@@ -1,7 +1,6 @@
 // Signed-in routing for real accounts: pending invitations → workspace → the app.
 // The server decides identity, membership and data access; navigation is a client-side affordance.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import App from '../app/App.tsx';
 import { LiveContext, ROLE_LABELS } from '../app/LiveContext.tsx';
@@ -87,7 +86,7 @@ export function LiveRoot({ client, onSignOut, onDemo }: { client: SupabaseClient
       </Card>
     );
   }
-  return <NoWorkspace client={client} context={context} onRefresh={refresh} onSignOut={onSignOut} onDemo={onDemo} />;
+  return <NoWorkspace context={context} onRefresh={refresh} onSignOut={onSignOut} onDemo={onDemo} />;
 }
 
 function LiveWorkspace({ client, context, membership, navigation, onSignOut, onLeave, canLeave, onChoose }: {
@@ -142,66 +141,13 @@ function Invitations({ client, context, onAccepted, onSkip, onSignOut }: { clien
   );
 }
 
-/** Signed in without a workspace: everyone waits in one queue, and the app opens by itself once an Owner or Admin places them. */
-function NoWorkspace({ client, context, onRefresh, onSignOut, onDemo }: { client: SupabaseClient; context: MyContext; onRefresh: () => Promise<void>; onSignOut: () => void; onDemo: () => void }) {
-  const [note, setNote] = useState(context.waiting?.message ?? '');
-  const [workspace, setWorkspace] = useState('');
-  const [notice, setNotice] = useState<{ tone: 'error' | 'info'; text: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [unsupported, setUnsupported] = useState(false);
-  const waiting = context.waiting ?? null;
-  const declined = !waiting && !!context.waiting_declined;
-  const pending = context.requests.filter(item => item.status === 'pending');
-
-  // Join the queue on arrival (never re-adds someone who was declined), then keep checking so the app opens on its own.
-  useEffect(() => {
-    if (waiting || declined || unsupported) return;
-    void client.rpc('join_waiting_room', { p_message: '' }).then(({ error }) => { if (error) setUnsupported(true); else void onRefresh(); });
-  }, [client, waiting, declined, unsupported, onRefresh]);
+/** Signed in without a workspace. Identity v1: people join through a manager's setup link, so this
+ * screen says exactly that. (Waiting-room and request records already on the server stay as they are.) */
+function NoWorkspace({ context, onRefresh, onSignOut, onDemo }: { context: MyContext; onRefresh: () => Promise<void>; onSignOut: () => void; onDemo: () => void }) {
   useEffect(() => { const id = setInterval(() => void onRefresh(), 15_000); return () => clearInterval(id); }, [onRefresh]);
-
-  async function saveNote(event: FormEvent) {
-    event.preventDefault();
-    if (declined && !note.trim()) { setNotice({ tone: 'error', text: 'Add a short note so they know who you are.' }); return; }
-    setBusy(true);
-    const { error } = await client.rpc('join_waiting_room', { p_message: note.trim() });
-    setBusy(false);
-    setNotice(error ? { tone: 'error', text: errorText(error) } : { tone: 'info', text: declined ? 'You’re back in the waiting room.' : 'Note saved. The person who places you will see it.' });
-    if (!error) void onRefresh();
-  }
-  async function ask(event: FormEvent) {
-    event.preventDefault();
-    if (!workspace.trim()) return;
-    setBusy(true);
-    const { data, error } = await client.rpc('request_access', { p_workspace: workspace.trim(), p_message: note.trim() });
-    setBusy(false);
-    setNotice(error ? { tone: 'error', text: errorText(error) } : { tone: 'info', text: String(data) });
-    if (!error) { setWorkspace(''); void onRefresh(); }
-  }
-
-  // Before the waiting-room migration exists the server can't queue anyone: fall back to asking a workspace by name.
-  const title = unsupported ? 'No workspace yet' : declined ? 'Your request wasn’t approved' : waiting ? 'You’re in the waiting room' : 'Joining the waiting room…';
-  const subtitle = unsupported
-    ? `Signed in as ${context.email}. Ask your workspace by its exact name, and an Owner or Admin will approve you.`
-    : declined
-    ? `Signed in as ${context.email}. Add a note about who you are and ask again.`
-    : `Signed in as ${context.email}. An Owner or Admin will place you in your workspace. This page opens it automatically, so there’s nothing else to do.`;
   return (
-    <Card title={title} subtitle={subtitle}>
-      {waiting && <p className="auth-notice is-info" role="status">#{waiting.position} in line · since {new Date(waiting.since).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>}
-      {pending.length > 0 && <p className="auth-notice is-info">Also asked: {pending.map(item => item.org_name).join(', ')}.</p>}
-      {!unsupported && <form noValidate onSubmit={event => void saveNote(event)} className="auth-inline-form">
-        <div className="auth-field"><label htmlFor="msg">Who you are (optional)</label><div className="auth-input"><input id="msg" value={note} maxLength={500} onChange={event => setNote(event.target.value)} placeholder="e.g. Shan, developer · or Ralph, field crew" /></div></div>
-        <button className="auth-primary" disabled={busy}>{busy ? 'Saving…' : declined ? 'Ask again' : 'Save note'}</button>
-      </form>}
-      <details className="auth-more" open={unsupported || undefined}>
-        <summary>Know your workspace’s exact name?</summary>
-        <form noValidate onSubmit={event => void ask(event)} className="auth-inline-form">
-          <div className="auth-field"><label htmlFor="ws">Workspace</label><div className="auth-input"><input id="ws" value={workspace} onChange={event => setWorkspace(event.target.value)} placeholder="e.g. Quest Roofing" /></div></div>
-          <button className="auth-secondary" disabled={busy || !workspace.trim()}>Ask that workspace directly</button>
-        </form>
-      </details>
-      {notice && <p className={`auth-notice is-${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
+    <Card title="No workspace yet" subtitle={`Signed in as ${context.email}. Ask your manager for a personal setup link. Opening it adds this account to your workspace with the role they chose.`}>
+      <p className="auth-notice is-info">Already opened a link? It may have expired or been replaced. Your manager can send a new one in a few seconds.</p>
       <button type="button" className="auth-demo" onClick={() => void onRefresh()}>Check now</button>
       <button type="button" className="auth-demo" onClick={onDemo}>Explore the Task-HQ Demo</button>
       <button type="button" className="auth-demo" onClick={onSignOut}>Sign out</button>

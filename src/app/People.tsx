@@ -1,6 +1,7 @@
 import { Select } from '../ui/Select.tsx';
-// People & Access. Live: the organization's real members, requests, activation links and invitations.
-// One path for new employees: Add person → roles → Send activation link → they activate → Active.
+// People & Access. Live: the organization's real members, requests, setup links and older invitations.
+// Identity v1, one path: Invite (person + roles) → setup link and QR, shared through the manager's own
+// channel → the person proves their email with a six-digit code → Active.
 // Every change is a server RPC that re-checks the caller's role and is audited;
 // this screen only renders what the server returns. Demo: the synthetic team,
 // clearly labeled, with no production identity or privilege.
@@ -14,9 +15,10 @@ import { Avatar } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import { ROLE_LABELS, useLive } from './LiveContext.tsx';
 import type { LiveAccount, OrgRole } from './LiveContext.tsx';
-import { PersonForm, PlanWork, invitationMessage } from './StagedTeam.tsx';
+import { PersonForm, PlanWork } from './StagedTeam.tsx';
+import { qrSvg } from '../ui/qr.ts';
 import { ORG_ROLES, canManageMember, grantableRoles, isOrgAdmin } from './authority.ts';
-import { PRODUCTION_ORIGIN, STATUS_LABEL, activationLink, activationMessage, linkMessage, nextAction, provisionPath } from '../core/people-access.ts';
+import { PRODUCTION_ORIGIN, STATUS_LABEL, activationLink, activationMessage, nextAction, provisionPath } from '../core/people-access.ts';
 import type { PersonAccess } from '../core/people-access.ts';
 import type { Staged } from './StagedTeam.tsx';
 
@@ -27,8 +29,8 @@ interface Overview {
   invitations: { id: string; email: string; role: OrgRole; work_role: string; expires_at: string }[];
 }
 
-/** A freshly issued activation link: shown once, never stored on this device. */
-interface Issued { id: string; kind: 'link' | 'invite'; name: string; email: string; link: string; code: string; message: string; expiresAt: string }
+/** A freshly issued setup link: shown once, never stored on this device. */
+interface Issued { id: string; name: string; email: string; link: string; code: string; message: string; expiresAt: string; svg: string }
 
 /** The employee-activation function's error text, when it sent one. */
 async function functionError(error: unknown) {
@@ -80,7 +82,6 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
   const [notice, setNotice] = useState<{ tone: 'error' | 'info'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
-  const [prepared, setPrepared] = useState<{ email: string; message: string } | null>(null);
   // null = staging isn't available here (migration not applied, or not an admin).
   const [staged, setStaged] = useState<Staged[] | null>(null);
   const [editing, setEditing] = useState<Staged | 'new' | null>(null);
@@ -120,26 +121,20 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
     return !error;
   }
 
-  // Provisioning: one person → a personal single-use setup link (new account, their own password),
-  // or an invitation when their email already has a Task-HQ account (linked, never duplicated).
+  // Provisioning: one person → one personal single-use setup link (7 days). New and existing
+  // Task-HQ accounts take the same path; the person proves their email, so nothing is duplicated.
   // The server re-checks every step; Admin access needs an owner. Codes are shown once, never stored.
   async function provisionOne(person: PersonAccess): Promise<Issued | string> {
-    const path = provisionPath(person, live.role) ?? (person.has_account ? 'invite' : 'link');
     if (!person.affiliation_confirmed) {
       const { error } = await live.client.rpc('confirm_staged_affiliation', { p_contact: person.id, p_confirmed: true });
       if (error) return `${person.name}: ${errorText(error)}`;
     }
-    if (path === 'invite') {
-      const { error } = await live.client.rpc('invite_staged_contact', { p_contact: person.id, p_days: 14 });
-      if (error) return `${person.name}: ${errorText(error)}`;
-      return { id: person.id, kind: 'invite', name: person.name, email: person.email ?? '', link: PRODUCTION_ORIGIN, code: '', expiresAt: '',
-        message: linkMessage(person.name, live.org.name, PRODUCTION_ORIGIN, person.email ?? '') };
-    }
     const { data: result, error } = await live.client.functions.invoke('employee-activation', { body: { action: 'generate', org: live.org.id, employee: person.id } });
     if (error || !result?.code) return `${person.name}: ${error ? await functionError(error) : 'No setup link was created.'}`;
     const code = result.code as string, expiresAt = (result.data as { expires_at: string }).expires_at;
-    return { id: person.id, kind: 'link', name: person.name, email: person.email ?? '', code, expiresAt,
-      link: activationLink(PRODUCTION_ORIGIN, code), message: activationMessage(person.name, live.org.name, PRODUCTION_ORIGIN, code, expiresAt) };
+    const link = activationLink(PRODUCTION_ORIGIN, code);
+    return { id: person.id, name: person.name, email: person.email ?? '', code, expiresAt, link, svg: qrSvg(link),
+      message: activationMessage(person.name, live.org.name, PRODUCTION_ORIGIN, code, expiresAt) };
   }
   async function provision(people: PersonAccess[]) {
     setBusy(true); setNotice(null); setIssued([]); setConfirmAdmin(null); setConfirmBulk(false);
@@ -147,10 +142,9 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
     const done: Issued[] = [], failed: string[] = [];
     for (const person of people) { const result = await provisionOne(person); if (typeof result === 'string') failed.push(result); else done.push(result); }
     setProvisioning([]); setPicked([]); setBusy(false); setIssued(done);
-    const links = done.filter(item => item.kind === 'link').length, linked = done.length - links;
-    const summary = [links ? `${links} setup link${links === 1 ? '' : 's'} created` : '', linked ? `${linked} existing account${linked === 1 ? '' : 's'} invited to link` : ''].filter(Boolean).join(' · ');
+    const summary = done.length ? `${done.length} setup link${done.length === 1 ? '' : 's'} created` : '';
     setNotice(failed.length ? { tone: 'error', text: `${summary ? summary + '. ' : ''}Not provisioned — ${failed.join(' · ')}` }
-      : { tone: 'info', text: `${summary}. Copy each message below and send it privately — links are shown only once. Nothing was sent.` });
+      : { tone: 'info', text: `${summary}. Share each one privately below — links are shown only once. Nothing was sent.` });
     await load();
   }
   async function revokeLink(person: PersonAccess) {
@@ -181,6 +175,7 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
   const statusOf = (id: string) => accessOf(id)?.status;
   const counts = { active: data?.members.length ?? 0, notInvited: pending.filter(item => ['ready', 'needs-email', 'link-expired', 'link-invalid', 'invite-expired'].includes(statusOf(item.id) ?? 'ready')).length, invited: pending.filter(item => ['link-sent', 'invited'].includes(statusOf(item.id) ?? '')).length };
   const stagedEmails = new Set((staged ?? []).map(item => item.email).filter(Boolean));
+  const olderInvitations = (data?.invitations ?? []).filter(item => !stagedEmails.has(item.email));
   // Bulk provisioning: everyone selectable is eligible right now for this caller.
   const eligible = pending.map(item => accessOf(item.id)).filter((person): person is PersonAccess => !!person && !!provisionPath(person, live.role));
   const chosen = eligible.filter(person => picked.includes(person.id));
@@ -188,7 +183,6 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
   const planningPerson = (staged ?? []).find(item => item.id === planning) ?? null;
   const stagedName = (id: string | null) => (staged ?? []).find(item => item.id === id)?.full_name;
   const memberName = (id: string | null) => (data?.members ?? []).find(item => item.user_id === id);
-  const inviteMessage = (email: string, role: OrgRole, work: string) => invitationMessage(live.org.name, email, role, work);
   const rows = data?.members ?? state.people.map(item => ({ user_id: item.id, email: '', full_name: item.name, role: (Object.keys(ROLE_LABELS) as OrgRole[]).find(role => ROLE_LABELS[role] === item.title) ?? 'member', work_role: item.role, since: '' }));
 
   return (
@@ -204,7 +198,7 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
         {isAdmin && (
           <div className="head-actions">
             <button type="button" className="btn btn-primary" disabled={!staged} onClick={() => setEditing('new')}
-              title={staged ? 'Add someone, choose their roles, then provision their access.' : 'Needs the team-staging database update (pending approval).'}>+ Add person</button>
+              title={staged ? 'Choose the person and their roles, then share their setup link or QR code.' : 'Needs the team-staging database update (pending approval).'}>+ Invite</button>
           </div>
         )}
       </header>
@@ -213,14 +207,18 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
       {notice && <p className={`console-notice is-${notice.tone}`} role={notice.tone === 'error' ? 'alert' : 'status'}>{notice.text}</p>}
       {issued.length > 0 && (
         <section className="prepared issued-link" aria-labelledby="issued-title">
-          <p id="issued-title"><b>Setup messages ({issued.length})</b> · each link is personal, works once and expires in 24 hours — whoever opens it first can use it. Task-HQ doesn’t email anyone — send each one privately, one person at a time, never to a group. They won’t be shown again.</p>
+          <p id="issued-title"><b>Setup links ({issued.length})</b> · each is personal, works once and expires in 7 days. The person confirms their email with a six-digit code before it does anything. Task-HQ doesn’t send anything — share each one privately, one person at a time. They won’t be shown again.</p>
           {issued.map(item => (
             <div key={item.id} className="issued-item">
-              <p><b>{item.name}</b>{item.email ? ` · ${item.email}` : ''} · {item.kind === 'link' ? `setup link, expires ${new Date(item.expiresAt).toLocaleString()}` : 'existing account — sign in and join'}</p>
-              <textarea readOnly rows={3} value={item.message} onFocus={event => event.currentTarget.select()} aria-label={`Setup message for ${item.name}`} />
+              <p><b>{item.name}</b>{item.email ? ` · ${item.email}` : ''} · expires {new Date(item.expiresAt).toLocaleString()}</p>
+              <div className="issued-share">
+                <div className="badge-qr" role="img" aria-label={`QR code of ${item.name}’s setup link. Scan it with their phone.`} dangerouslySetInnerHTML={{ __html: item.svg }} />
+                <textarea readOnly rows={4} value={item.message} onFocus={event => event.currentTarget.select()} aria-label={`Setup message for ${item.name}`} />
+              </div>
               <span className="people-actions">
-                <button type="button" className="btn btn-primary btn-sm" onClick={() => void navigator.clipboard?.writeText(item.message)}>Copy setup message</button>
-                {item.kind === 'link' && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void navigator.clipboard?.writeText(item.link)}>Copy link only</button>}
+                {typeof navigator.share === 'function' && <button type="button" className="btn btn-primary btn-sm" onClick={() => void navigator.share({ title: `${live.org.name} Task-HQ setup`, text: item.message }).catch(() => undefined)}>Share…</button>}
+                <button type="button" className={`btn ${typeof navigator.share === 'function' ? 'btn-ghost' : 'btn-primary'} btn-sm`} onClick={() => void navigator.clipboard?.writeText(item.message)}>Copy message</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => void navigator.clipboard?.writeText(item.link)}>Copy link only</button>
               </span>
             </div>
           ))}
@@ -301,7 +299,7 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmAdmin(null)}>Cancel</button>
                       </span>
                     : <>
-                      {person && next && (next.primary === 'send-link' || next.primary === 'new-link' || next.primary === 'link-account') && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(person, 'send')}>{next.label}</button>}
+                      {person && next && (next.primary === 'send-link' || next.primary === 'new-link') && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(person, 'send')}>{next.label}</button>}
                       {next?.primary === 'owner-only' && <small className="muted" title="Admin access can only be granted by an owner.">Owner sends Admin links</small>}
                       {next?.primary === 'add-email' && <button type="button" className="btn btn-primary btn-sm" disabled={busy} onClick={() => setEditing(item)}>Add email</button>}
                       {person && next?.secondary.includes('revoke-link') && <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => act(person, 'revoke-link')}>Revoke link</button>}
@@ -324,7 +322,7 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
                   <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmBulk(false)}>Cancel</button>
                 </span>
               : <>
-                  <span className="muted">Each person gets a personal setup link (24 h) and chooses their own password. Existing accounts are linked, not duplicated.</span>
+                  <span className="muted">Each person gets a personal setup link (7 days) and confirms their email with a six-digit code. Existing accounts are linked, not duplicated.</span>
                   <button type="button" className="btn btn-primary btn-sm" disabled={!chosen.length || busy} onClick={() => (chosenAdmins.length ? setConfirmBulk(true) : void provision(chosen))}>{busy && provisioning.length ? 'Provisioning…' : `Provision ${chosen.length || ''} selected`}</button>
                 </>}
           </div>
@@ -350,29 +348,14 @@ function LivePeople({ quest, live }: { quest: Quest; live: LiveAccount }) {
         <p className="muted">{staged ? 'Reporting lines are planning data for staged people. ' : 'Reporting lines and temporary deactivation aren’t configured in this workspace yet. '}Removing access deletes the membership (history stays); the person can be invited again.</p>
       </section>
 
-      {isAdmin && data && (
+      {isAdmin && olderInvitations.length > 0 && (
         <section className="panel" aria-labelledby="invite-title">
-          <h3 id="invite-title" className="section-label">Invite an existing Task-HQ account</h3>
-          <p className="muted">For someone who already signs in to Task-HQ. New employees get an activation link from the directory above instead.</p>
-          {data.invitations.some(item => !stagedEmails.has(item.email)) && (
-            <ul className="people-list">{data.invitations.filter(item => !stagedEmails.has(item.email)).map(item => (
-              <li key={item.id}><span><b>{item.email}</b><small>{ROLE_LABELS[item.role]} · {WORK_LABELS[item.work_role] ?? item.work_role} · pending · expires {new Date(item.expires_at).toLocaleDateString()}</small></span>
-                <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void run(() => live.client.rpc('revoke_invitation', { p_invitation: item.id }), `Invitation for ${item.email} revoked.`)}>Revoke</button></li>
-            ))}</ul>
-          )}
-          <InviteForm grantable={grantable} busy={busy} onInvite={async (email, role, work) => {
-            const ok = await run(() => live.client.rpc('create_invitation', { p_org: live.org.id, p_email: email, p_role: role, p_work_role: work, p_days: 14 }), `Invitation for ${email} recorded. Nothing was sent.`);
-            if (ok) setPrepared({ email, message: inviteMessage(email, role, work) });
-            return ok;
-          }} />
-          {prepared && (
-            <div className="prepared" role="status">
-              <p><b>Ready for you to send.</b> Task-HQ doesn’t email anyone. Copy this to {prepared.email} yourself:</p>
-              <textarea readOnly rows={3} value={prepared.message} onFocus={event => event.currentTarget.select()} />
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => { void navigator.clipboard?.writeText(prepared.message); }}>Copy message</button>
-            </div>
-          )}
-          <p className="muted">Only the account with that confirmed address can accept. Owner and admin invitations require an owner.</p>
+          <h3 id="invite-title" className="section-label">Older invitations <span>{olderInvitations.length}</span></h3>
+          <p className="muted">Created before setup links replaced email invitations. They still work until they expire, or you can revoke them. New people join through Invite.</p>
+          <ul className="people-list">{olderInvitations.map(item => (
+            <li key={item.id}><span><b>{item.email}</b><small>{ROLE_LABELS[item.role]} · {WORK_LABELS[item.work_role] ?? item.work_role} · pending · expires {new Date(item.expires_at).toLocaleDateString()}</small></span>
+              <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void run(() => live.client.rpc('revoke_invitation', { p_invitation: item.id }), `Invitation for ${item.email} revoked.`)}>Revoke</button></li>
+          ))}</ul>
         </section>
       )}
 
@@ -439,24 +422,6 @@ function RequestRow({ item, grantable, busy, onDecide }: { item: Overview['reque
         <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => onDecide(false, role, work)}>Decline</button>
       </span>
     </li>
-  );
-}
-
-function InviteForm({ grantable, busy, onInvite }: { grantable: OrgRole[]; busy: boolean; onInvite: (email: string, role: OrgRole, work: string) => Promise<boolean> }) {
-  const [email, setEmail] = useState('');
-  const [role, setRole] = useState<OrgRole>('member');
-  const [work, setWork] = useState('field');
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (await onInvite(email.trim().toLowerCase(), role, role === 'reviewer' ? 'reviewer' : work)) setEmail('');
-  }
-  return (
-    <form className="invite-form" onSubmit={event => void submit(event)}>
-      <label className="field"><span>Email</span><input type="email" required placeholder="name@company.com" value={email} onChange={event => setEmail(event.target.value)} /></label>
-      <label className="field"><span>Organization role</span><Select value={role} onChange={event => { const next = event.target.value as OrgRole; setRole(next); setWork(keepWork(work, next)); }}>{grantable.map(value => <option key={value} value={value}>{ROLE_LABELS[value]}</option>)}</Select></label>
-      <label className="field"><span>Work role</span><Select value={role === 'reviewer' ? 'reviewer' : work} disabled={role === 'reviewer'} onChange={event => setWork(event.target.value)}>{(role === 'reviewer' ? ['reviewer'] : WORK_ROLES).map(value => <option key={value} value={value}>{WORK_LABELS[value]}</option>)}</Select></label>
-      <button className="btn btn-primary" disabled={busy || !email.trim()}>Prepare invitation</button>
-    </form>
   );
 }
 
