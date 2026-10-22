@@ -67,3 +67,14 @@ The isolated preview signs in on its own origin. Continuing to the existing prod
 ## Deferred improvement: onboarding pass
 
 Not scheduled and not implemented. Idea: after activation, give a new employee a short, role-aware "onboarding pass" (what they can open, what is preview-only, who to ask) instead of landing directly in the workspace. The activation flow itself stays unchanged until the pilot has run.
+
+## Deferred architecture decision: Tools drawer
+
+Not scheduled and not implemented. The primary sidebar stays unchanged during employee onboarding; no links are moved or removed.
+
+Future idea: an expandable **Tools** drawer as a secondary navigation layer for modular capabilities (Estimates, First Response, Relationships, Operations Workbook).
+
+Requirements to honor when it is built:
+- Keep existing routes and server-enforced permissions exactly as they are.
+- Each entry carries a status label: Live, Preview or Unavailable.
+- Tools are registered from one list, so adding a tool does not require editing primary navigation.
