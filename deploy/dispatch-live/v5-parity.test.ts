@@ -164,8 +164,4 @@ test('rollback is safe: production v4 keeps working on state written by v5', () 
   }
 });
 
-test('v5 core is the current engine, byte for byte', async () => {
-  const { readFileSync, readdirSync } = await import('node:fs');
-  const dir = new URL('./v5/core/', import.meta.url);
-  for (const file of readdirSync(dir)) assert.equal(readFileSync(new URL(file, dir), 'utf8'), readFileSync(new URL(`../../src/core/${file}`, import.meta.url), 'utf8'), `${file} drifted; run npm run sync:functions`);
-});
+// v5 is frozen (live until v6 ships); the byte-for-byte check against src/core moved to v6.test.ts.

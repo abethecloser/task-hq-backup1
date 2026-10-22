@@ -297,6 +297,9 @@ body { background: var(--canvas); }
 .ctx-history .is-undone p { color: var(--faint); text-decoration: line-through; }
 .ctx-done { display: grid; gap: 8px; justify-items: start; }
 .ctx-done .offer-form { width: 100%; }
+.ctx-done-state { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ctx-done-state .icon { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; color: var(--ok, #1f8a4c); }
+.ctx-review { margin: 0 0 8px; }
 
 /* Signals column */
 .signals-body { gap: 0; padding: 6px 18px 40px; }

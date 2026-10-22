@@ -176,7 +176,7 @@ export function sectionFor(state: QuestState, action: Action): Section | null | 
       return null; // feedback stays possible during Critical Focus
     case 'task/create':
       return 'create-task';
-    case 'task/comment': case 'task/update': case 'task/advance': case 'task/request-help': case 'task/resolve': case 'task/send-back': case 'task/handoff': case 'task/reopen':
+    case 'task/comment': case 'task/update': case 'task/advance': case 'task/request-help': case 'task/resolve': case 'task/send-back': case 'task/handoff': case 'task/reopen': case 'task/archive': case 'task/unarchive':
       return action.id === focusTask ? null : 'company-work';
     case 'lead/claim': case 'lead/tags': case 'lead/receive': case 'lead/assign': case 'lead/attempt': case 'lead/qualify': case 'lead/block':
     case 'lead/follow-up': case 'lead/advance': case 'lead/escalate':

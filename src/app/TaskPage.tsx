@@ -180,6 +180,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
         <aside className="tp-col tp-conversation" aria-label="Conversation and quick actions">
           <section className="tp-card tp-actions" aria-labelledby="tp-actions">
             <h2 id="tp-actions" className="ctx-label">Quick actions</h2>
+            {task.status === 'review' && <p className="ctx-review" role="status"><b>Submitted for review</b> · {task.approver ? `waiting for ${nameOf(state, task.approver, 'the approver')}` : 'waiting for approval'}. It is not complete until approved.</p>}
             {task.status === 'done' ? <Completed quest={quest} task={task} /> : <TaskSituation quest={quest} taskId={task.id} onOpen={onOpen} />}
           </section>
 
@@ -236,9 +237,14 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
     const result = await dispatch({ type: 'task/reopen', id: task.id, note });
     if (result.ok) { setNote(''); setOpen(false); }
   }
+  const by = task.completedBy || finish?.actor || '';
+  const approved = finish?.kind === 'approval';
+  const archiveAvailable = backend.supports?.taskArchive !== false && allowed;
   return (
-    <div className="ctx-done">
-      <p><b>Completed {task.completedAt ? when(task.completedAt) : ''}</b>{finish ? ` · ${nameOf(state, finish.actor, 'someone')}` : ''}</p>
+    <div className={`ctx-done ${task.archivedAt ? 'is-archived' : ''}`}>
+      <p className="ctx-done-state" role="status"><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+        <b>{approved ? 'Approved and completed' : 'Completed'}</b>{task.completedAt ? ` ${when(task.completedAt)}` : ''}{by ? ` · ${nameOf(state, by, 'someone')}` : ''}</p>
+      {task.archivedAt ? <p className="muted">Archived {when(task.archivedAt)}{task.archivedBy ? ` · ${nameOf(state, task.archivedBy, 'someone')}` : ''}. Its history is kept.</p> : null}
       {canUndo && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void dispatch({ type: 'undo', eventId: finish!.id })}>Undo my completion</button>}
       {allowed && reopenAvailable && !open && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(true)}>Reopen…</button>}
       {allowed && reopenAvailable && open && (
@@ -247,6 +253,7 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
           <span className="offer-form-actions"><button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>Cancel</button><button className="btn btn-primary btn-sm" disabled={!note.trim()}>Reopen</button></span>
         </form>
       )}
+      {archiveAvailable && !open && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void dispatch({ type: task.archivedAt ? 'task/unarchive' : 'task/archive', id: task.id })}>{task.archivedAt ? 'Restore from archive' : 'Archive'}</button>}
       {allowed && !reopenAvailable && !canUndo && <p className="muted">Reopening finished work arrives with the next server release. Until then, create a follow-up task.</p>}
     </div>
   );

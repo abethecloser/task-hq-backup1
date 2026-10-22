@@ -27,7 +27,7 @@ export const LEGACY_LENSES: Record<string, Partial<RegistryQuery>> = {
   mine: { scope: 'mine', lens: 'all' }, team: { scope: 'company', lens: 'all' }, attention: { lens: 'all' }, completed: { lens: 'all', status: 'done' },
 };
 
-export type StatusFilter = TaskStatus | 'open' | 'any';
+export type StatusFilter = TaskStatus | 'open' | 'any' | 'archived';
 export type DueFilter = 'any' | 'overdue' | 'today' | 'week' | 'none';
 export type PriorityFilter = 'any' | 'high' | 'normal' | 'ultra';
 /** Status, due and priority take one value or several; several match when any of them does. An empty list means any. */
@@ -79,6 +79,8 @@ const inView = (task: Task, actor: string, scope: Scope, lens: Lens, now: number
 
 function statusMatch(task: Task, status: Multi<StatusFilter>) {
   const wanted = asList(status);
+  // Archived work leaves every list except the explicit Archived one; its history stays on the task.
+  if (task.archivedAt) return wanted.includes('archived');
   return !wanted.length || wanted.some(value => value === 'any' || (value === 'open' ? isOpen(task) : task.status === value));
 }
 
