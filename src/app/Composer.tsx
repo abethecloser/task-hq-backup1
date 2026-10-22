@@ -21,7 +21,7 @@ type Variant = 'home' | 'registry' | 'form';
 const PLACEHOLDER: Record<Variant, string> = {
   home: 'What needs to happen?  Try: Meeting with @Maya tomorrow 9am #permits !high',
   registry: 'Add tasks in plain words — @person #tag /type !high tomorrow 9am',
-  form: 'Describe it in one line to fill the form — e.g. Inspect Elm St friday 2pm !high',
+  form: 'What needs to get done?  e.g. Inspect Elm St friday 2pm !high',
 };
 
 /** Staged (not yet invited) people, for owners/admins in a live workspace. */

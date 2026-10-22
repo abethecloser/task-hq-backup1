@@ -8,6 +8,7 @@ import type { EditableTaskFields, Task } from '../core/contract.ts';
 import { canEditTask, canReopenTask, lockedTaskFields } from '../core/permissions.ts';
 import { blockingDeps, dependents, firstName, isOpen, isOverdue, leadById, nameOf, projectName, taskById } from '../core/selectors.ts';
 import { Avatar, PersonSelect, TaskTags } from '../ui/components.tsx';
+import { ResponsibilityCard } from '../ui/ResponsibilityCard.tsx';
 import { useFeedbackRecord } from '../ui/Feedback.tsx';
 import { ReferenceInput, ReferenceTextarea, ReferencedText } from '../ui/ReferenceEditor.tsx';
 import { Select } from '../ui/Select.tsx';
@@ -33,6 +34,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
   useEffect(() => { setTitle(task.title); setNextAction(task.nextAction); setDescription(task.description); setWaitingOn(task.waitingOn); }, [task.title, task.nextAction, task.description, task.waitingOn]);
   useEffect(() => { window.scrollTo(0, 0); back.current?.focus({ preventScroll: true }); }, [task.id]);
 
+  const completedByEvent = task.status === 'done' ? state.events.find(event => event.taskId === task.id && !event.undone && event.undo?.tasks[task.id] && event.undo.tasks[task.id]!.status !== 'done')?.actor ?? '' : '';
   const me = state.people.find(item => item.id === actor);
   const reviewer = me?.role === 'reviewer';
   const editable = canEditTask(state, task, actor);
@@ -87,6 +89,10 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
         <p className="ctx-sub">Created by {nameOf(state, task.createdBy, 'someone')}{created ? ` · ${when(created.at)}` : ''} · updated {when(task.updatedAt)}</p>
         <div className="ctx-tags"><TaskTags state={state} task={task} now={quest.now} /></div>
       </header>
+
+      <ResponsibilityCard state={state} task={task} actor={actor}>
+        {task.status === 'done' && <p><b>Completed</b>{task.completedAt ? ` ${when(task.completedAt)}` : ''}{(task.completedBy || completedByEvent) ? ` · ${nameOf(state, task.completedBy || completedByEvent, 'someone')}` : ''}{task.archivedAt ? ' · Archived' : ''}</p>}
+      </ResponsibilityCard>
 
       <dl className="tp-facts" aria-label="Status, assigned, priority and due date">
         <div><dt>Status</dt><dd><StatusMenu quest={quest} task={task} /></dd></div>
