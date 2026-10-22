@@ -44,3 +44,37 @@ test('Manage is a permanent permission from organization role, separate from the
   // Every Manage view is still subject to the temporary restriction.
   assert.ok(MANAGE_VIEWS.every(view => !canNavigate(CLOSED, view)));
 });
+
+import { PAGE_STATUS, pageTag, restriction } from './navigation.ts';
+
+const context = (over: Partial<Parameters<typeof restriction>[1]> = {}) => ({ access: { full: false, restricted: ['executive', 'feedback', 'agents'] }, manager: false, reviewer: false, hasDesk: false, feedbackOn: false, agentPilot: false, ...over });
+
+test('every routed page has a status, so none can be hidden by being unfinished', () => {
+  for (const view of [...ALWAYS_OPEN, ...RESTRICTABLE.filter(item => item !== 'search'), 'workbook']) assert.ok(PAGE_STATUS[view], view);
+});
+
+test('a member opens unfinished pages but gets a restricted view for Manage pages', () => {
+  for (const view of ['tools', 'leads', 'relationships', 'workbook', 'inbox']) assert.equal(restriction(view, context()), null, view);
+  for (const view of MANAGE_VIEWS) assert.notEqual(restriction(view, context()), null, view);
+  assert.equal(restriction('people', context()), 'role');
+});
+
+test('server restrictions become an unavailable page, never a hidden entry; full access bypasses them', () => {
+  assert.equal(restriction('agents', context({ manager: true })), 'unavailable');
+  assert.equal(restriction('feedback', context({ manager: true, access: { full: true, restricted: [] } })), 'unavailable');
+  assert.equal(restriction('agents', context({ manager: true, agentPilot: true, access: { full: true, restricted: ['agents'] } })), null);
+  assert.equal(restriction('agents', context({ manager: true, access: { full: true, restricted: [] } })), 'unavailable', 'the pilot stays off until its policy is on');
+});
+
+test('role rules still apply to the executive desk and to estimates for reviewers', () => {
+  assert.equal(restriction('executive', context({ manager: true, access: { full: true, restricted: [] } })), 'role');
+  assert.equal(restriction('tools', context({ reviewer: true })), 'role');
+});
+
+test('navigation tags tell the truth about status and access', () => {
+  assert.equal(pageTag('tools', null), 'Preview');
+  assert.equal(pageTag('home', null), undefined);
+  assert.equal(pageTag('people', 'role'), 'Restricted');
+  assert.equal(pageTag('agents', 'unavailable'), 'Unavailable');
+  assert.equal(pageTag('feedback', null), 'Unavailable');
+});

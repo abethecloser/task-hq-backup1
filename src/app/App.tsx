@@ -55,8 +55,8 @@ import { Tools } from './Tools.tsx';
 import { OperationsWorkbook } from './OperationsWorkbook.tsx';
 import { CompanySignals } from './CompanySignals.tsx';
 import { notificationsFor } from './notifications.ts';
-import { PREVIEW_VIEWS, PreviewNotice } from './PreviewNotice.tsx';
-import { CLOSED, UNDER_CONSTRUCTION, canManage, canNavigate, isManageView } from '../core/navigation.ts';
+import { PREVIEW_VIEWS, PreviewNotice, RestrictedPage } from './PreviewNotice.tsx';
+import { CLOSED, DEMO_ACCESS, UNDER_CONSTRUCTION, canManage, canNavigate, pageTag, restriction } from '../core/navigation.ts';
 import { panelLayout } from '../core/layout.ts';
 import type { Notification } from './notifications.ts';
 
@@ -224,19 +224,14 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const awareAttention = useMemo(() => attentionFor(state, minute * 60000, actor, sidebar.snoozes), [state, minute, actor, snoozeKey]);
   // The server's temporary navigation restrictions also apply to authenticated workspaces.
-  const access = live?.navigation ?? CLOSED;
+  // The Demo holds only synthetic data, so every page opens there; role rules below still apply.
+  const access = live ? live.navigation ?? CLOSED : DEMO_ACCESS;
   // Work / Manage remains a role permission, separate from temporary navigation restrictions.
   const manager = canManage(live ? live.role : me.role === 'manager' ? 'owner' : me.role === 'coordinator' ? 'supervisor' : me.role);
-  const open = (next: View) => (manager || !isManageView(next)) && (next !== 'tools' || me.role !== 'reviewer') && (next !== 'executive' || hasDesk) && canNavigate(access, next) && (next !== 'feedback' || feedbackOn);
+  const restrictionOf = (next: View) => restriction(next, { access, manager, reviewer: me.role === 'reviewer', hasDesk, feedbackOn, agentPilot: !!state.policy.agentPilot });
+  const open = (next: View) => restrictionOf(next) === null;
   const underConstruction = () => quest.say(UNDER_CONSTRUCTION);
-  const view: View = allowed(requested) && open(requested) && (requested !== 'executive' || hasDesk) ? requested : 'home';
-
-  // A restricted address (typed, deep link, back button or a link inside a panel) lands on Home.
-  useEffect(() => {
-    if (open(requested)) return;
-    setRequested('home');
-    history.replaceState(null, '', '#/home');
-  }, [requested, access]); // eslint-disable-line react-hooks/exhaustive-deps
+  const view: View = allowed(requested) ? requested : 'home';
 
   // When temporary access ends, close anything opened with it.
   useEffect(() => {
@@ -245,7 +240,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   }, [focused, grant, taskId, state.focus]);
 
   function go(next: View) {
-    if (!open(next)) { underConstruction(); return; }
     setRequested(next);
     setTaskId(null);
     history.pushState(null, '', next === 'leads' && leadId ? `#/leads/${leadId}` : `#/${next}`);
@@ -259,7 +253,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     history.replaceState(null, '', `#/${view}`);
   }
   function openLead(id: string) {
-    if (!open('leads')) { underConstruction(); return; }
     setLeadId(id); setRequested('leads'); setTaskId(null);
     history.replaceState(null, '', `#/leads/${id}`);
   }
@@ -323,7 +316,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     { id: 'all-tasks', label: 'All Tasks', count: counts.all, icon: <Icon d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v2H4z" /> },
     { id: 'calendar', label: 'Calendar', icon: <Icon d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4" /> },
     { id: 'inbox', label: 'Inbox', count: inboxUnread, hot: inboxUnread > 0, icon: <Icon d="M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z" /> },
-    { id: 'workbook', label: 'Operations Workbook · Preview', icon: <Icon d="M3 4h18v16H3zM3 9h18M8 4v16M14 4v16" /> },
+    { id: 'workbook', label: 'Operations Workbook', icon: <Icon d="M3 4h18v16H3zM3 9h18M8 4v16M14 4v16" /> },
     { id: 'tools' as View, label: 'Estimates & Proposals', count: tools?.estimates.filter(item => item.status !== 'approved').length, icon: <Icon d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h5" /> },
     { id: 'needs-attention', label: 'Needs Attention', count: attention.length, hot: myAttention > 0, icon: <Icon d="M12 4 21 20H3zM12 10v4M12 17v.5" /> },
     { id: 'leads', label: 'First Response', count: leadAttention, hot: leadAttention > 0, icon: <Icon d="M13 3 5 14h6l-1 7 8-11h-6z" /> },
@@ -333,9 +326,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     { id: 'people', label: 'Team', count: state.people.length, icon: <Icon d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" /> },
     { id: 'reports', label: 'Reports', icon: <Icon d="M4 20V10M10 20V4M16 20v-7M22 20H2" /> },
     { id: 'activity', label: 'Activity', icon: <Icon d="M4 12h4l3-7 3 14 3-7h3" /> },
-    ...(feedbackOn ? [{ id: 'feedback' as View, label: 'Feedback', count: state.feedback.filter(item => item.status !== 'resolved').length, icon: <Icon d="M4 5h16v11H9l-5 4z" /> }] : []),
+    { id: 'feedback' as View, label: 'Feedback', count: feedbackOn ? state.feedback.filter(item => item.status !== 'resolved').length : undefined, icon: <Icon d="M4 5h16v11H9l-5 4z" /> },
     { id: 'settings', label: 'Policy & data', icon: <Icon d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3" /> },
-    ...(state.policy.agentPilot ? [{ id: 'agents' as View, label: 'Agent pilot', icon: <Icon d="M12 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM5 21a7 7 0 0 1 14 0" /> }] : []),
+    { id: 'agents' as View, label: 'Agent pilot', icon: <Icon d="M12 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM5 21a7 7 0 0 1 14 0" /> },
   ];
 
   const selected = taskId ? taskById(state, taskId) : undefined;
@@ -345,7 +338,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   // Short on room, the left panel narrows first; a right panel that still can't dock becomes a drawer.
   const geometry = (rightOpen: boolean, rightWidth: number) => panelLayout({ viewport: width, mobile: sidebar.isMobile, leftOpen: sidebar.open, leftWidth: sidebar.width, leftMin: PANEL_MIN, rightOpen, rightWidth, minCanvas: MIN_CANVAS, minCanvasBoth: MIN_CANVAS_BOTH });
   // The deck shows team-wide counts, so Home needs the same access as Company Work.
-  const deckAllowed = SIGNAL_VIEWS.includes(view) && !focused;
+  const deckAllowed = SIGNAL_VIEWS.includes(view) && !focused && open(view);
   const signalsWanted = !selected && deckAllowed
     && contextPref !== 'closed';
   const signalsFit = geometry(true, SIGNAL_PANEL).right === 'docked';
@@ -382,7 +375,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
           onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
-        items={navigation.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, locked: !allowed(item.id), restricted: !open(item.id), preview: PREVIEW_VIEWS.includes(item.id), info: info[item.id] }))}
+        items={navigation.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, locked: !allowed(item.id), tag: pageTag(item.id, restrictionOf(item.id)), info: info[item.id] }))}
         onSelect={id => go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
@@ -415,10 +408,11 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             <p>Part of this demo. Use the account menu to try another demo person. No real attendance is recorded.</p>
             {attendanceDemo && <ShiftBridge quest={quest} />}
           </details>}
-          {!(selected && contextAllowed) && PREVIEW_VIEWS.includes(view) && <PreviewNotice view={view} live={!!live} />}
+          {!(selected && contextAllowed) && PREVIEW_VIEWS.includes(view) && open(view) && <PreviewNotice view={view} live={!!live} />}
           {selected && contextAllowed ? <TaskPage key={selected.id} quest={quest} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)} />
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
+            : !open(view) ? <RestrictedPage label={VIEW_LABELS[view]} reason={restrictionOf(view) ?? 'unavailable'} onHome={() => go('home')} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
                 unseen={{ count: inboxUnread, latest: inbox.items.find(item => !sidebar.read.has(item.id))?.title }} onUnseen={() => sidebar.showTab('inbox')}
                 mentions={mentions} read={sidebar.read}
@@ -449,12 +443,11 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             { id: 'all-tasks' as View, label: 'Tasks', hot: false, icon: <Icon d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v2H4z" /> },
             ...(['inbox', 'needs-attention', 'leads'] as View[]).map(id => navigation.find(item => item.id === id)).filter(item => !!item),
           ].map(item => {
-            const restricted = !open(item.id);
             return (
-              <button key={item.id} type="button" className={`${view === item.id ? 'is-active' : ''} ${restricted ? 'is-restricted' : ''}`} disabled={!allowed(item.id)}
-                aria-disabled={restricted || undefined} title={restricted ? UNDER_CONSTRUCTION : undefined} onClick={() => (item.id === 'all-tasks' ? openLens(registryView.lens) : go(item.id))}>
+              <button key={item.id} type="button" className={`${view === item.id ? 'is-active' : ''}`} disabled={!allowed(item.id)}
+                onClick={() => (item.id === 'all-tasks' ? openLens(registryView.lens) : go(item.id))}>
                 {item.icon}<span>{item.label.replace('Speed to Lead', 'Leads').replace('First Response', 'Leads').replace('Needs Attention', 'Attention').replace('All Tasks', 'Tasks')}</span>
-                {restricted ? <span className="sr-only">, under construction</span> : item.hot && allowed(item.id) && <i className="tab-dot" />}
+                {item.hot && allowed(item.id) && <i className="tab-dot" />}
               </button>
             );
           })}

@@ -40,3 +40,23 @@ export function PreviewNotice({ view, live }: { view: string; live: boolean }) {
     </aside>
   );
 }
+
+const RESTRICTED_COPY = {
+  role: 'This page is for owners, admins and supervisors. Your account does not have access to it. Nothing on it has been changed or shown.',
+  unavailable: 'This page is not available yet. It keeps its place here and will open when it is ready. Nothing on it has been changed or shown.',
+} as const;
+
+export function RestrictedPage({ label, reason, onHome }: { label: string; reason: 'role' | 'unavailable'; onHome: () => void }) {
+  return (
+    <div className="view restricted-page">
+      <header className="view-head">
+        <div>
+          <p className="eyebrow">{reason === 'role' ? 'Restricted' : 'Unavailable'}</p>
+          <h1>{label}</h1>
+          <p className="lede">{RESTRICTED_COPY[reason]}</p>
+        </div>
+      </header>
+      <button type="button" className="btn" onClick={onHome}>Back to Home</button>
+    </div>
+  );
+}

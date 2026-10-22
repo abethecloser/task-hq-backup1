@@ -62,7 +62,7 @@ body { background: var(--canvas); }
 .seam-toggle { position: fixed; top: 50%; z-index: 38; display: grid; place-items: center; width: var(--seam); height: var(--seam); padding: 0; border: 1px solid var(--hair-2); border-radius: 50%; background: var(--card); color: var(--ink-2); box-shadow: 0 2px 8px rgb(17 18 20 / 10%); transform: translateY(-50%); transition: left var(--sidebar-speed) var(--sidebar-ease), right var(--sidebar-speed) var(--sidebar-ease), box-shadow .2s, border-color .2s, color .15s; }
 .seam-toggle .icon { width: 14px; height: 14px; stroke-width: 2.2; }
 .seam-toggle:hover { border-color: var(--accent-line); color: var(--accent-ink); box-shadow: 0 0 0 4px var(--accent-pale), 0 2px 8px rgb(17 18 20 / 10%); }
-.seam-toggle.is-left { left: calc(var(--rail) + var(--panel-offset, 0px) - var(--seam) / 2); }
+.seam-toggle.is-left { left: calc(var(--rail) + var(--panel-offset, 0px) - 6px); } /* clears the rail's icons: the toggle sits on the seam, not on the navigation */
 .seam-toggle.is-right { right: max(6px, calc(var(--context-offset, 0px) - var(--seam) / 2)); }
 .shell[data-resizing] .seam-toggle { transition: none; }
 /* Collapsed signals: a labeled tab on the right edge instead of a bare circle, so it reads as a place to go. */

@@ -26,6 +26,9 @@ export const RESTRICTABLE: readonly string[] = [
 
 export const CLOSED: NavigationAccess = { full: false, restricted: [...RESTRICTABLE] };
 
+/** The Demo's synthetic workspace: no server answer to wait for, nothing sensitive to protect. */
+export const DEMO_ACCESS: NavigationAccess = { full: true, restricted: [] };
+
 export function canNavigate(access: NavigationAccess, view: string): boolean {
   return ALWAYS_OPEN.includes(view) || access.full || !access.restricted.includes(view);
 }
@@ -61,4 +64,50 @@ export const isManageView = (view: string) => MANAGE_VIEWS.includes(view);
 /** Organization roles that get the Manage workspace. Developer / Observer keeps its read-only view of it. */
 export function canManage(role: string | undefined): boolean {
   return role === 'owner' || role === 'admin' || role === 'supervisor' || role === 'reviewer';
+}
+
+// ── One page model ─────────────────────────────────────────────────────────
+// Every destination stays in the sidebar and can be opened. A page that is unfinished is
+// labelled by its status; a page the account may not use opens a restricted view in place of
+// its content. None of this grants data access: the server still enforces every read and action.
+
+export type PageStatus = 'live' | 'preview' | 'unavailable';
+
+/** What the page does today. Unavailable pages keep their route and source but render no functionality. */
+export const PAGE_STATUS: Readonly<Record<string, PageStatus>> = {
+  home: 'live', 'all-tasks': 'live', calendar: 'live', inbox: 'live', 'needs-attention': 'live',
+  'company-work': 'live', people: 'live', reports: 'live', activity: 'live', settings: 'live', executive: 'live',
+  workbook: 'preview', tools: 'preview', leads: 'preview', relationships: 'preview',
+  feedback: 'unavailable', agents: 'unavailable',
+};
+
+export type Restriction = 'role' | 'unavailable';
+
+export interface PageContext {
+  access: NavigationAccess;
+  /** Owner, admin, supervisor or reviewer in the current organization. */
+  manager: boolean;
+  reviewer: boolean;
+  /** Owns or manages executive decisions. */
+  hasDesk: boolean;
+  feedbackOn: boolean;
+  agentPilot: boolean;
+}
+
+/** Why this account sees a restricted view instead of the page, or null when the page may open. */
+export function restriction(view: string, context: PageContext): Restriction | null {
+  if (isManageView(view) && !context.manager) return 'role';
+  if (view === 'executive' && !context.hasDesk) return 'role';
+  if (view === 'tools' && context.reviewer) return 'role';
+  if (view === 'feedback' && !context.feedbackOn) return 'unavailable';
+  if (view === 'agents' && !context.agentPilot) return 'unavailable';
+  if (!canNavigate(context.access, view)) return 'unavailable';
+  return null;
+}
+
+/** The short label shown beside a navigation entry, if any. */
+export function pageTag(view: string, restricted: Restriction | null): 'Restricted' | 'Unavailable' | 'Preview' | undefined {
+  if (restricted === 'role') return 'Restricted';
+  if (restricted === 'unavailable' || PAGE_STATUS[view] === 'unavailable') return 'Unavailable';
+  return PAGE_STATUS[view] === 'preview' ? 'Preview' : undefined;
 }
