@@ -9,7 +9,7 @@
     "build:app": "tsc -b && vite build",
     "build:extension": "npm run icons && vite build -c vite.extension.config.ts",
     "icons": "node scripts/make-icons.mjs",
-    "test": "node scripts/sync-functions.mjs && node --test src/core/*.test.ts src/core/tools/*.test.ts src/ui/*.test.ts src/adapter/*.test.ts src/automation/*.test.ts src/integrations/*.test.ts src/auth/*.test.ts supabase/functions/badge-check-in/*.test.ts supabase/functions/dispatch/*.test.ts deploy/dispatch-live/*.test.ts src/activation/handler.test.ts",
+    "test": "node scripts/sync-functions.mjs && node --test src/core/*.test.ts src/core/tools/*.test.ts src/ui/*.test.ts src/adapter/*.test.ts src/automation/*.test.ts src/integrations/*.test.ts src/auth/*.test.ts supabase/functions/badge-check-in/*.test.ts supabase/functions/dispatch/*.test.ts deploy/dispatch-live/*.test.ts src/activation/handler.test.ts src/shifts/workday.test.ts",
     "preview": "vite preview --host 0.0.0.0",
     "sync:functions": "node scripts/sync-functions.mjs",
     "test:intake:runner": "node --test scripts/intake-db/*.test.mjs",
