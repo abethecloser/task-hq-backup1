@@ -1088,6 +1088,10 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .badges .badge-issued { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel, var(--card)); }
 .badges .badge-qr { width: 168px; max-width: 100%; aspect-ratio: 1; padding: 6px; border-radius: 10px; background: #fff; }
 .badges .badge-qr svg { display: block; width: 100%; height: 100%; }
+.issued-share { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.issued-share .badge-qr { width: 148px; max-width: 100%; aspect-ratio: 1; padding: 6px; border-radius: 10px; background: #fff; flex: 0 0 auto; }
+.issued-share .badge-qr svg { display: block; width: 100%; height: 100%; }
+.issued-share textarea { flex: 1 1 220px; min-width: 0; }
 .badges .badge-issued-text { display: grid; gap: 6px; min-width: 0; flex: 1 1 220px; }
 .badges .badge-issued-text code { overflow-wrap: anywhere; font-size: 12px; }
 @media print {
@@ -1108,3 +1112,26 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
   .calendar-activity .deck-cal-grid button { min-width: 0; }
   .calendar-activity .sig-item { overflow-wrap: anywhere; }
 }
+
+/* Task detail: responsibility and the authorized action share one visual anchor. */
+:root:root .tp-story { display: grid; gap: 14px; padding: clamp(18px, 3vw, 28px); border: 1px solid var(--hair-2); border-left: 5px solid var(--accent); border-radius: 12px; background: var(--card); box-shadow: none; min-width: 0; overflow-wrap: anywhere; }
+.tp-story-person { display: flex; align-items: center; gap: 12px; }
+:root:root .tp-story-person .avatar { width: 44px; height: 44px; font-size: 17px; }
+.tp-story-label { margin: 0 0 4px; font-size: 14px; color: var(--muted); }
+:root:root .tp-story h2 { margin: 0; font-size: clamp(24px, 3vw, 30px); line-height: 1.2; }
+:root:root .tp-story-action { margin: 0; font-size: 20px; line-height: 1.45; font-weight: 650; }
+.tp-story-handoff { margin: 0; padding-top: 14px; border-top: 1px solid var(--hair-2); font-size: 16px; }
+.tp-journey { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; list-style: none; margin: 0; padding: 0; }
+.tp-journey li { padding: 10px 8px; border-top: 2px solid var(--hair-2); font-size: 15px; font-weight: 700; }
+.tp-journey li[aria-current] { border-color: var(--accent); background: var(--accent-pale); color: var(--accent-ink); }
+.tp-journey small { display: block; margin-top: 4px; font-size: 12px; font-weight: 500; }
+.tp-story-note { margin: 0; font-size: 13px; color: var(--muted); }
+:root:root .tp-story button { min-height: 48px; font-size: 16px; box-shadow: none; }
+:root:root .tp-story .situation { gap: 10px; box-shadow: none; }
+.tp-story .situation-label, .tp-story .situation-reveal:empty { display: none; }
+:root:root .task-page .tp-facts { border-top: 1px solid var(--hair-2); border-radius: 10px; }
+:root:root .task-page .tp-facts dt, :root:root .task-page .tp-people dt { font-size: 12px; letter-spacing: .03em; }
+:root:root .task-page .tp-people dd, :root:root .task-page .tp-feed p { font-size: 16px; }
+:root:root .task-page .tp-tabs button { min-height: 44px; font-size: 15px; }
+:root:root .task-page .tp-people button { min-height: 44px; }
+@container (max-width: 560px) { .tp-journey { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

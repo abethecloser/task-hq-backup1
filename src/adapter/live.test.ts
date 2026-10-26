@@ -17,3 +17,62 @@ test('session refresh failures return a bounded failure rather than throwing a d
  const f=fixture();f.client.auth.getSession=async()=>{throw Error('synthetic session error');};
  await assert.rejects(f.backend.load(),/could not confirm/);
 });
+
+test('deployed contract rejects unsupported actions and fields before sending any request', async t => {
+ const f=fixture();let calls=0;
+ t.mock.method(globalThis,'fetch',async()=>{calls++;return new Response(JSON.stringify({ok:true,state,rev:1}));});
+ await f.backend.load();
+ const actions = [
+  {type:'task/create',task:{title:'Test',dueTime:'09:00'}},
+  {type:'task/create',task:{title:'Test',tags:[]}},
+  {type:'task/update',id:'t',changes:{type:undefined}},
+  {type:'taxonomy/update',taxonomy:{types:[],tags:[]}},
+  {type:'taxonomy/register-tags',tags:['test']},
+  {type:'task/reopen',id:'t',note:'Test'},
+  {type:'lead/claim',id:'l'}, {type:'lead/tags',id:'l',tags:[]},
+  {type:'roles/label',label:'Test'},
+ ] as unknown as import('../core/contract.ts').Action[];
+ for(const action of actions){const result=await f.backend.dispatch(action,'actor');assert.equal(result.ok,false);if(!result.ok)assert.match(result.error,/unavailable/);assert.equal(result.state.rev,1);}
+ assert.equal(calls,1,'refused writes never reach the older server');
+});
+
+test('a typed @mention never blocks later writes: reference drafts are not sent to the older server',async t=>{
+ const f=fixture();const bodies:Record<string,unknown>[]=[];
+ t.mock.method(globalThis,'fetch',async(_url:unknown,init:{body:string})=>{bodies.push(JSON.parse(init.body));return new Response(JSON.stringify({ok:true,state,rev:bodies.length}));});
+ await f.backend.load();
+ const drafts=[{text:'@Synthetic owner please check',spans:[{kind:'person',id:'actor',workspaceId:'synthetic',start:0,end:16,label:'@Synthetic owner'}]}];
+ for(const action of [{type:'task/comment',id:'t',note:'@Synthetic owner please check',referenceDrafts:drafts},{type:'task/advance',id:'t',referenceDrafts:drafts}] as unknown as import('../core/contract.ts').Action[]){
+  const result=await f.backend.dispatch(action,'actor');assert.equal(result.ok,true);
+  const sent=bodies.at(-1)!.action as Record<string,unknown>;assert.equal('referenceDrafts' in sent,false);assert.equal(sent.type,action.type);
+ }
+ assert.equal((bodies[1]!.action as {note:string}).note,'@Synthetic owner please check','comment text is sent verbatim');
+});
+
+test('an HTTP failure cannot be reported as a saved task even with a success-shaped body',async t=>{
+ const f=fixture();let calls=0;t.mock.method(globalThis,'fetch',async()=>new Response(JSON.stringify({ok:true,state,rev:++calls}),{status:calls===1?200:500}));
+ await f.backend.load();const result=await f.backend.dispatch({type:'task/comment',id:'t',note:'Test'},'actor');
+ assert.equal(result.ok,false);assert.equal(result.state.rev,1);
+});
+
+test('a v5 server opens the gated features; a later reply without a contract closes them again',async t=>{
+ const f=fixture();const bodies:Record<string,unknown>[]=[];let contract:number|undefined=5;
+ t.mock.method(globalThis,'fetch',async(_url:unknown,init:{body:string})=>{bodies.push(JSON.parse(init.body));return new Response(JSON.stringify({ok:true,state,rev:bodies.length,...(contract?{contract}:{})}));});
+ assert.equal(f.backend.supports?.taskTaxonomy,false,'closed until the server says otherwise');
+ await f.backend.load();
+ assert.deepEqual(f.backend.supports,{taskTaxonomy:true,taskReopen:true,leadOwnership:true,workLabels:true,structuredReferences:true});
+ const drafts=[{text:'@Synthetic owner',spans:[{kind:'person',id:'actor',workspaceId:'synthetic',start:0,end:16,label:'@Synthetic owner'}]}];
+ for(const action of [{type:'task/reopen',id:'t',note:'Leak returned'},{type:'task/update',id:'t',changes:{tags:['permits'],dueTime:'09:00'}},{type:'task/comment',id:'t',note:'@Synthetic owner',referenceDrafts:drafts}] as unknown as import('../core/contract.ts').Action[]){
+  const result=await f.backend.dispatch(action,'actor');assert.equal(result.ok,true,action.type);assert.deepEqual(bodies.at(-1)!.action,action,'sent unchanged');
+ }
+ contract=undefined;await f.backend.load();
+ assert.equal(f.backend.supports?.taskReopen,false);
+ const refused=await f.backend.dispatch({type:'task/reopen',id:'t',note:'x'},'actor');assert.equal(refused.ok,false);
+});
+
+test('a gateway error without a contract does not close features a v5 server opened',async t=>{
+ const f=fixture();let status=200;
+ t.mock.method(globalThis,'fetch',async()=>new Response(JSON.stringify(status===200?{ok:true,state,rev:1,contract:5}:{ok:false,error:'Invalid JWT'}),{status}));
+ await f.backend.load();status=401;
+ const failed=await f.backend.dispatch({type:'task/comment',id:'t',note:'x'},'actor');assert.equal(failed.ok,false);
+ assert.equal(f.backend.supports?.taskReopen,true);
+});

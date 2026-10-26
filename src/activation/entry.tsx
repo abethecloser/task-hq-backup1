@@ -1,11 +1,9 @@
 import React,{useEffect,useState} from 'react';
 import {createRoot} from 'react-dom/client';
 import {supabase} from '../auth/client';
-import {AuthScreen,useSession,type AuthView} from '../auth/AuthScreen';
 import '@fontsource/hanken-grotesk/400.css';
 import '@fontsource/hanken-grotesk/600.css';
 import './activation.css';
-type Employee={id:string;name:string;role:string;status:string;affiliation_confirmed:boolean;expires_at:string|null};
 const client=supabase();
 // A single-use activation link carries the code in the fragment (#code=…), which browsers never send
 // to the server or in referrers. Read it once at load, then remove it from the address bar and history.
@@ -18,37 +16,66 @@ async function call(body:Record<string,unknown>){
  if(error) {let message='Activation is unavailable. Please try again.';try{message=(await error.context.json()).error||message;}catch{}throw new Error(message);}
  if(data.error)throw new Error(data.error);return data;
 }
+type Identity={employee_id:string;name:string;company:string};
+type Step='code'|'identity'|'verify'|'password'|'done';
+const UNAVAILABLE_LINK='This setup link has expired, was already used, or was replaced by a newer one. Ask your manager to send you a new link.';
+// Identity v1: the link says who the person is; a six-digit code sent to their email proves the
+// address is theirs (Supabase Auth). Only then does the server redeem the link for that account.
 function EmployeeActivation(){
- const[code,setCode]=useState(linkCode),[identity,setIdentity]=useState<{employee_id:string;name:string;company:string}|null>(null),[confirmed,setConfirmed]=useState(false),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[done,setDone]=useState(false);
- // Opened from a link: look the code up straight away, so the employee lands on their identity.
- useEffect(()=>{if(!linkCode)return;setBusy(true);call({action:'preview',code:linkCode}).then(result=>setIdentity(result.data)).catch(err=>{const m=(err as Error).message;setError(/^Code unavailable/.test(m)?'This setup link has expired, was already used, or was replaced by a newer one. Ask your administrator to send you a new link.':m);}).finally(()=>setBusy(false));},[]);
- async function submit(e:React.FormEvent){e.preventDefault();setBusy(true);setError('');try{
-  if(!identity){const result=await call({action:'preview',code});setIdentity(result.data);}
-  else{await call({action:'redeem',code,employee:identity.employee_id,confirmed,email,password});
-   const {error}=await client!.auth.signInWithPassword({email:email.trim(),password});setPassword('');
-   if(error)throw new Error('Your account is activated. Use normal sign-in with the email and password you chose.');setDone(true);setCode('');}
- }catch(err){setError((err as Error).message);}finally{setBusy(false);}}
- return <main className="activation"><span className="activation-brand">Quest Task HQ</span><h1>{done?'You’re ready to begin.':'Activate your account'}</h1>
- {done?<><p>Your account is active. Starting a shift is a separate step.</p><a className="activation-button" href={home}>Continue to Task HQ</a><p>Check in explicitly when you’re ready to start your shift.</p></>:<form onSubmit={submit}>
- {!identity?<><p>Enter the one-time code provided by your administrator.</p><label>Activation code<input required autoComplete="off" value={code} onChange={e=>setCode(e.target.value)} spellCheck={false}/></label></>:<><p className="activation-identity"><strong>{identity.name}</strong><span>{identity.company}</span></p><label className="activation-check"><input type="checkbox" required checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>This is my employee identity.</label>
- <label>Your email<input type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Create password<input type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={password} onChange={e=>setPassword(e.target.value)}/></label><p className="activation-hint">Use at least 12 characters. Your code grants only the workspace access your administrator approved.</p></>}
- {error&&<p role="alert">{error}</p>}<button disabled={busy||!!identity&&!confirmed}>{busy?'Please wait…':identity?'Activate and sign in':'Continue'}</button>
- {identity&&<button type="button" className="activation-secondary" disabled={busy} onClick={()=>{setIdentity(null);setConfirmed(false);setPassword('');setError('');}}>Use a different code</button>}</form>}
+ const[step,setStep]=useState<Step>(linkCode?'identity':'code'),[code,setCode]=useState(linkCode),[identity,setIdentity]=useState<Identity|null>(null),[confirmed,setConfirmed]=useState(false),
+  [email,setEmail]=useState(''),[otp,setOtp]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(!!linkCode),[error,setError]=useState(''),[sentAt,setSentAt]=useState(0),[now,setNow]=useState(Date.now());
+ useEffect(()=>{if(!sentAt)return;const t=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(t);},[sentAt]);
+ const wait=Math.max(0,60-Math.floor((now-sentAt)/1000));
+ const unavailable=(m:string)=>/^Code unavailable/.test(m)?UNAVAILABLE_LINK:m;
+ // Opened from a link: look the code up straight away, so the person lands on their identity.
+ useEffect(()=>{if(!linkCode)return;call({action:'preview',code:linkCode}).then(result=>setIdentity(result.data)).catch(err=>{setStep('code');setError(unavailable((err as Error).message));}).finally(()=>setBusy(false));},[]);
+ async function run(work:()=>Promise<void>){setBusy(true);setError('');try{await work();}catch(err){setError(unavailable((err as Error).message));}finally{setBusy(false);}}
+ async function sendCode(){
+  // A setup link may be opened on a phone or tablet someone else is signed in on: start clean.
+  await client!.auth.signOut({scope:'local'});
+  const {error}=await client!.auth.signInWithOtp({email:email.trim(),options:{shouldCreateUser:true,data:{full_name:identity!.name}}});
+  if(error)throw new Error(/rate|security purposes/i.test(error.message)?'Please wait a minute before asking for another code.':'We couldn’t send a code to that email. Check the address and try again.');
+  setSentAt(Date.now());setNow(Date.now());setOtp('');setStep('verify');
+ }
+ async function verify(){
+  const {error}=await client!.auth.verifyOtp({email:email.trim(),token:otp.trim(),type:'email'});
+  if(error)throw new Error('That code didn’t work. Check the latest email, or ask for a new code.');
+  try{const result=await call({action:'activate',code,employee:identity!.employee_id,confirmed});setCode('');setStep(result.has_password?'done':'password');}
+  catch(err){
+   // Verified the email but the link didn't redeem: don't leave a half-signed-in session behind.
+   await client!.auth.signOut({scope:'local'});const m=(err as Error).message;
+   if(/email address your manager/.test(m)){setStep('identity');throw new Error('Use the email address your manager has on file for you. Ask them if you’re not sure which one.');}
+   throw err;
+  }
+ }
+ async function savePassword(){const {error}=await client!.auth.updateUser({password});setPassword('');if(error)throw new Error('Your account is active, but the password wasn’t saved. Try again, or sign in later with an email code.');setStep('done');}
+ const title=step==='done'?'You’re ready to begin.':step==='password'?'Choose a password':step==='verify'?'Check your email':'Set up your account';
+ return <main className="activation"><span className="activation-brand">Quest Task HQ</span><h1>{title}</h1>
+  {step==='done'&&<><p>Your account is active. Starting a shift is a separate step.</p><a className="activation-button" href={home}>Continue to Task HQ</a><p>Check in explicitly when you’re ready to start your shift.</p></>}
+  {step==='code'&&<form onSubmit={e=>{e.preventDefault();void run(async()=>{const result=await call({action:'preview',code});setIdentity(result.data);setStep('identity');});}}>
+   <p>Open the setup link your manager sent you, or enter the code from it.</p>
+   <label>Setup code<input required autoComplete="off" value={code} onChange={e=>setCode(e.target.value)} spellCheck={false}/></label>
+   {error&&<p role="alert">{error}</p>}<button disabled={busy}>{busy?'Please wait…':'Continue'}</button></form>}
+  {step==='identity'&&(identity?<form onSubmit={e=>{e.preventDefault();void run(sendCode);}}>
+   <p className="activation-identity"><strong>{identity.name}</strong><span>{identity.company}</span></p>
+   <label className="activation-check"><input type="checkbox" required checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>This is me.</label>
+   <label>Your email<input type="email" inputMode="email" autoComplete="email" required maxLength={254} value={email} onChange={e=>setEmail(e.target.value)}/></label>
+   <p className="activation-hint">We’ll email you a six-digit code to confirm the address is yours. This link grants only the access your manager approved.</p>
+   {error&&<p role="alert">{error}</p>}<button disabled={busy||!confirmed}>{busy?'Please wait…':'Email me a code'}</button></form>:<p>{busy?'Opening your setup link…':error}</p>)}
+  {step==='verify'&&<form onSubmit={e=>{e.preventDefault();void run(verify);}}>
+   <p>We sent a six-digit code to <strong>{email.trim()}</strong>. It may take a minute to arrive.</p>
+   <label>Six-digit code<input required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6,10}" maxLength={10} autoFocus value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,''))}/></label>
+   {error&&<p role="alert">{error}</p>}<button disabled={busy||otp.length<6}>{busy?'Please wait…':'Confirm and activate'}</button>
+   <button type="button" className="activation-secondary" disabled={busy||wait>0} onClick={()=>void run(sendCode)}>{wait>0?`Send a new code in ${wait}s`:'Send a new code'}</button>
+   <button type="button" className="activation-secondary" disabled={busy} onClick={()=>{setStep('identity');setOtp('');setError('');}}>Use a different email</button></form>}
+  {step==='password'&&<form onSubmit={e=>{e.preventDefault();void run(savePassword);}}>
+   <p>Your account is active. Choose a password for signing in next time.</p>
+   <input type="email" autoComplete="username" value={email.trim()} readOnly hidden/>
+   <label>Create password<input type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={password} onChange={e=>setPassword(e.target.value)}/></label>
+   <p className="activation-hint">Use at least 12 characters.</p>
+   {error&&<p role="alert">{error}</p>}<button disabled={busy}>{busy?'Please wait…':'Save password'}</button></form>}
  </main>;
 }
-function Admin(){
- const[orgs,setOrgs]=useState<{id:string;name:string}[]>([]),[org,setOrg]=useState(''),[employees,setEmployees]=useState<Employee[]>([]),[employee,setEmployee]=useState(''),[code,setCode]=useState(''),[expires,setExpires]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
- useEffect(()=>{let alive=true;(async()=>{if(!client)throw new Error('Supabase is not configured.');const {data:{user}}=await client.auth.getUser();if(!user)throw new Error('Sign in to Task HQ as an administrator first.');const {data,error}=await client.from('memberships').select('org_id,role,organizations(id,name)').eq('user_id',user.id).in('role',['owner','admin']);if(error)throw error;const orgs=(data??[]).flatMap(row=>{const item=row.organizations as unknown as {id:string;name:string}|null;return item?[item]:[];});if(alive){setOrgs(orgs);setOrg(orgs[0]?.id??'');if(!orgs.length)setError('Sign in as a workspace owner or administrator first.');}})().catch(err=>alive&&setError(err.message));return()=>{alive=false;};},[]);
- useEffect(()=>{let alive=true;setCode('');setEmployee('');setEmployees([]);if(org)call({action:'list',org}).then(result=>{if(alive)setEmployees(result.data);}).catch(err=>alive&&setError(err.message));return()=>{alive=false;};},[org]);
- async function act(action:'generate'|'revoke'){setBusy(true);setError('');setCode('');try{const result=await call({action,org,employee});if(result.code){setCode(result.code);setExpires(result.data.expires_at);}const list=await call({action:'list',org});setEmployees(list.data);}catch(err){setError((err as Error).message);}finally{setBusy(false);}}
- const selected=employees.find(e=>e.id===employee);
- return <main className="activation"><span className="activation-brand">Quest Task HQ · Administration</span><h1>Team activation</h1><p>Codes expire after 24 hours. Regenerating revokes the previous code. Share codes privately with the intended employee.</p>
- <label>Workspace<select value={org} onChange={e=>setOrg(e.target.value)} disabled={busy}>{orgs.map(o=><option key={o.id} value={o.id}>{o.name}</option>)}</select></label>
- <label>Employee<select value={employee} onChange={e=>{setEmployee(e.target.value);setCode('');}} disabled={busy}><option value="">Select existing employee</option>{employees.map(e=><option key={e.id} value={e.id}>{e.name} · {e.status}</option>)}</select></label>
- {selected&&<><p>Status: <strong>{selected.status}</strong> · {selected.role}</p><p className="activation-hint">Employee ID: {selected.id}</p>{!selected.affiliation_confirmed&&<p>Confirm affiliation in People &amp; Roles before issuing a code.</p>}
- <button disabled={busy||selected.status==='active'||!selected.affiliation_confirmed} onClick={()=>void act('generate')}>{selected.status==='pending'?'Regenerate code':'Generate one-time code'}</button><button className="activation-secondary" disabled={busy||selected.status!=='pending'} onClick={()=>void act('revoke')}>Revoke code</button></>}
- {code&&<section aria-live="polite"><p>Copy this code now. It is shown only here.</p><output>{code}</output><p>Expires {new Date(expires).toLocaleString()}</p><p>Activation page: <a href={location.pathname}>{location.origin+location.pathname}</a></p></section>}
- {error&&<p role="alert">{error}</p>}<a href={home}>Return to Task HQ</a></main>;
-}
-function AdminEntry(){const session=useSession(),[view,setView]=useState<AuthView>('sign-in');if(!session.ready)return <main className="activation"><p>Checking your sign-in…</p></main>;if(!session.email||session.recovery)return <AuthScreen view={session.recovery?'reset':view} go={setView} onDemo={()=>location.assign(home)}/>;return <Admin key={session.email}/>;}
+// Invites are created in Task-HQ: Team → People & access → Invite. This old address points there.
+function AdminEntry(){return <main className="activation"><span className="activation-brand">Quest Task HQ · Administration</span><h1>Invites moved</h1><p>Create setup links and QR codes in Task HQ under People &amp; access → Invite.</p><a className="activation-button" href={`${home.replace(/\/$/,'')}/#/people`}>Open People &amp; access</a></main>;}
 createRoot(document.getElementById('root')!).render(new URLSearchParams(location.search).has('admin')?<AdminEntry/>:<EmployeeActivation/>);

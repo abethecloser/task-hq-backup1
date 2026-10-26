@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PRODUCTION_ORIGIN, activationLink, activationMessage, linkMessage, nextAction, provisionPath } from './people-access.ts';
+import { PRODUCTION_ORIGIN, activationLink, activationMessage, nextAction, provisionPath } from './people-access.ts';
 import type { PersonAccess } from './people-access.ts';
 
 const base: PersonAccess = { id: 'c1', name: 'Ralph Palad', email: 'ralph@example.com', role: 'member', work_role: 'field', affiliation_confirmed: true, member: null, invitation: null, activation: null, status: 'ready' };
@@ -29,25 +29,28 @@ test('only an owner can send an Admin activation', () => {
 });
 
 test('the link carries the code in the fragment only', () => {
-  const link = activationLink('https://task-hq-three.vercel.app', 'ABC123-DEF456');
-  assert.equal(link, 'https://task-hq-three.vercel.app/activate/index.html#code=ABC123-DEF456');
+  const link = activationLink(PRODUCTION_ORIGIN, 'ABC123-DEF456');
+  assert.equal(link, 'https://task.questroofing.com/activate/index.html#code=ABC123-DEF456');
   assert.ok(!link.includes('?'));
-  const message = activationMessage('Ralph Palad', 'Quest Roofing', 'https://task-hq-three.vercel.app', 'ABC123-DEF456', soon);
-  assert.match(message, /^Hi Ralph, here is your personal Quest Roofing Task-HQ setup link: https:\/\/task-hq-three\.vercel\.app\/activate\/index\.html#code=ABC123-DEF456/);
+  const message = activationMessage('Ralph Palad', 'Quest Roofing', PRODUCTION_ORIGIN, 'ABC123-DEF456', soon);
+  assert.match(message, /^Hi Ralph, here is your personal Quest Roofing Task-HQ setup link: https:\/\/task\.questroofing\.com\/activate\/index\.html#code=ABC123-DEF456/);
+  assert.match(message, /six-digit code/);
+  assert.doesNotMatch(message, /password/i);
   assert.match(message, /enter this code: ABC123-DEF456$/);
 });
 
 test('provisioning: one path per person, never a duplicate account', () => {
   assert.equal(provisionPath(base, 'admin'), 'link');
-  assert.equal(provisionPath({ ...base, has_account: true }, 'admin'), 'invite', 'existing accounts are linked');
-  assert.equal(provisionPath({ ...base, has_account: true, status: 'invited' }, 'admin'), null);
+  assert.equal(provisionPath({ ...base, has_account: true }, 'admin'), 'link', 'existing accounts are linked by the same setup link');
+  assert.equal(provisionPath({ ...base, has_account: true, status: 'invited' }, 'admin'), 'link', 'an older invitation does not block a setup link');
   assert.equal(provisionPath({ ...base, status: 'active' }, 'owner'), null);
   assert.equal(provisionPath({ ...base, status: 'link-sent' }, 'owner'), null, 'a pending link is reissued deliberately, not in bulk');
   assert.equal(provisionPath({ ...base, status: 'link-expired' }, 'admin'), 'link', 'expired links recover by reissue');
   assert.equal(provisionPath({ ...base, email: null, status: 'needs-email' }, 'owner'), null);
   assert.equal(provisionPath({ ...base, role: 'admin' }, 'admin'), null, 'Admin access needs an owner');
   assert.equal(provisionPath({ ...base, role: 'admin' }, 'owner'), 'link');
-  assert.equal(nextAction({ ...base, has_account: true }, 'admin').primary, 'link-account');
-  assert.equal(PRODUCTION_ORIGIN, 'https://task-hq-three.vercel.app');
-  assert.match(linkMessage('Ralph Palad', 'Quest Roofing', PRODUCTION_ORIGIN, 'r@example.com'), /Sign in at https:\/\/task-hq-three\.vercel\.app with your existing account \(r@example\.com\)/);
+  const existing = nextAction({ ...base, has_account: true }, 'admin');
+  assert.equal(existing.primary, 'send-link');
+  assert.match(existing.detail, /Has a Task-HQ account/);
+  assert.equal(PRODUCTION_ORIGIN, 'https://task.questroofing.com', 'links open where people use Task-HQ');
 });

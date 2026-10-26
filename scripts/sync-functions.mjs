@@ -11,3 +11,6 @@ console.log(`synced ${readdirSync(target).length} engine files into supabase/fun
 const automation = new URL('../supabase/functions/dispatch/automation/', import.meta.url);
 mkdirSync(automation, { recursive: true });
 for (const file of ['contract.ts', 'project.ts', 'executive-interface.ts']) copyFileSync(new URL(`../src/automation/${file}`, import.meta.url), new URL(file, automation));
+
+// deploy/dispatch-live/v5 is live in production (deployed 2026-10-21) and frozen: it is not
+// synced. Start the next server engine change as deploy/dispatch-live/v6; see its README.

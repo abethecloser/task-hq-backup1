@@ -113,8 +113,11 @@ export function Composer({ quest, variant, onFill, initialText = '', single = fa
     return out;
   }, [drafts, state, actor, now, taxonomyOk]);
 
+  const creating = useRef(false);
   async function create() {
-    if (!drafts) return;
+    // Synchronous guard: a second tap before the re-render must not create the batch twice.
+    if (!drafts || creating.current) return;
+    creating.current = true;
     setBusy(true);
     const created: { id: string; title: string; eventId: string | null }[] = []; const ids: Record<string, string> = {}; let failed: string | undefined;
     for (const draft of drafts.filter(item => item.include)) {
@@ -126,6 +129,7 @@ export function Composer({ quest, variant, onFill, initialText = '', single = fa
       ids[draft.key] = task.id;
       created.push({ id: task.id, title: task.title, eventId: res.eventId });
     }
+    creating.current = false;
     setBusy(false);
     setResult({ created, failed, planned: [] });
     if (created.length) onCreated?.(created);
@@ -310,7 +314,7 @@ function DraftCard({ quest, draft, previous, refusal, taxonomyOk, onChange, onPl
         <label className="draft-after"><input type="checkbox" checked={draft.after === previous.key} onChange={event => onChange({ after: event.target.checked ? previous.key : null })} />
           Starts after “{previous.title}”</label>
       )}
-      {!taxonomyOk && (draft.type || draft.tags.length > 0 || draft.dueTime) && <p className="draft-note">Type, tags and time are saved after the next server update. The task is created without them.</p>}
+      {!taxonomyOk && (draft.type || draft.tags.length > 0 || draft.dueTime) && <p className="draft-note">Type, tags and time cannot be saved on the current shared server. The task will be created without them; these values are not queued for later.</p>}
       {draft.notes.length > 0 && <ul className="draft-notes">{draft.notes.map(note => <li key={note}>{note}</li>)}</ul>}
       {refusal && <p className="draft-refusal" role="alert">Won’t be allowed: {refusal}</p>}
     </article>

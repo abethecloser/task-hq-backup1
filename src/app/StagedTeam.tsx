@@ -121,7 +121,7 @@ export function PersonForm({ live, person, staged, members, onClose, onSaved, on
           </div>
           <label className="field"><span>Responsibilities / notes</span><textarea rows={2} maxLength={500} value={notes} onChange={event => setNotes(event.target.value)} placeholder="What they’ll own, crews, territories…" /></label>
           <p className="boundary">{invitable
-            ? <>{person ? 'Saving changes cancels any activation link already sent. ' : ''}<b>Save & provision</b> adds them and creates a personal single-use setup link (24 h) that joins them as {ROLE_LABELS[role]} once they choose their own password; if their email already has a Task-HQ account, it’s linked instead. Nothing is emailed — you get a message to send. <b>Save person</b> only adds them to the directory.</>
+            ? <>{person ? 'Saving changes cancels any activation link already sent. ' : ''}<b>Save & invite</b> adds them and creates a personal setup link and QR code (works once, 7 days). They confirm their email with a six-digit code and join as {ROLE_LABELS[role]}; an existing Task-HQ account is linked, not duplicated. Nothing is sent — you share it. <b>Save person</b> only adds them to the directory.</>
             : 'Planned roles grant nothing. Saving changes the directory only — no account, no access, no email.'}</p>
           {error && <p className="auth-notice is-error form-error" role="alert">{error}</p>}
           <footer className="form-actions">
@@ -129,7 +129,7 @@ export function PersonForm({ live, person, staged, members, onClose, onSaved, on
             {!person && <button type="button" className="btn btn-ghost" disabled={busy || org === NOT_SET_UP} onClick={() => void save('again')}>Save & add another</button>}
             {/* Editing keeps Save changes primary: people waiting on an activation code (no account yet) shouldn't be nudged into an invitation. */}
             <button className={`btn ${person ? 'btn-primary' : 'btn-ghost'}`} disabled={busy || org === NOT_SET_UP}>{busy ? 'Saving…' : person ? 'Save changes' : 'Save person'}</button>
-            {invitable && <button type="button" className={`btn ${person ? 'btn-ghost' : 'btn-primary'}`} disabled={busy || org === NOT_SET_UP || !email.trim()} title={email.trim() ? undefined : 'Add their email to provision access'} onClick={() => void save('invite')}>{busy ? 'Working…' : 'Save & provision'}</button>}
+            {invitable && <button type="button" className={`btn ${person ? 'btn-ghost' : 'btn-primary'}`} disabled={busy || org === NOT_SET_UP || !email.trim()} title={email.trim() ? undefined : 'Add their email: it’s the address they’ll confirm'} onClick={() => void save('invite')}>{busy ? 'Working…' : 'Save & invite'}</button>}
           </footer>
         </form>
       </section>

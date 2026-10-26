@@ -1,5 +1,7 @@
 # Employee activation (isolated module)
 
+> **Identity v1 (2026-10-20, local, not deployed):** links last 7 days; the employee proves their email with a six-digit Supabase code and the endpoint's `activate` action redeems the link for that account (`employee_activation_redeem`). The account-creating `redeem` action below is retired (410), and `?admin=1` points to People & access → Invite. See `docs/identity-v1-release.md`. The sections below describe the v1 flow as deployed on 2026-10-19.
+
 This module adds no shared routing, navigation, auth-screen, dispatch or core edits.
 
 ## Entry points
@@ -9,7 +11,9 @@ This module adds no shared routing, navigation, auth-screen, dispatch or core ed
 - Source during Vite development: `/src/activation/index.html`
 - `node src/activation/build.mjs` rebuilds only `public/activate/`. These static files are copied by the existing production Vite build, without editing its configuration. Rebuild after source changes. Browser configuration uses existing publishable Supabase settings only.
 
-Admin: select workspace and existing employee, confirm affiliation in existing People & Roles first, generate a 24-hour code, copy privately. Regeneration revokes the previous code. Revocation is immediate. Owners alone may issue admin access; owner access cannot be issued by this flow. Codes are displayed once and never recoverable from the database.
+Admin: use People & Access → Invite or the existing employee row, and confirm affiliation before issuing access. The server sends the employee-bound setup link through Resend and records `pending`, `sent`, or `failed` delivery state. A retry in the same browser session reuses the current code; when its plaintext is no longer available, the administrator must explicitly replace the active link. Replacement revokes the previous code. Revocation is immediate. Owners alone may issue admin access; owner access cannot be issued by this flow. Only code hashes are stored in the database.
+
+Email delivery uses the Edge Function secrets `RESEND_API_KEY` and `RESEND_FROM_EMAIL`; neither is available to the browser. Apply `20261022010000_activation_delivery.sql` and deploy the updated `employee-activation` function before deploying the frontend delivery controls.
 
 Employee: code → employee/company confirmation → email and password (12–128 characters) → confirmed account → password sign-in → normal Task HQ. Authentication never starts a shift. The isolated ShiftBridge still requires Claude's coordinated application integration; this module does not mount it or deploy its separate schema.
 

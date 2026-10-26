@@ -6,15 +6,13 @@
 //           nothing ever covers the work; a drawer on smaller screens.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { Section } from '../core/contract.ts';
-import { SECTION_LABELS } from '../core/contract.ts';
 import { decisionDesk } from '../core/executive.ts';
+import { SECTION_LABELS } from '../core/contract.ts';
 import type { Lens, RegistryQuery } from '../core/registry.ts';
 import { LEGACY_LENSES, LENSES, LENS_LABELS, lensCounts, queryTasks } from '../core/registry.ts';
 import { canCreateTask } from '../core/permissions.ts';
 import { insights, insightsFor } from '../core/rules.ts';
-import { activeGrant, activeLeads, canEnter, inFocus, leadBucket, manages, myTasks, person, taskById } from '../core/selectors.ts';
-import AgentWorkspace from '../AgentWorkspace.tsx';
+import { activeGrant, activeLeads, inFocus, leadBucket, myTasks, person, taskById } from '../core/selectors.ts';
 import { LookSwitch, ModeChip, BrandMark, ToastBar } from '../ui/components.tsx';
 import { useQuest } from '../ui/useQuest.ts';
 import type { Quest } from '../ui/useQuest.ts';
@@ -54,24 +52,24 @@ import { Tools } from './Tools.tsx';
 import { OperationsWorkbook } from './OperationsWorkbook.tsx';
 import { CompanySignals } from './CompanySignals.tsx';
 import { notificationsFor } from './notifications.ts';
-import { CLOSED, UNDER_CONSTRUCTION, canManage, canNavigate, isManageView } from '../core/navigation.ts';
+import { pageStatus } from '../core/navigation.ts';
+import type { AppPageId } from '../core/navigation.ts';
 import { panelLayout } from '../core/layout.ts';
 import type { Notification } from './notifications.ts';
 
 // Product feedback is archived: hidden for every account. Stored feedback is kept.
 const FEEDBACK_ON = false;
 
-export type View = 'home' | 'reports' | 'all-tasks' | 'inbox' | 'tools' | 'company-work' | 'needs-attention' | 'leads' | 'executive' | 'people' | 'feedback' | 'activity' | 'settings' | 'agents' | 'relationships' | 'calendar' | 'workbook';
-
-// All Tasks shows company-wide work, so Critical Focus gates it exactly like Company Work.
-const VIEW_SECTION: Record<View, Section | 'my-work' | 'never'> = {
-  workbook: 'my-work', home: 'my-work', calendar: 'my-work', reports: 'never', relationships: 'leads', 'all-tasks': 'company-work', inbox: 'never', tools: 'never', 'company-work': 'company-work', 'needs-attention': 'needs-attention', leads: 'leads', feedback: 'my-work',
-  executive: 'never', people: 'never', activity: 'never', settings: 'never', agents: 'never',
-};
+export type View = AppPageId;
 
 const VIEW_LABELS: Record<View, string> = {
   workbook: 'Operations Workbook · Preview', home: 'Home', calendar: 'Calendar', reports: 'Reports', relationships: 'Relationship Vault', 'all-tasks': 'All Tasks', inbox: 'Inbox', tools: 'Estimates & Proposals', 'company-work': 'Projects', 'needs-attention': 'Needs Attention', leads: 'First Response',
   executive: 'Executive Desk', people: 'Team', feedback: 'Feedback', activity: 'Activity', settings: 'Policy & data', agents: 'Agent pilot',
+};
+
+const PREVIEW_NOTES: Partial<Record<View, string>> = {
+  leads: 'This page shows only workspace lead records. No inbound inquiry source or customer communication channel is connected.',
+  relationships: 'This page shows only authorized workspace contact records. No lead source or outreach channel is connected.',
 };
 
 /** Views where the Instrument Deck (signals, calendar, insights) is useful beside the canvas. */
@@ -184,21 +182,17 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
   const focused = inFocus(state, actor);
   const grant = activeGrant(state, actor, now);
-  const allowed = (view: View) => {
-    const section = VIEW_SECTION[view];
-    if (section === 'never') return !focused;
-    return canEnter(state, actor, section, now);
-  };
+  // Destinations are consistent across workspace roles. Data and mutations remain
+  // protected by RLS and the existing server-authorized action checks.
   const me = person(state, actor)!;
   // Team-wide panels and answers need the same access as Company Work.
-  const company = me.role !== 'reviewer' && allowed('company-work');
+  const company = me.role !== 'reviewer';
   // Re-derived when state changes or each minute, not on every one-second clock tick.
   const minute = Math.floor(now / 60000);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const notifications = useMemo(() => notificationsFor(state, minute * 60000, actor), [state, minute, actor]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const decisions = useMemo(() => decisionDesk(state, minute * 60000, actor).length, [state, minute, actor]);
-  const hasDesk = manages(me) || decisions > 0;
   // One inbox per person: demo channels (this browser) + the task notifications above.
   const messagingStore = useMemo(() => (live ? null : demoMessaging(state.people)), [live]); // eslint-disable-line react-hooks/exhaustive-deps
   const [messaging, setMessaging] = useState(() => messagingStore?.load() ?? null);
@@ -220,20 +214,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const snoozeKey = sidebar.snoozes.map(item => `${item.id}:${item.until}`).join(',');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const awareAttention = useMemo(() => attentionFor(state, minute * 60000, actor, sidebar.snoozes), [state, minute, actor, snoozeKey]);
-  // The server's temporary navigation restrictions also apply to authenticated workspaces.
-  const access = live?.navigation ?? CLOSED;
-  // Work / Manage remains a role permission, separate from temporary navigation restrictions.
-  const manager = canManage(live ? live.role : me.role === 'manager' ? 'owner' : me.role === 'coordinator' ? 'supervisor' : me.role);
-  const open = (next: View) => (manager || !isManageView(next)) && (next !== 'tools' || me.role !== 'reviewer') && (next !== 'executive' || hasDesk) && canNavigate(access, next) && (next !== 'feedback' || feedbackOn);
-  const underConstruction = () => quest.say(UNDER_CONSTRUCTION);
-  const view: View = allowed(requested) && open(requested) && (requested !== 'executive' || hasDesk) ? requested : 'home';
-
-  // A restricted address (typed, deep link, back button or a link inside a panel) lands on Home.
-  useEffect(() => {
-    if (open(requested)) return;
-    setRequested('home');
-    history.replaceState(null, '', '#/home');
-  }, [requested, access]); // eslint-disable-line react-hooks/exhaustive-deps
+  const view: View = requested;
 
   // When temporary access ends, close anything opened with it.
   useEffect(() => {
@@ -242,7 +223,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   }, [focused, grant, taskId, state.focus]);
 
   function go(next: View) {
-    if (!open(next)) { underConstruction(); return; }
     setRequested(next);
     setTaskId(null);
     history.pushState(null, '', next === 'leads' && leadId ? `#/leads/${leadId}` : `#/${next}`);
@@ -256,7 +236,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     history.replaceState(null, '', `#/${view}`);
   }
   function openLead(id: string) {
-    if (!open('leads')) { underConstruction(); return; }
     setLeadId(id); setRequested('leads'); setTaskId(null);
     history.replaceState(null, '', `#/leads/${id}`);
   }
@@ -278,7 +257,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
   // Top-bar task views: each opens All Tasks on that view and changes nothing else.
   function openLens(lens: Lens) {
-    if (!allowed('all-tasks')) return;
     setPreset(current => ({ lens, keep: true, nonce: (current?.nonce ?? 0) + 1 }));
     setRequested('all-tasks'); setTaskId(null);
     if (location.hash !== `#/all-tasks/${lens}`) history.pushState(null, '', `#/all-tasks/${lens}`);
@@ -321,7 +299,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     { id: 'calendar', label: 'Calendar', icon: <Icon d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4" /> },
     { id: 'inbox', label: 'Inbox', count: inboxUnread, hot: inboxUnread > 0, icon: <Icon d="M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z" /> },
     { id: 'workbook', label: 'Operations Workbook · Preview', icon: <Icon d="M3 4h18v16H3zM3 9h18M8 4v16M14 4v16" /> },
-    { id: 'tools' as View, label: 'Estimates & Proposals', count: tools?.estimates.filter(item => item.status !== 'approved').length, icon: <Icon d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h5" /> },
+    { id: 'tools' as View, label: 'Estimates & Proposals · Preview', count: tools?.estimates.filter(item => item.status !== 'approved').length, icon: <Icon d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h5" /> },
     { id: 'needs-attention', label: 'Needs Attention', count: attention.length, hot: myAttention > 0, icon: <Icon d="M12 4 21 20H3zM12 10v4M12 17v.5" /> },
     { id: 'leads', label: 'First Response', count: leadAttention, hot: leadAttention > 0, icon: <Icon d="M13 3 5 14h6l-1 7 8-11h-6z" /> },
     { id: 'executive' as View, label: 'Executive Desk', count: decisions, hot: decisions > 0, icon: <Icon d="M4 20V9l8-5 8 5v11M9 20v-6h6v6" /> },
@@ -330,10 +308,11 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     { id: 'people', label: 'Team', count: state.people.length, icon: <Icon d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" /> },
     { id: 'reports', label: 'Reports', icon: <Icon d="M4 20V10M10 20V4M16 20v-7M22 20H2" /> },
     { id: 'activity', label: 'Activity', icon: <Icon d="M4 12h4l3-7 3 14 3-7h3" /> },
-    ...(feedbackOn ? [{ id: 'feedback' as View, label: 'Feedback', count: state.feedback.filter(item => item.status !== 'resolved').length, icon: <Icon d="M4 5h16v11H9l-5 4z" /> }] : []),
+    { id: 'feedback' as View, label: 'Feedback · Preview', icon: <Icon d="M4 5h16v11H9l-5 4z" /> },
     { id: 'settings', label: 'Policy & data', icon: <Icon d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3" /> },
-    ...(state.policy.agentPilot ? [{ id: 'agents' as View, label: 'Agent pilot', icon: <Icon d="M12 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM5 21a7 7 0 0 1 14 0" /> }] : []),
+    { id: 'agents' as View, label: 'Agent pilot · Preview', icon: <Icon d="M12 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM5 21a7 7 0 0 1 14 0" /> },
   ];
+  for (const item of navigation) if (pageStatus(item.id) === 'preview' && !item.label.endsWith('· Preview')) item.label += ' · Preview';
 
   const selected = taskId ? taskById(state, taskId) : undefined;
   const contextAllowed = selected && (!focused || selected.id === state.focus?.taskId || !!grant);
@@ -370,8 +349,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         settings={close => <>
           <p className="menu-note"><b>Settings</b>{live ? '' : <><br />Task-HQ Demo · synthetic people and data</>}</p>
           <div className="rail-settings-look"><LookSwitch /></div>
-          {open('people') && allowed('people') && <button type="button" role="menuitem" onClick={() => { close(); go('people'); }}>People &amp; access</button>}
-          {open('settings') && allowed('settings') && <button type="button" role="menuitem" onClick={() => { close(); go('settings'); }}>Workspace settings<small>Policy &amp; data</small></button>}
+          <button type="button" role="menuitem" onClick={() => { close(); go('people'); }}>People &amp; access</button>
+          <button type="button" role="menuitem" onClick={() => { close(); go('settings'); }}>Workspace settings<small>Policy &amp; data</small></button>
           {!live && onExitDemo && <button type="button" role="menuitem" onClick={() => { close(); onExitDemo(); }}>Leave demo · sign in</button>}
         </>}
         account={{ label: me.name && !me.name.includes('@') ? me.name : live?.email ?? me.name, detail: live ? ROLE_LABELS[live.role] : me.title, mark: <AccountMark quest={quest} />, menu: close => <AccountMenu quest={quest} close={close} /> }}
@@ -379,7 +358,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
           onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
-        items={navigation.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, locked: !allowed(item.id), restricted: !open(item.id), info: info[item.id] }))}
+        items={navigation.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, hot: item.hot, active: view === item.id, info: info[item.id] }))}
         onSelect={id => go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
@@ -395,14 +374,16 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
       <main className="main">
         <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen}
-          tabs={LENSES.map(lens => ({ id: lens, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && registryView.lens === lens, allowed: allowed('all-tasks') }))}
-          onTab={id => { if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} open={canNavigate(access, 'search')} onOpen={openSearchResult} onBlocked={underConstruction} />} onAsk={() => setAskOpen(value => !value)} onBell={() => sidebar.showTab('inbox')}
+          tabs={LENSES.map(lens => ({ id: lens, label: lens === 'all' ? 'All Tasks' : LENS_LABELS[lens], count: topCounts[lens], hot: (lens === 'overdue' || lens === 'urgent') && topCounts[lens] > 0, active: view === 'all-tasks' && registryView.lens === lens }))}
+          onTab={id => { if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={() => setAskOpen(value => !value)} onBell={() => sidebar.showTab('inbox')}
           onMenu={sidebar.openMobile} menuOpen={sidebar.mobileOpen} />
 
         {quest.feedback.cue && <FeedbackBar quest={quest} preferences={feedbackOn} />}
         {focused && grant && <GrantBar quest={quest} grant={grant} onReturn={() => { closeTask(); go('home'); }} />}
 
         <section className={`content view-${selected && contextAllowed ? 'task' : view}`}>
+          {view === 'feedback' && !feedbackOn && <aside className="page-preview" role="status"><b>Preview</b><span>Feedback capture is archived. Existing records appear here only when available to this workspace account.</span></aside>}
+          {PREVIEW_NOTES[view] && <aside className="page-preview" role="note"><b>Preview</b><span>{PREVIEW_NOTES[view]}</span></aside>}
           {selected && contextAllowed ? <TaskPage key={selected.id} quest={quest} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)} />
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
@@ -410,10 +391,10 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
                 unseen={{ count: inboxUnread, latest: inbox.items.find(item => !sidebar.read.has(item.id))?.title }} onUnseen={() => sidebar.showTab('inbox')}
                 mentions={mentions} read={sidebar.read}
                 onOpen={openTask} onOpenLead={openLead} onCreate={() => setCreating(true)}
-                onOpenMention={item => { if (!open('inbox')) { underConstruction(); return; } sidebar.markRead([item.id]); location.hash = `#/inbox/${encodeURIComponent(item.channelId ?? '')}/${encodeURIComponent(item.messageId ?? '')}`; }}
+                onOpenMention={item => { sidebar.markRead([item.id]); location.hash = `#/inbox/${encodeURIComponent(item.channelId ?? '')}/${encodeURIComponent(item.messageId ?? '')}`; }}
                 onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} onActivity={() => go('activity')} />
             : view === 'all-tasks' ? <AllTasks quest={quest} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} registry={registry} />
-            : view === 'reports' ? (hasDesk ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} /> : <Activity quest={quest} onOpen={openTask} />)
+            : view === 'reports' ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} />
             : view === 'inbox' ? <Inbox quest={quest} data={inboxData} notes={notifications} read={sidebar.read} markRead={sidebar.markRead} onOpenTask={openTask} onOpenLead={openLead} />
             : view === 'workbook' ? <OperationsWorkbook key={`${state.workspace.tenantId}:${actor}`} />
             : view === 'tools' ? <Tools quest={quest} store={toolsStore} tools={tools} onOpenTask={openTask} />
@@ -427,7 +408,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             : view === 'leads' ? <SpeedToLead quest={quest} onOpen={openTask} selectedLead={leadId} onSelectLead={id => { setLeadId(id); history.replaceState(null, '', id ? `#/leads/${id}` : '#/leads'); }} />
             : view === 'activity' ? <Activity quest={quest} onOpen={openTask} />
             : view === 'settings' ? <Settings quest={quest} onPeople={() => go('people')} />
-            : <AgentWorkspace />}
+            : <PagePreview title="Agent pilot" detail="This pilot is not connected to an agent service or workspace data. No tasks are sent and no outcomes are generated here." />}
         </section>
 
         <nav className="tabbar" aria-label="Task-HQ sections">
@@ -436,12 +417,10 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             { id: 'all-tasks' as View, label: 'Tasks', hot: false, icon: <Icon d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v2H4z" /> },
             ...(['inbox', 'needs-attention', 'leads'] as View[]).map(id => navigation.find(item => item.id === id)).filter(item => !!item),
           ].map(item => {
-            const restricted = !open(item.id);
             return (
-              <button key={item.id} type="button" className={`${view === item.id ? 'is-active' : ''} ${restricted ? 'is-restricted' : ''}`} disabled={!allowed(item.id)}
-                aria-disabled={restricted || undefined} title={restricted ? UNDER_CONSTRUCTION : undefined} onClick={() => (item.id === 'all-tasks' ? openLens(registryView.lens) : go(item.id))}>
+              <button key={item.id} type="button" className={`${view === item.id ? 'is-active' : ''}`} onClick={() => (item.id === 'all-tasks' ? openLens(registryView.lens) : go(item.id))}>
                 {item.icon}<span>{item.label.replace('Speed to Lead', 'Leads').replace('First Response', 'Leads').replace('Needs Attention', 'Attention').replace('All Tasks', 'Tasks')}</span>
-                {restricted ? <span className="sr-only">, under construction</span> : item.hot && allowed(item.id) && <i className="tab-dot" />}
+                {item.hot && <i className="tab-dot" />}
               </button>
             );
           })}
@@ -499,4 +478,8 @@ function LoadError({ message }: { message: string }) {
       </p>
     </div>
   );
+}
+
+function PagePreview({ title, detail }: { title: string; detail: string }) {
+  return <div className="view page-preview-view"><header className="view-head"><div><p className="eyebrow">Preview</p><h1>{title}</h1><p className="lede">{detail}</p></div></header></div>;
 }

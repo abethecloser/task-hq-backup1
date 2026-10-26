@@ -333,6 +333,10 @@ export type EditableTaskFields = Pick<Task,
   'title' | 'description' | 'projectId' | 'owner' | 'nextOwner' | 'decisionOwner' | 'approver'
   | 'waitingOn' | 'watchers' | 'priority' | 'due' | 'nextAction' | 'dependsOn' | 'type' | 'tags' | 'dueTime'>;
 
+/** The same keys at runtime: `task/update` refuses anything else (status, ultra, id, createdBy…). */
+export const EDITABLE_TASK_FIELDS = ['title', 'description', 'projectId', 'owner', 'nextOwner', 'decisionOwner', 'approver',
+  'waitingOn', 'watchers', 'priority', 'due', 'nextAction', 'dependsOn', 'type', 'tags', 'dueTime'] as const satisfies readonly (keyof EditableTaskFields)[];
+
 /** An organization's own task types and known tags. Words map to a type only if configured here. */
 export interface TaskType { id: string; label: string; keywords: string[] }
 export interface Taxonomy { types: TaskType[]; tags: string[]; tagAliases?: Record<string, string> }

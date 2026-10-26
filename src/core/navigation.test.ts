@@ -1,46 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ALWAYS_OPEN, CLOSED, MANAGE_VIEWS, RESTRICTABLE, canManage, canNavigate, forOrg, isManageView, parseNavigation } from './navigation.ts';
+import { APP_PAGE_IDS, PAGE_STATUS, pageStatus } from './navigation.ts';
 
-const server = { full: false, restricted: ['people', 'leads', 'reports'] };
-
-test('approved core pages stay open, even when server restrictions are active', () => {
-  for (const view of ALWAYS_OPEN) assert.ok(canNavigate(CLOSED, view), view);
-  assert.ok(canNavigate({ full: false, restricted: [...ALWAYS_OPEN] }, 'home'), 'the server cannot close the approved experience');
+test('every existing application page remains a destination with an explicit live or preview state', () => {
+  const expected = ['home', 'reports', 'all-tasks', 'inbox', 'tools', 'company-work', 'needs-attention', 'leads', 'executive', 'people', 'feedback', 'activity', 'settings', 'agents', 'relationships', 'calendar', 'workbook'];
+  assert.deepEqual([...APP_PAGE_IDS], expected);
+  assert.deepEqual(Object.keys(PAGE_STATUS).sort(), [...expected].sort());
+  assert.ok(expected.every(view => pageStatus(view) === 'live' || pageStatus(view) === 'preview'));
 });
 
-test('restricted sections are closed for legacy server responses', () => {
-  assert.equal(canNavigate(server, 'people'), false);
-  assert.equal(canNavigate(server, 'leads'), false);
-  assert.ok(canNavigate({ ...server, full: true }, 'people'));
-  assert.ok(canNavigate({ ...server, full: true }, 'reports'));
-});
-
-test('a section reopened on the server (row deleted) opens without a client change', () => {
-  assert.ok(canNavigate(server, 'settings'));
-  assert.ok(canNavigate({ full: false, restricted: ['leads'] }, 'people'));
-});
-
-test('missing or malformed answers fail closed', () => {
-  for (const bad of [null, undefined, 'full', { full: 'yes', restricted: [] }, { full: true }, { full: true, restricted: [1] }]) {
-    assert.deepEqual(parseNavigation(bad), CLOSED);
-  }
-  for (const view of RESTRICTABLE) assert.equal(canNavigate(CLOSED, view), false, view);
-  assert.deepEqual(parseNavigation({ full: true, restricted: ['people'] }), { full: true, restricted: ['people'], byOrg: {} });
-});
-
-test('a role can reopen a section in one organization only (owners keep People & Roles)', () => {
-  const owner = parseNavigation({ full: false, restricted: ['people', 'leads'], by_org: { quest: ['people'], other: 'bad' } });
-  assert.deepEqual(owner.byOrg, { quest: ['people'] });
-  assert.ok(canNavigate(forOrg(owner, 'quest'), 'people'));
-  assert.equal(canNavigate(forOrg(owner, 'quest'), 'leads'), false, 'other sections stay restricted');
-  assert.equal(canNavigate(forOrg(owner, 'elsewhere'), 'people'), false, 'only where they hold the role');
-  assert.equal(canNavigate(forOrg(parseNavigation({ full: false, restricted: ['people'] }), 'quest'), 'people'), false, 'older servers without by_org stay restricted');
-});
-
-test('Manage is a permanent permission from organization role, separate from the temporary restriction', () => {
-  assert.deepEqual(['owner', 'admin', 'supervisor', 'reviewer', 'member', undefined].map(canManage), [true, true, true, true, false, false]);
-  assert.ok(isManageView('people') && isManageView('settings') && !isManageView('home') && !isManageView('all-tasks'));
-  // Every Manage view is still subject to the temporary restriction.
-  assert.ok(MANAGE_VIEWS.every(view => !canNavigate(CLOSED, view)));
+test('unfinished work is labeled as preview instead of being hidden or presented as a live feature', () => {
+  for (const view of ['workbook', 'tools', 'leads', 'relationships', 'feedback', 'agents']) assert.equal(pageStatus(view), 'preview', view);
+  for (const view of ['home', 'all-tasks', 'inbox', 'people', 'reports', 'settings']) assert.equal(pageStatus(view), 'live', view);
+  assert.equal(pageStatus('future-page'), 'preview', 'unknown destinations fail toward an honest preview label');
 });

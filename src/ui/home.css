@@ -328,13 +328,15 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 /* Work / Manage: one app, two permission-based experiences. */
 .mode-switch { display: inline-flex; flex: none; gap: 2px; padding: 3px; border-radius: 10px; background: var(--sunk); }
 .mode-switch button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font-size: 13px; font-weight: 700; }
-.mode-switch button:hover:not(.is-on):not(.is-restricted) { color: var(--ink); }
+.mode-switch button:hover:not(.is-on) { color: var(--ink); }
 .mode-switch button.is-on { background: var(--card); color: var(--accent-ink); box-shadow: 0 1px 2px rgb(17 18 20 / 12%); }
-.mode-switch button.is-restricted { opacity: .42; cursor: default; }
 
 .top-link { display: inline-flex; align-items: center; gap: 4px; padding: 8px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font-size: 13.5px; font-weight: 650; white-space: nowrap; }
 .top-link:hover:not(:disabled), .top-link[aria-expanded="true"] { background: var(--sunk); color: var(--ink); }
 .top-link:disabled { opacity: .4; }
+.page-preview { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 0 0 18px; padding: 12px 14px; border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 9px; background: var(--sunk); color: var(--ink-2); }
+.page-preview b { color: var(--accent-ink); }
+.page-preview-view { padding: clamp(18px, 4vw, 40px); }
 .icon.icon-sm { width: 14px; height: 14px; }
 .topbar .topbar-right { flex: none; margin-left: 0; gap: 10px; }
 /* Search lives in the top bar: an open line like every wide field, results drop down beneath it. */
@@ -434,17 +436,6 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .signals-empty { padding: 12px; color: var(--muted); }
 @media (max-width: 1000px) { .company-signals { flex-wrap: wrap; gap: 4px; } .company-signal-preview { flex-basis: 100%; } }
 
-
-/* ── Temporary restricted navigation (core/navigation.ts) ──────────────────
-   Sections under construction keep their place and icon, muted; they stay focusable
-   and announce "under construction". Remove these rules with the restriction. */
-.nav-item.is-restricted .nav-icon, .top-tab.is-restricted, .panel-nav button.is-restricted, .tabbar button.is-restricted { opacity: .42; }
-.nav-item.is-restricted:hover .nav-icon, .nav-item.is-restricted:focus-visible .nav-icon, .top-tab.is-restricted:hover, .top-tab.is-restricted:focus-visible,
-.panel-nav button.is-restricted:hover, .panel-nav button.is-restricted:focus-visible { opacity: .7; }
-:is(.nav-item, .top-tab, .panel-nav button, .tabbar button).is-restricted { cursor: help; }
-.top-tab.is-restricted:hover { background: transparent; }
-.panel-soon { margin-left: auto; color: var(--faint); font-size: 11px; font-weight: 600; white-space: nowrap; }
-.top-search.is-restricted { opacity: .55; }
 
 /* ── People & Access ───────────────────────────────────────────────────── */
 .people-row .access-detail { display: block; margin-top: 3px; font-size: 11.5px; line-height: 1.35; }

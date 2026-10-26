@@ -1,20 +1,24 @@
-// Badge check-in: the one endpoint a badge scan calls (no sign-in needed to reach it).
-// A valid badge scanned on its own phone records a check-in or check-out (pending an
-// Owner or Admin's confirmation) and returns a one-time sign-in token for that person.
-// Any other phone, or any invalid badge, signs no one in. Codes, phone keys and tokens
-// are never logged or stored in plain form.
+// Badge check-in: the one endpoint a badge scan calls.
+// A badge identifies a person; it is never an account credential, so no reply ever carries a
+// session, sign-in link or token. It needs both the caller's own signed-in session AND that
+// account owning the badge: holding a QR alone does nothing, and a different signed-in
+// account is refused (never switched). A badge records no attendance either: on success the
+// app continues to SOD and check-in, which live in shift_sessions (the one attendance record).
+// Codes and phone keys are never logged or stored in plain form.
 
-export type ScanResult =
-  | { result: 'ok'; kind: 'in' | 'out'; at: string; email: string; name: string; note: string }
+export type VerifyResult =
+  | { result: 'ok'; name: string; org_id: string }
   | { result: 'device-pending'; name: string }
+  | { result: 'mismatch' }
   | { result: 'unavailable' };
 
 export interface BadgeDependencies {
   /** Rate limit (true = allowed). */
   limit(bucket: string, max: number, seconds: number): Promise<boolean>;
-  scan(codeHash: string, deviceHash: string): Promise<ScanResult>;
-  /** One-time sign-in token for this account; nothing is emailed. */
-  signInToken(email: string): Promise<string>;
+  /** The signed-in user behind the request's Authorization header, or null. */
+  caller(authorization: string): Promise<string | null>;
+  /** Badge owner check and phone binding for that user (public.badge_verify). */
+  verify(codeHash: string, deviceHash: string, user: string): Promise<VerifyResult>;
 }
 
 export const sha256 = async (value: string) =>
@@ -44,11 +48,15 @@ export async function handleBadge(req: Request, deps: BadgeDependencies): Promis
     if (!BADGE.test(code) || !DEVICE.test(device)) return reply(400, { error: UNAVAILABLE });
     const codeHash = await sha256(code);
     if (!await deps.limit(`badge:${codeHash}`, 20, 900)) return reply(429, { error: 'Too many scans of this badge. Wait 15 minutes.' });
-    const scan = await deps.scan(codeHash, await sha256(device));
-    if (scan.result === 'device-pending') return reply(202, { status: 'device-pending', name: scan.name });
-    if (scan.result !== 'ok') return reply(400, { error: UNAVAILABLE });
-    const token = await deps.signInToken(scan.email);
-    return reply(200, { status: 'ok', kind: scan.kind, at: scan.at, name: scan.name, note: scan.note, token_hash: token });
+    // Identity first: nothing is bound or recorded until the badge owner is the one signed in.
+    const user = await deps.caller(req.headers.get('Authorization') ?? '');
+    if (!user) return reply(401, { status: 'sign-in-required', error: 'Sign in with your own account to check in.' });
+    const verified = await deps.verify(codeHash, await sha256(device), user);
+    if (verified.result === 'mismatch') return reply(409, { status: 'account-mismatch', error: 'This badge belongs to a different account than the one signed in. Nothing was recorded.' });
+    if (verified.result === 'device-pending') return reply(202, { status: 'device-pending', name: verified.name });
+    if (verified.result !== 'ok') return reply(400, { error: UNAVAILABLE });
+    // Only what the next screen needs; the account email stays on the server.
+    return reply(200, { status: 'verified', name: verified.name, orgId: verified.org_id });
   } catch {
     return reply(400, { error: 'Check-in couldn’t complete. Try scanning again.' });
   }

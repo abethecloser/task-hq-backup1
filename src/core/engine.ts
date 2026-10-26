@@ -8,7 +8,7 @@ import { validateAliases, tagKey, validTag, canonicalTag, referenceScope } from 
 import type {
   AccessGrant, Action, ApplyContext, ApplyResult, EventEffect, EventKind, Lead, Policy, QuestEvent, QuestState, Role, Section, Task, UltraFocus,
 } from './contract.ts';
-import { APP_VERSION, FEEDBACK_CATEGORY_LABELS, FEEDBACK_STATUS_LABELS, OPERATIONAL_ROLES, SECTION_LABELS } from './contract.ts';
+import { APP_VERSION, EDITABLE_TASK_FIELDS, FEEDBACK_CATEGORY_LABELS, FEEDBACK_STATUS_LABELS, OPERATIONAL_ROLES, SECTION_LABELS } from './contract.ts';
 import { blankLead, blankTask, seedState } from './seed.ts';
 import { PRESETS, presetFor } from './workspace.ts';
 import {
@@ -305,6 +305,8 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
     case 'task/update': {
       const task = taskById(state, action.id);
       if (!task) return fail(input, 'That task no longer exists.');
+      if (!action.changes || typeof action.changes !== 'object') return fail(input, 'Nothing to change.');
+      if (Object.keys(action.changes).some(key => !(EDITABLE_TASK_FIELDS as readonly string[]).includes(key))) return fail(input, 'Those task fields can’t be edited directly. Nothing was changed.');
       const changes = { ...action.changes };
       if (changes.title !== undefined && !changes.title.trim()) return fail(input, 'A task needs a name.');
       if (me.authority && !managerish) {

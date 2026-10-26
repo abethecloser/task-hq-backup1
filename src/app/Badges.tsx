@@ -2,26 +2,23 @@
 // check-ins, check-outs and new phones with one tap. The server enforces every rule (badge_issue,
 // badge_revoke, org_badges, decide_check_in); a badge code is shown once and never stored.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import qrcode from 'qrcode-generator';
+import { qrSvg } from '../ui/qr.ts';
 import type { LiveAccount, OrgRole } from './LiveContext.tsx';
 import { PRODUCTION_ORIGIN } from '../core/people-access.ts';
 import { badgeHash, badgeLink, newBadgeCode } from '../auth/badge.ts';
 
 interface Member { user_id: string; email: string; full_name: string | null; role: OrgRole }
 interface CheckIn { id: string; user_id: string; email: string; full_name: string | null; kind: 'in' | 'out' | 'device'; at: string; status: 'pending' | 'confirmed' | 'rejected'; note: string }
+// Issuance stays closed until badge-check-in v2 (no sign-in credentials) is deployed and
+// verified in production. Revoking and confirming check-ins remain available.
+const BADGE_ISSUANCE_OPEN = false;
+
 interface BadgeRow { user_id: string; issued_at: string; phone_linked: boolean; last_used_at: string | null }
 interface Issued { name: string; link: string; display: string; svg: string }
 
 const KIND: Record<CheckIn['kind'], string> = { in: 'Checked in', out: 'Checked out', device: 'New phone' };
 const time = (iso: string) => new Date(iso).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
 const errorText = (error: unknown) => (error && typeof error === 'object' && 'message' in error ? String((error as { message: unknown }).message) : 'Something went wrong. Try again.');
-
-function qrSvg(text: string) {
-  const qr = qrcode(0, 'M');
-  qr.addData(text);
-  qr.make();
-  return qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
-}
 
 export function Badges({ live, members }: { live: LiveAccount; members: Member[] }) {
   const [badges, setBadges] = useState<BadgeRow[] | null>(null);
@@ -65,7 +62,8 @@ export function Badges({ live, members }: { live: LiveAccount; members: Member[]
   return (
     <section className="panel badges" aria-labelledby="badges-title">
       <h3 id="badges-title" className="section-label">Badges & check-ins {pending.length > 0 && <span>{pending.length}</span>}</h3>
-      <p className="muted">Each person scans their own QR badge with their own phone to check in or out. Their first phone becomes the badge’s phone; a scan from any other phone waits for your approval. Owner and Admin accounts keep their password.</p>
+      <p className="muted">Each person scans their own QR badge with their own phone to check in or out. Their first phone becomes the badge’s phone; a scan from any other phone waits for your approval. Owner and Admin accounts keep their password. A badge is for check-in only; it never signs anyone in.</p>
+      {!BADGE_ISSUANCE_OPEN && <p className="boundary">New badges are paused until the badge security update is verified. You can still switch badges off and confirm check-ins.</p>}
 
       {pending.length > 0 && (
         <div className="badge-pending">
@@ -112,7 +110,7 @@ export function Badges({ live, members }: { live: LiveAccount; members: Member[]
             <span><b>{member.full_name || member.email}</b>
               <small>{badge ? `Badge active · ${badge.phone_linked ? 'phone linked' : 'not scanned yet'}${badge.last_used_at ? ` · last scan ${time(badge.last_used_at)}` : ''}` : 'No badge'}</small></span>
             <span className="people-actions">
-              <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void issue(member)}>{badge ? 'New badge' : 'Issue badge'}</button>
+              <button type="button" className="btn btn-sm" disabled={busy || !BADGE_ISSUANCE_OPEN} title={BADGE_ISSUANCE_OPEN ? undefined : 'Paused until the badge security update is verified'} onClick={() => void issue(member)}>{badge ? 'New badge' : 'Issue badge'}</button>
               {badge && <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void run(() => live.client.rpc('badge_revoke', { p_org: live.org.id, p_user: member.user_id }), 'Badge switched off.')}>Switch off</button>}
             </span>
           </li>

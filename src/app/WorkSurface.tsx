@@ -71,12 +71,12 @@ export function WorkSurface({ quest, onOpen }: { quest: Quest; onOpen: (id: stri
 }
 
 /** Task drawer: the same composition, scoped to one task. */
-export function TaskSituation({ quest, taskId, onOpen }: { quest: Quest; taskId: string; onOpen: (id: string) => void }) {
+export function TaskSituation({ quest, taskId, onOpen, actionsOnly = false }: { quest: Quest; taskId: string; onOpen: (id: string) => void; actionsOnly?: boolean }) {
   const { state, actor, now } = quest;
   const [justDid, setJustDid] = useState<string | null>(null);
-  const situation = (justDid && composeOutcome(state, actor, now, justDid)) || composeForTask(state, actor, now, taskId, { viewport: 'compact' });
+  const situation = (!actionsOnly && justDid && composeOutcome(state, actor, now, justDid)) || composeForTask(state, actor, now, taskId, { viewport: 'compact' });
   if (!situation) return null;
-  return <SituationView quest={quest} situation={situation} onOpen={onOpen} variant="drawer" onPerformed={setJustDid} onContinue={() => setJustDid(null)} />;
+  return <SituationView quest={quest} situation={actionsOnly ? { ...situation, blocks: [], headline: '', detail: '', why: '', people: [], history: [] } : situation} onOpen={onOpen} variant="drawer" onPerformed={setJustDid} onContinue={() => setJustDid(null)} />;
 }
 
 /** The instrument deck for the current situation, opened on demand and remembered on this device. */
@@ -139,11 +139,11 @@ export function SituationView({ quest, situation, onOpen, onPerformed, onContinu
   return (
     <div {...feedback} data-feedback-record={s.taskId ?? s.leadId} className={`situation v-${variant} k-${s.kind} layout-${s.layout}`} key={s.key} data-kind={s.kind}>
       {variant === 'drawer' && <p className="ctx-label situation-label">Next authorized action</p>}
-      <header className="situation-head">
+      {s.headline && <header className="situation-head">
         <span className={`situation-kicker k-${s.kind}`}>{s.kind === 'critical-focus' && <span className="pulse" />}{s.kicker}</span>
         {s.taskId && variant !== 'drawer' && s.kind !== 'outcome' && <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpen(s.taskId!)}>Details</button>}
-      </header>
-      <h2 className="situation-headline">{s.headline}</h2>
+      </header>}
+      {s.headline && <h2 className="situation-headline">{s.headline}</h2>}
       {s.detail && <p className="situation-detail">{s.detail}</p>}
       {s.why && <p className="situation-why">{s.why}</p>}
 
