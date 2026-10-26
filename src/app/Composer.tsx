@@ -21,7 +21,7 @@ type Variant = 'home' | 'registry' | 'form';
 const PLACEHOLDER: Record<Variant, string> = {
   home: 'What needs to happen?  Try: Meeting with @Maya tomorrow 9am #permits !high',
   registry: 'Add tasks in plain words — @person #tag /type !high tomorrow 9am',
-  form: 'What needs to get done?  e.g. Inspect Elm St friday 2pm !high',
+  form: 'e.g. Inspect Elm St Friday 2pm !high',
 };
 
 /** Staged (not yet invited) people, for owners/admins in a live workspace. */
@@ -154,7 +154,7 @@ export function Composer({ quest, variant, onFill, value, onTextChange, initialT
     if (!live) return;
     const { error } = await live.client.rpc('save_staged_assignment', { p_contact: contactId, p_assignment: null, p_title: draft.title, p_next_action: '', p_due: draft.due || null, p_priority: draft.priority, p_notes: `From the command input: “${draft.source}”` });
     if (error) { update(draft.key, { notes: [...draft.notes, errorText(error)] }); return; }
-    update(draft.key, { include: false, notes: [...draft.notes, `Planned for ${name} (not assigned). It appears under their planned work in People & Roles.`] });
+    update(draft.key, { include: false, notes: [...draft.notes, `Planned for ${name} (not assigned). It appears under their planned work in People & Access.`] });
   }
 
   if (reviewer) return null;
@@ -165,7 +165,7 @@ export function Composer({ quest, variant, onFill, value, onTextChange, initialT
   return (
     <section className={`composer v-${variant} ${expanded ? 'is-open' : ''}`} aria-label="Command input">
       <div className="composer-box">
-        <ReferenceTextarea referenceScope={variant === 'form' ? taskEntryScope(state, actor) : undefined} ref={input} rows={1} value={text} placeholder={PLACEHOLDER[variant]} aria-label="Describe what needs to happen"
+        <ReferenceTextarea referenceScope={variant === 'form' ? taskEntryScope(state, actor) : undefined} ref={input} rows={1} value={text} placeholder={PLACEHOLDER[variant]} aria-label={variant === 'form' ? 'Describe it for me (optional)' : 'Describe what needs to happen'}
           aria-autocomplete="list" aria-expanded={!!suggest} aria-controls="composer-suggest" aria-activedescendant={suggest ? `composer-opt-${cursor}` : undefined}
           onChange={event => { setText(event.target.value); refreshSuggest(event.target.value, event.target.selectionStart); }}
           onSelect={event => refreshSuggest(event.currentTarget.value, event.currentTarget.selectionStart)}

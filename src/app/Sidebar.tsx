@@ -119,6 +119,8 @@ export interface SidebarItem {
   label: string;
   icon: ReactNode;
   count?: number;
+  /** Unit of the badge, so task totals are not mistaken for project totals. */
+  countLabel?: string;
   hot?: boolean;
   active: boolean;
   /** Short, role-appropriate line shown under the section in the panel. */
@@ -215,11 +217,11 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
         <nav className="nav" aria-label="Task-HQ sections">
           {items.map(item => {
             const unread = unreadIn(notifications, read, item.id);
-            const name = `${item.label}${item.count ? `, ${item.count}${item.hot ? ' need attention' : ''}` : ''}${unread ? `, ${unread} unread` : ''}`;
+            const name = `${item.label}${item.count ? `, ${item.count}${item.countLabel ? ` ${item.countLabel}` : item.hot ? ' need attention' : ''}` : ''}${unread ? `, ${unread} unread` : ''}`;
             return (
               <button key={item.id} type="button" className={`nav-item ${item.active ? 'is-active' : ''}`}
                 aria-current={item.active ? 'page' : undefined} aria-label={name}
-                {...hintFor(item.label, [item.info?.replace(/\.$/, ''), unread ? `${unread} unread` : ''].filter(Boolean).join(' · ') || undefined)}
+                {...hintFor(item.label, [item.info?.replace(/\.$/, ''), item.count && item.countLabel ? `${item.count} ${item.countLabel}` : '', unread ? `${unread} unread` : ''].filter(Boolean).join(' · ') || undefined)}
                 onClick={() => { setHint(null); onSelect(item.id); control.afterNavigate(); }}>
                 <span className="nav-icon">
                   {item.icon}
@@ -259,9 +261,10 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
               </button>
               {items.map(item => (
                 <button key={item.id} type="button" className={item.active ? 'is-active' : ''} aria-current={item.active ? 'page' : undefined}
+                  aria-label={item.count && item.countLabel ? `${item.label}, ${item.count} ${item.countLabel}` : item.label}
                   onClick={() => { onSelect(item.id); control.afterNavigate(); }}>
                   {item.icon}<span>{item.label}</span>
-                  {item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`}>{item.count}</span> : null}
+                  {item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`} title={item.countLabel ? `${item.count} ${item.countLabel}` : undefined}>{item.count}</span> : null}
                 </button>
               ))}
             </nav>
