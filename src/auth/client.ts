@@ -15,7 +15,12 @@ function isSecretKey(value: string) {
   } catch { return false; }
 }
 
-export const backendConfigured = !!(url && key && !isSecretKey(key));
+function isHttpUrl(value: string | undefined): boolean {
+  try { return ['https:', 'http:'].includes(new URL(value ?? '').protocol); }
+  catch { return false; }
+}
+
+export const backendConfigured = !!(isHttpUrl(url) && key && !isSecretKey(key));
 if (key && isSecretKey(key)) console.error('Refusing a secret Supabase key in the browser. Use the publishable key.');
 
 let client: SupabaseClient | null = null;

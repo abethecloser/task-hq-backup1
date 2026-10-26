@@ -1,0 +1,14 @@
+import { chromium } from '/Users/alexiavalenzuela/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs';
+const browser=await chromium.launch({channel:'chrome',headless:true});
+const page=await browser.newPage();
+const errors=[];
+page.on('pageerror',e=>{errors.push(e.message);console.log('PAGEERROR',e.stack)});
+page.on('console',m=>{if(m.type()==='error')console.log('CONSOLE',m.text())});
+page.on('response',r=>{if(r.url().includes('/assets/'))console.log('ASSET',r.status(),r.headers()['content-type'],r.url())});
+await page.goto(process.argv[2],{waitUntil:'networkidle'});
+await page.getByRole('button',{name:'Sign in',exact:true}).waitFor();
+console.log('BODY',await page.locator('body').innerText());
+if(errors.length)throw Error(errors.join('; '));
+console.log('PASS visible sign-in form; zero uncaught runtime errors');
+await page.screenshot({path:'/private/tmp/quest-incident-smoke.png',fullPage:true});
+await browser.close();
