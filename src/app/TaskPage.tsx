@@ -10,11 +10,12 @@ import { blockingDeps, dependents, firstName, isOpen, isOverdue, leadById, moveF
 import { completionDetails } from '../core/completed.ts';
 import { Avatar, PersonSelect, TaskTags } from '../ui/components.tsx';
 import { useFeedbackRecord } from '../ui/Feedback.tsx';
-import { ReferenceInput, ReferenceTextarea, ReferencedText } from '../ui/ReferenceEditor.tsx';
+import { ReferenceInput, ReferenceTextarea } from '../ui/ReferenceEditor.tsx';
 import { Select } from '../ui/Select.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import { AssigneeSelect, DueInput, PrioritySelect, StatusMenu } from './TaskControls.tsx';
 import { TaskSituation } from './WorkSurface.tsx';
+import { CommentReply, EventFeed, isComment } from './TaskComments.tsx';
 
 const when = (at: number) => new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const isFormField = (target: EventTarget) => target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable="true"]');
@@ -27,7 +28,6 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
   const [nextAction, setNextAction] = useState(task.nextAction);
   const [description, setDescription] = useState(task.description);
   const [waitingOn, setWaitingOn] = useState(task.waitingOn);
-  const [comment, setComment] = useState('');
   const [tab, setTab] = useState<'comments' | 'activity' | 'history'>('comments');
   const feedback = useFeedbackRecord(task.id);
   const back = useRef<HTMLButtonElement>(null);
@@ -46,18 +46,13 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
   const unlocks = dependents(state, task);
   const candidates = state.tasks.filter(item => (item.id !== task.id && item.status !== 'done') || task.dependsOn.includes(item.id));
   const events = state.events.filter(event => event.taskId === task.id);
-  const comments = events.filter(event => / commented: /.test(event.text));
-  const historyEvents = events.filter(event => !/ commented: /.test(event.text));
+  const comments = events.filter(isComment);
+  const historyEvents = events.filter(event => !isComment(event));
   const feed = tab === 'comments' ? comments : tab === 'history' ? historyEvents : events;
   const created = events.find(event => event.text.includes('created'));
   const people = state.people.filter(item => item.role !== 'reviewer');
   const watching = task.watchers.includes(actor);
 
-  async function addComment(event: FormEvent) {
-    event.preventDefault();
-    const result = await dispatch({ type: 'task/comment', id: task.id, note: comment });
-    if (result.ok) { setComment(''); setTab('comments'); }
-  }
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === 'Escape' && !event.defaultPrevented && !isFormField(event.target)) { event.stopPropagation(); onClose(); }
   }
@@ -197,19 +192,10 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             </div>
             <p className="muted tp-sub">Recent retained workspace activity; older events may no longer be available.</p>
             {!reviewer && tab === 'comments' && (
-              <form className="task-comment-form" onSubmit={event => void addComment(event)}>
-                <ReferenceTextarea rows={2} maxLength={2000} value={comment} onChange={event => setComment(event.target.value)} aria-label="Task comment" placeholder="Write a comment. Use @ to mention someone." />
-                <button className="btn btn-primary btn-sm" disabled={!comment.trim()}>Comment</button>
-              </form>
+              <CommentReply quest={quest} taskId={task.id} onSent={() => setTab('comments')} />
             )}
             <div id="tp-feed-panel" role="tabpanel" aria-labelledby={`tp-tab-${tab}`}>
-            {feed.length === 0
-              ? <p className="muted">{tab === 'comments' ? 'No comments yet.' : tab === 'history' ? 'No history yet.' : 'No activity yet.'}</p>
-              : (
-                <ol className="ctx-history tp-feed">{feed.slice(0, 60).map(event => (
-                  <li key={event.id} className={event.undone ? 'is-undone' : ''}><time>{when(event.at)}</time><p><ReferencedText text={event.text} document={event.references?.text} /></p></li>
-                ))}</ol>
-              )}
+            <EventFeed events={feed} empty={tab === 'comments' ? 'No comments yet.' : tab === 'history' ? 'No history yet.' : 'No activity yet.'} />
             </div>
           </section>
 

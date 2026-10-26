@@ -59,19 +59,6 @@ body { background: var(--canvas); }
 .note-item { border-color: var(--hair); }
 
 /* Seam toggles: circular handles that sit on the boundary between zones. */
-.seam-toggle { position: fixed; top: 50%; z-index: 38; display: grid; place-items: center; width: var(--seam); height: var(--seam); padding: 0; border: 1px solid var(--hair-2); border-radius: 50%; background: var(--card); color: var(--ink-2); box-shadow: 0 2px 8px rgb(17 18 20 / 10%); transform: translateY(-50%); transition: left var(--sidebar-speed) var(--sidebar-ease), right var(--sidebar-speed) var(--sidebar-ease), box-shadow .2s, border-color .2s, color .15s; }
-.seam-toggle .icon { width: 14px; height: 14px; stroke-width: 2.2; }
-.seam-toggle:hover { border-color: var(--accent-line); color: var(--accent-ink); box-shadow: 0 0 0 4px var(--accent-pale), 0 2px 8px rgb(17 18 20 / 10%); }
-.seam-toggle.is-left { left: calc(var(--rail) + var(--panel-offset, 0px) - 6px); } /* clears the rail's icons: the toggle sits on the seam, not on the navigation */
-.seam-toggle.is-right { right: max(6px, calc(var(--context-offset, 0px) - var(--seam) / 2)); }
-.shell[data-resizing] .seam-toggle { transition: none; }
-/* Collapsed signals: a labeled tab on the right edge instead of a bare circle, so it reads as a place to go. */
-.seam-toggle.is-right.is-tab { right: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; width: 36px; height: auto; padding: 12px 0 14px; border: 0; border-radius: 12px 0 0 12px; background: var(--ink); color: #fff; box-shadow: -2px 4px 16px rgb(17 18 20 / 18%); transition: width .18s var(--ease-out), box-shadow .2s, background .15s; }
-.seam-toggle.is-right.is-tab:hover { width: 42px; border-color: transparent; background: var(--accent-ink); color: #fff; box-shadow: -4px 6px 20px rgb(17 18 20 / 22%); }
-.seam-toggle.is-right.is-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.seam-tab-label { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
-.seam-tab-count { display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.seam-toggle.is-right.is-tab:hover .seam-tab-count { background: #fff; color: var(--accent-ink); }
 
 /* Floating controls stay on the canvas, never on top of the context zone. */
 .review-launcher { right: calc(var(--context-offset, 0px) + 22px); transition: right var(--sidebar-speed) var(--sidebar-ease), transform .15s; }
@@ -264,7 +251,7 @@ body { background: var(--canvas); }
 .context { position: fixed; inset: 0 0 0 auto; z-index: 34; display: flex; flex-direction: column; width: 420px; max-width: 100%; border-left: 1px solid var(--hair); background: var(--context-bg); }
 .context.is-drawer { z-index: 35; width: min(500px, 100%); background: var(--card); box-shadow: var(--shadow-lg); animation: slide .26s var(--ease-out); }
 .context.is-docked.context-task { animation: context-in .3s var(--ease-out); }
-.context-signals { width: 288px; background-color: var(--context-bg); background-image: linear-gradient(rgb(17 18 20 / 3.2%) 1px, transparent 1px), linear-gradient(90deg, rgb(17 18 20 / 3.2%) 1px, transparent 1px); background-size: 18px 18px; animation: context-in .3s var(--ease-out); }
+.context-signals { width: 288px; background-color: var(--context-bg); animation: context-in .3s var(--ease-out); }
 .context-head { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 0 12px 0 20px; border-bottom: 1px solid var(--hair); }
 .context-head .icon-btn { margin-left: auto; }
 .context-head .pill { margin-left: auto; }
@@ -473,7 +460,6 @@ i.sev.sev-high { background: var(--accent); }
   .invite-form { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 760px) {
-  .seam-toggle { display: none; }
   .review-launcher { right: 14px; }
   .toast { left: 50%; }
   .main { margin-right: 0; }
@@ -1040,7 +1026,7 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .tp-card .field > input, .tp-card .field > textarea { width: 100%; }
 .tp-card textarea { min-height: 0; padding: 9px 10px; field-sizing: content; resize: vertical; }
 .tp-card textarea[readonly], .tp-card input[readonly] { border-color: transparent; background: var(--surface-2); }
-.tp-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--hair-2); }
+.tp-tabs { display: flex; gap: 4px; }
 .tp-tabs button { margin-bottom: -1px; padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font-size: 13px; font-weight: 750; }
 .tp-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); }
 .tp-tabs button span { margin-left: 4px; color: var(--faint); font-weight: 650; }
@@ -1249,3 +1235,24 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 :root:root .task-page .tp-tabs button { min-height: 44px; font-size: 15px; }
 :root:root .task-page .tp-people button { min-height: 44px; }
 @container (max-width: 560px) { .tp-journey { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ── Pullouts: calendar quick view (left) and notifications (right) ──────────────────────────────── */
+.pullout-calendar { display: grid; gap: 12px; padding: 4px 4px 24px; }
+.pullout-full { width: 100%; justify-content: center; }
+.pullout-note { padding: 16px; }
+.context.context-signals.notify-drawer { width: 360px; background: var(--card); background-image: none; animation: none; }
+.context.context-signals.notify-drawer.is-drawer { width: min(420px, 100%); box-shadow: var(--shadow-lg); animation: slide .26s var(--ease-out); }
+.notify-body { padding: 10px 14px 32px; }
+.thread-head { gap: 8px; padding: 0 8px 0 10px; }
+.thread-head .icon-btn { margin-left: auto; }
+.thread-body { gap: 14px; padding-top: 14px; }
+.thread-context h2 { margin: 0 0 4px; font-size: 16px; font-weight: 800; line-height: 1.25; letter-spacing: -.01em; }
+.thread-context p { margin: 3px 0; font-size: 13px; line-height: 1.4; }
+.thread-reply { flex: none; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--hair); background: var(--card); }
+.thread-reply .task-comment-form { display: grid; gap: 8px; }
+.thread-reply .task-comment-form .btn { justify-self: end; }
+.field-error { margin: 0; color: var(--stop); font-size: 12.5px; font-weight: 650; }
+/* A phone shows one full-width panel; it follows the visible area so the reply box stays above the keyboard. */
+@media (max-width: 760px) {
+  .context.context-signals.notify-drawer, .context.context-signals.notify-drawer.is-drawer { inset: 0; width: 100%; max-width: 100%; height: var(--vvh, 100dvh); }
+}

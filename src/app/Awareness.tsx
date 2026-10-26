@@ -18,9 +18,11 @@ import type { AwarenessTab, SidebarControl } from './Sidebar.tsx';
 
 const SHOWN = 8;
 
-export function Awareness({ quest, control, inbox, attention, onOpenTask, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity }: {
+export function Awareness({ quest, control, inbox, attention, onOpenTask, onOpenThread, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity }: {
   quest: Quest; control: SidebarControl; inbox: UniversalInbox; attention: Attention;
-  onOpenTask: (id: string) => void; onOpenLead: (id: string) => void; onOpenInbox: () => void; onOpenAttention: () => void; onOpenActivity: () => void;
+  onOpenTask: (id: string) => void;
+  /** Inbox task notifications open their conversation here instead of the task page. */
+  onOpenThread?: (id: string) => void; onOpenLead: (id: string) => void; onOpenInbox: () => void; onOpenAttention: () => void; onOpenActivity: () => void;
 }) {
   const { state, now } = quest;
   const tab = control.tab;
@@ -40,7 +42,7 @@ export function Awareness({ quest, control, inbox, attention, onOpenTask, onOpen
         ))}
       </div>
       <div className="aware-panel" role="tabpanel" id={`aware-panel-${tab}`} aria-labelledby={`aware-tab-${tab}`}>
-        {tab === 'inbox' && <InboxTab quest={quest} control={control} inbox={inbox} onOpenTask={id => go(() => onOpenTask(id))} onOpenLead={id => go(() => onOpenLead(id))} onOpenInbox={() => go(onOpenInbox)} />}
+        {tab === 'inbox' && <InboxTab quest={quest} control={control} inbox={inbox} onOpenTask={id => go(() => onOpenTask(id))} onOpenThread={onOpenThread} onOpenLead={id => go(() => onOpenLead(id))} onOpenInbox={() => go(onOpenInbox)} />}
         {tab === 'attention' && <AttentionTab quest={quest} control={control} attention={attention} onOpenTask={id => go(() => onOpenTask(id))} onOpenLead={id => go(() => onOpenLead(id))} onOpenAll={() => go(onOpenAttention)} />}
         {tab === 'activity' && <ActivityTab quest={quest} onOpenTask={id => go(() => onOpenTask(id))} onOpenAll={() => go(onOpenActivity)} />}
       </div>
@@ -50,7 +52,7 @@ export function Awareness({ quest, control, inbox, attention, onOpenTask, onOpen
   );
 }
 
-function InboxTab({ quest, control, inbox, onOpenTask, onOpenLead, onOpenInbox }: { quest: Quest; control: SidebarControl; inbox: UniversalInbox; onOpenTask: (id: string) => void; onOpenLead: (id: string) => void; onOpenInbox: () => void }) {
+function InboxTab({ quest, control, inbox, onOpenTask, onOpenThread, onOpenLead, onOpenInbox }: { quest: Quest; control: SidebarControl; inbox: UniversalInbox; onOpenTask: (id: string) => void; onOpenThread?: (id: string) => void; onOpenLead: (id: string) => void; onOpenInbox: () => void }) {
   const { state, now } = quest;
   const [all, setAll] = useState(false);
   const read = control.read;
@@ -68,7 +70,7 @@ function InboxTab({ quest, control, inbox, onOpenTask, onOpenLead, onOpenInbox }
       <ul className="aware-list">
         {items.map(item => {
           const unread = !read.has(item.id);
-          const open = () => { control.markRead([item.id]); if (item.channelId) onOpenInbox(); else if (item.taskId) onOpenTask(item.taskId); else if (item.leadId) onOpenLead(item.leadId); else onOpenInbox(); };
+          const open = () => { control.markRead([item.id]); if (item.channelId) onOpenInbox(); else if (item.taskId) (onOpenThread ?? onOpenTask)(item.taskId); else if (item.leadId) onOpenLead(item.leadId); else onOpenInbox(); };
           return (
             <li key={item.id} className={`aware-row has-check ${unread ? 'is-unread' : ''} ${item.urgent ? 'is-urgent' : ''}`}>
               <button type="button" className="aware-main" onClick={open}>

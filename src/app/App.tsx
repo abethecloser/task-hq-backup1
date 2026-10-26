@@ -19,7 +19,7 @@ import type { Quest } from '../ui/useQuest.ts';
 import { AllTasks, useRegistryPrefs } from './AllTasks.tsx';
 import type { RegistryPreset } from './AllTasks.tsx';
 import { CompanyWork } from './CompanyWork.tsx';
-import { CalendarPage, CalendarSidebar } from './ContextPanel.tsx';
+import { CalendarPage, CalendarPullout } from './ContextPanel.tsx';
 import { TaskPage } from './TaskPage.tsx';
 import type { DeckSection } from './ContextPanel.tsx';
 import { CreateTask } from './CreateTask.tsx';
@@ -41,8 +41,8 @@ import { CriticalFocus, GrantBar } from './UltraFocus.tsx';
 import { FeedbackInbox, ReviewLayer, ReviewerWelcome } from './Review.tsx';
 import { ROLE_LABELS, useLive } from './LiveContext.tsx';
 import type { QuestBackend } from '../adapter/store.ts';
-import { PANEL_MIN, Sidebar, useSidebar } from './Sidebar.tsx';
-import { Awareness } from './Awareness.tsx';
+import { Sidebar, useSidebar } from './Sidebar.tsx';
+import { NotificationDrawer } from './NotificationDrawer.tsx';
 import { attentionFor } from '../core/awareness.ts';
 import { Inbox, inboxFor } from './Inbox.tsx';
 import type { InboxData } from './Inbox.tsx';
@@ -56,7 +56,9 @@ import { notificationsFor } from './notifications.ts';
 import { PREVIEW_VIEWS, PreviewNotice } from './PreviewNotice.tsx';
 import { canonicalPage, pageStatus } from '../core/navigation.ts';
 import type { AppPageId } from '../core/navigation.ts';
-import { panelLayout } from '../core/layout.ts';
+import { openPullout, pulloutMode, togglePullout } from '../core/layout.ts';
+import type { PulloutRoom, Pullouts } from '../core/layout.ts';
+import { splitFilters } from '../core/task-filters.ts';
 import type { Notification } from './notifications.ts';
 
 // Product feedback is archived: hidden for every account. Stored feedback is kept.
@@ -71,7 +73,8 @@ const VIEW_LABELS: Record<View, string> = {
 
 /** Views where the Instrument Deck (signals, calendar, insights) is useful beside the canvas. */
 const SIGNAL_VIEWS: View[] = ['home', 'all-tasks', 'company-work', 'needs-attention'];
-const SIGNAL_PANEL = 288;
+/** Width of the notifications drawer when docked beside the page. */
+const NOTIFY_PANEL = 360;
 /** The canvas never gets narrower than this because of a docked panel. */
 const MIN_CANVAS = 600;
 /** With the left panel open too, the canvas may narrow further before the right panel overlays. */
@@ -97,27 +100,6 @@ function useViewportWidth() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   return width;
-}
-
-/** 'auto' shows signals only when there is something to say; the person can pin it open or closed. */
-type ContextPref = 'auto' | 'open' | 'closed';
-/** Which Instrument Deck section is showing; a per-viewer convenience on this device. */
-function useDeckSection(actor: string): [DeckSection, (next: DeckSection) => void] {
-  const key = `quest.deck-section.v1.${actor}`;
-  const read = (): DeckSection => { try { const value = localStorage.getItem(key); return value === 'calendar' || value === 'insights' ? value : 'signals'; } catch { return 'signals'; } };
-  const [section, setSection] = useState<DeckSection>(read);
-  const [owner, setOwner] = useState(actor);
-  if (owner !== actor) { setOwner(actor); setSection(read()); }
-  return [section, next => { setSection(next); try { localStorage.setItem(key, next); } catch { /* this page only */ } }];
-}
-
-function useContextPref(actor: string): [ContextPref, (next: ContextPref) => void] {
-  const key = `quest.context.v1.${actor}`;
-  const read = (): ContextPref => { try { const value = localStorage.getItem(key); return value === 'open' || value === 'closed' ? value : 'auto'; } catch { return 'auto'; } };
-  const [pref, setPref] = useState<ContextPref>(read);
-  const [owner, setOwner] = useState(actor);
-  if (owner !== actor) { setOwner(actor); setPref(read()); }
-  return [pref, next => { setPref(next); try { localStorage.setItem(key, next); } catch { /* this page only */ } }];
 }
 
 export default function App({ onExitDemo, backend }: { onExitDemo?: () => void; backend?: QuestBackend } = {}) {
@@ -152,9 +134,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const sidebar = useSidebar(actor);
   const collapseSidebar = sidebar.collapse;
   const width = useViewportWidth();
-  const [contextPref, setContextPref] = useContextPref(actor);
-  /** The deck as a drawer, when it was asked for but can't dock beside the canvas. */
-  const [deckDrawer, setDeckDrawer] = useState(false);
+  /** Notifications drawer (right). Session-only: it always starts closed. The calendar pullout (left) is `sidebar.open`. */
+  const [notifOpen, setNotifOpen] = useState(false);
 
   useEffect(() => {
     const onHash = () => {
@@ -175,7 +156,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { setTaskId(null); setCreating(false); setDeckDrawer(false); collapseSidebar(); }
+      if (event.key === 'Escape') { setTaskId(null); setCreating(false); collapseSidebar(); }
       if (event.key === 'n' && !event.metaKey && !event.ctrlKey && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement)) { event.preventDefault(); setCreating(true); }
     };
     window.addEventListener('keydown', onKey);
@@ -331,32 +312,45 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
   // Left and right panels keep independent open state (core/layout.ts): opening one never closes the other.
   // Short on room, the left panel narrows first; a right panel that still can't dock becomes a drawer.
-  const geometry = (rightOpen: boolean, rightWidth: number) => panelLayout({ viewport: width, mobile: sidebar.isMobile, leftOpen: sidebar.open, leftWidth: sidebar.width, leftMin: PANEL_MIN, rightOpen, rightWidth, minCanvas: MIN_CANVAS, minCanvasBoth: MIN_CANVAS_BOTH });
-  // The deck shows team-wide counts, so Home needs the same access as Company Work.
+  // The Home screen's Calendar button needs the same access as Company Work.
   const deckAllowed = SIGNAL_VIEWS.includes(view) && !focused;
-  const signalsWanted = !selected && deckAllowed
-    && contextPref !== 'closed';
-  const signalsFit = geometry(true, SIGNAL_PANEL).right === 'docked';
-  const showSignals = signalsWanted && signalsFit;
-  // A deck opened from the seam stays open: where it can't dock on desktop it shows as a drawer.
-  const showDeckDrawer = !selected && deckAllowed && !signalsFit && (deckDrawer || (contextPref === 'open' && !sidebar.isMobile));
-  /** Home's Calendar and Insights buttons: open the deck on that section, docked or as a drawer. */
-  function openDeck(section: DeckSection) {
-    if (signalsFit) setContextPref('open'); else setDeckDrawer(true);
+
+  // Two pullouts. Left: the calendar quick view, opened by the rail's Calendar icon (not in Critical Focus).
+  // Right: notifications, opened by the bell. Both start closed. Both may be open on a wide desktop only while
+  // the center stays usable; otherwise opening one closes the other. On a phone only one panel shows at a time.
+  const calendarAllowed = !focused;
+  const room: PulloutRoom = { viewport: width, mobile: sidebar.isMobile, calendarWidth: sidebar.width, notificationsWidth: NOTIFY_PANEL, minCanvasBoth: MIN_CANVAS_BOTH, minCanvas: MIN_CANVAS };
+  const pullouts: Pullouts = { calendar: !sidebar.isMobile && calendarAllowed && sidebar.open, notifications: notifOpen };
+  const notifyDocked = pulloutMode('notifications', pullouts, room) === 'docked';
+  function showPullouts(next: Pullouts) {
+    if (next.notifications !== notifOpen) setNotifOpen(next.notifications);
+    if (!sidebar.isMobile && next.calendar !== sidebar.open) sidebar.toggle();
   }
-  // An open task is a full page in the canvas, so only the deck ever takes the right side.
-  const contextOffset = showSignals ? SIGNAL_PANEL : 0;
-  const leftReserved = geometry(showSignals, SIGNAL_PANEL).left;
-  const deckOpen = showSignals || showDeckDrawer;
-  const closeDeck = () => { setDeckDrawer(false); if (showSignals || contextPref === 'open') setContextPref('closed'); };
-  const signalSeam = !selected && deckAllowed && !sidebar.isMobile;
+  /** The Calendar icon: a quick view beside the page on desktop; the full calendar page on a phone or in Critical Focus. */
+  function toggleCalendar() {
+    if (sidebar.isMobile || !calendarAllowed) { go('calendar'); return; }
+    showPullouts(togglePullout(pullouts, 'calendar', room));
+  }
+  /** Home's Calendar and Insights buttons open the same quick view. */
+  function openDeck(_section: DeckSection) {
+    if (!pullouts.calendar) toggleCalendar();
+  }
+  /** The bell: Inbox in the right drawer. Pressing it again closes it. */
+  function toggleNotifications() {
+    if (notifOpen) { setNotifOpen(false); return; }
+    sidebar.setTab('inbox');
+    if (sidebar.isMobile) { sidebar.closeMobile(); setNotifOpen(true); return; }
+    showPullouts(openPullout(pullouts, 'notifications', room));
+  }
+  const contextOffset = notifOpen && notifyDocked ? NOTIFY_PANEL : 0;
+  const leftReserved = pullouts.calendar ? sidebar.width : 0;
 
   return (
     <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'}`}
       style={{ ...sidebar.shellStyle, ...(sidebar.isMobile ? {} : { ['--panel-offset' as string]: `${leftReserved}px` }), ['--context-offset' as string]: `${contextOffset}px` }}
       data-sidebar={sidebar.isMobile ? undefined : sidebar.open ? 'open' : 'closed'} data-context={contextOffset ? 'open' : 'closed'} data-resizing={sidebar.resizing || undefined}>
       <Sidebar
-        control={leftReserved && leftReserved !== sidebar.width ? { ...sidebar, width: leftReserved } : sidebar}
+        control={sidebar}
         notifications={notifications}
         settings={close => <>
           <p className="menu-note"><b>Settings</b>{live ? '' : <><br />Task-HQ Demo · synthetic people and data</>}</p>
@@ -366,33 +360,28 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           {!live && onExitDemo && <button type="button" role="menuitem" onClick={() => { close(); onExitDemo(); }}>Sign in to Task HQ</button>}
         </>}
         account={{ label: me.name && !me.name.includes('@') ? me.name : live?.email ?? me.name, detail: live ? ROLE_LABELS[live.role] : me.title, mark: <AccountMark quest={quest} />, menu: close => <AccountMenu quest={quest} close={close} /> }}
-        awareness={<Awareness quest={quest} control={sidebar} inbox={inbox} attention={awareAttention}
-          onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
-          onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />}
+        pulloutTitle="Calendar"
+        pullout={calendarAllowed
+          ? <CalendarPullout quest={quest} company={company} onOpenTask={openTask} onExpandCalendar={() => go('calendar')} onCreate={canCreate ? due => createOn(due) : undefined} />
+          : <p className="muted pullout-note">The calendar is unavailable during Critical Focus.</p>}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
-        items={navigation.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: view === item.id, info: info[item.id] }))}
-        onSelect={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
+        items={navigation.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: view === item.id || (item.id === 'calendar' && pullouts.calendar), info: info[item.id] }))}
+        onSelect={id => id === 'all-tasks' ? openLens(registryView.lens) : id === 'calendar' ? toggleCalendar() : go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
           ? <><LookSwitch compact /><ModeChip quest={quest} /><p>Signed in as {me.name && !me.name.includes('@') ? me.name : live.email} · {ROLE_LABELS[live.role]}{live.isPlatformAdmin ? ' · platform admin (separate)' : ''}</p><button type="button" className="link exit-demo" onClick={live.onSignOut}>Sign out</button></>
           : <><LookSwitch compact /><ModeChip quest={quest} /><p><b>Task-HQ Demo</b> · synthetic people and data. Changes stay on this device; teammates are not notified.</p>{onExitDemo && <button type="button" className="link exit-demo" onClick={onExitDemo}>Sign in to Task HQ</button>}</>}
       />
-      {!sidebar.isMobile && (
-        <button type="button" className="seam-toggle is-left" onClick={sidebar.toggle} aria-controls="quest-sidebar" aria-expanded={sidebar.open}
-          aria-label={sidebar.open ? 'Collapse sidebar' : 'Expand sidebar'} title={sidebar.open ? 'Collapse sidebar' : 'Expand sidebar'}>
-          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={sidebar.open ? 'M14 7l-5 5 5 5' : 'M10 7l5 5-5 5'} /></svg>
-        </button>
-      )}
-
       <main className="main">
         {!live && onExitDemo && <aside className="demo-access" aria-label="Task HQ demo">
           <div><strong>Task HQ Demo</strong><span>Sample data · changes stay on this device</span></div>
           <button type="button" className="btn btn-primary" onClick={onExitDemo}>Sign in to Task HQ</button>
         </aside>}
-        <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen}
-          tabs={taskTabs}
-          onTab={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={() => setAskOpen(value => !value)} onBell={() => sidebar.showTab('inbox')}
-          onMenu={sidebar.openMobile} menuOpen={sidebar.mobileOpen} />
+        <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen} notifOpen={notifOpen}
+          title={(VIEW_LABELS[view] ?? '').replace(' · Preview', '')}
+          tabs={view === 'all-tasks' && !(selected && contextAllowed) ? taskTabs : undefined}
+          onTab={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={() => setAskOpen(value => !value)} onBell={toggleNotifications}
+          onMenu={() => { setNotifOpen(false); sidebar.openMobile(); }} menuOpen={sidebar.mobileOpen} />
 
         {quest.feedback.cue && <FeedbackBar quest={quest} preferences={feedbackOn} onViewCompleted={() => { const task = state.tasks.find(task => task.id === quest.feedback.cue?.taskId); openCompleted(task?.owner === actor ? 'mine' : 'company'); }} />}
         {focused && grant && <GrantBar quest={quest} grant={grant} onReturn={() => { closeTask(); go('home'); }} />}
@@ -451,21 +440,14 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       {selected && !contextAllowed && (
         <div className="locked-note" role="alert">“{selected.title}” is outside your Critical Focus. Request access to {SECTION_LABELS['company-work']} first. <button className="btn btn-ghost btn-sm" onClick={closeTask}>Close</button></div>
       )}
-      {(showSignals || showDeckDrawer) && <>
-        {showDeckDrawer && <button className="scrim" aria-label="Close instrument deck" onClick={closeDeck} />}
-        <CalendarSidebar quest={quest} notifications={notifications} company={company} docked={showSignals}
-          onOpenNotification={note => { setDeckDrawer(false); openNotification(note); }} onOpenTask={id => { setDeckDrawer(false); openTask(id); }}
-          onClose={closeDeck} onExpandCalendar={() => { setDeckDrawer(false); go('calendar'); }}
-          onCreate={canCreate ? due => { setDeckDrawer(false); createOn(due); } : undefined} />
+      {notifOpen && <>
+        {!notifyDocked && <button type="button" className="scrim" aria-label="Close notifications" onClick={() => setNotifOpen(false)} />}
+        <NotificationDrawer quest={quest} control={sidebar} inbox={inbox} attention={awareAttention} docked={notifyDocked}
+          threadAllowed={id => !focused || id === state.focus?.taskId || !!grant}
+          onClose={() => setNotifOpen(false)}
+          onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
+          onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />
       </>}
-      {signalSeam && (
-        <button type="button" className={`seam-toggle is-right ${showSignals ? '' : 'is-tab'}`} onClick={() => (deckOpen ? closeDeck() : setContextPref('open'))} aria-expanded={deckOpen}
-          aria-label={deckOpen ? 'Collapse calendar and activity' : `Show instrument deck${notifications.length ? `, ${notifications.length} need you` : ''}`} title={deckOpen ? 'Collapse calendar and activity' : 'Show instrument deck'}>
-          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={deckOpen ? 'M10 7l5 5-5 5' : 'M14 7l-5 5 5 5'} /></svg>
-          {!showSignals && <span className="seam-tab-label">Calendar</span>}
-          {!showSignals && notifications.length > 0 && <span className="seam-tab-count">{notifications.length > 9 ? '9+' : notifications.length}</span>}
-        </button>
-      )}
       {askOpen && !focused && <AskTasks quest={quest} company={company} onClose={() => setAskOpen(false)} />}
       {creating && canCreate && <CreateTask quest={quest} due={createDue} onClose={() => { setCreating(false); setCreateDue(undefined); }} onCreated={id => { setCreating(false); setCreateDue(undefined); openTask(id); }} />}
       {feedbackOn && <ReviewLayer quest={quest} openRequest={reviewRequest}
