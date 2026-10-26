@@ -25,7 +25,7 @@ export function CompanyWork({ quest, onOpen }: { quest: Quest; onOpen: (id: stri
       <header className="view-head">
         <div>
           <p className="eyebrow">Shared visibility</p>
-          <h1>Company Work</h1>
+          <h1>Projects</h1>
           <p className="lede">Everything the team is moving. Everyone in {quest.backend.kind === 'live' ? state.workspace.name : 'this demo workspace'} can see it; owners and approvers control what moves.</p>
         </div>
       </header>

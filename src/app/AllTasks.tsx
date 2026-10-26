@@ -111,7 +111,7 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
         <div>
           <p className="eyebrow">{live ? `${state.workspace.name} · task registry` : 'Task-HQ Demo · synthetic records'}</p>
           <div className="view-title-row">
-            <h1>{completed ? 'Completed' : query.lens === 'all' ? 'All Tasks' : LENS_LABELS[query.lens]}</h1>
+            <h1>{completed ? 'Completed' : query.lens === 'all' ? 'Tasks' : LENS_LABELS[query.lens]}</h1>
             <div className="scope-seg" role="group" aria-label="Whose tasks">
               <button type="button" aria-pressed={query.scope === 'mine'} onClick={() => pickScope('mine')}>
                 <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 21a7.5 7.5 0 0 1 15 0" /></svg>My work

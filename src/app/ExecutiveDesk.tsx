@@ -1,4 +1,4 @@
-// Executive Desk: the Executive Brief, Decision Desk and Daily Signal from the
+// Owner overview (formerly Executive Desk and Reports, which were the same page): the Executive Brief, Decision Desk and Daily Signal from the
 // shared core (src/core/executive.ts), computed on the workspace this person is
 // already authorized to load. Nothing runs by itself: every option is performed
 // only after the principal confirms, through the same engine dispatch as any
@@ -57,8 +57,8 @@ export function ExecutiveDesk({ quest, onOpenTask, onOpenLead }: { quest: Quest;
     <div className="view exec">
       <header className="view-head">
         <div>
-          <p className="eyebrow">Executive Desk · {new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(now)}{brief.synthetic ? ' · synthetic demo' : ''}</p>
-          <h1>{firstName(state, actor, 'Your')}’s desk</h1>
+          <p className="eyebrow">Owner overview · {new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(now)}{brief.synthetic ? ' · synthetic demo' : ''}</p>
+          <h1>{firstName(state, actor, 'Your')}’s overview</h1>
           <p className="lede">{brief.headline}</p>
         </div>
       </header>

@@ -123,13 +123,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             {lead && <div className="callout"><b>Lead</b> {lead.name} · {lead.phone} · {lead.address}</div>}
           </section>
           <section className="tp-card" aria-labelledby="tp-people">
-            <h2 id="tp-people" className="ctx-label">People</h2>
-            <dl className="tp-people">
-              <div><dt>Next-step owner</dt><dd>{editable ? <PersonSelect state={state} label="Next-step owner" value={task.nextOwner} onChange={id => void update({ nextOwner: id })} /> : task.nextOwner ? nameOf(state, task.nextOwner) : '—'}</dd></div>
-              <div><dt>Approver</dt><dd>{editable ? <PersonSelect state={state} label="Approver" value={task.approver} emptyLabel="No approval needed" onChange={id => void update({ approver: id })} /> : task.approver ? nameOf(state, task.approver) : 'None'}</dd></div>
-              {(editable || task.decisionOwner) && <div><dt>Decision owner</dt><dd>{editable ? <PersonSelect state={state} label="Decision owner" value={task.decisionOwner} onChange={id => void update({ decisionOwner: id })} /> : nameOf(state, task.decisionOwner)}</dd></div>}
-            </dl>
-            <h3 className="ctx-label tp-sub">Watchers <span>{task.watchers.length}</span></h3>
+            <h2 id="tp-people" className="ctx-label">Watchers <span>{task.watchers.length}</span></h2>
             <ul className="tp-watchers">
               {task.watchers.map(id => (
                 <li key={id}><Avatar state={state} id={id} size="sm" />{id === actor ? 'You' : nameOf(state, id, 'Former member')}
@@ -161,23 +155,32 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             </section>
           )}
 
-          {editable && (
-            <details className="tp-card drawer-details">
-              <summary>More details</summary>
-              <div className="roles">
-                {quest.backend.supports?.taskTaxonomy !== false && <>
-                  <label className="field"><span>Time</span><input type="time" value={task.dueTime ?? ''} disabled={!task.due || locked} onChange={event => void update({ dueTime: event.target.value || undefined })} /></label>
-                  {(state.taxonomy?.types.length ?? 0) > 0 && <label className="field"><span>Type</span><Select value={task.type ?? ''} onChange={event => void update({ type: event.target.value || undefined })}><option value="">No type</option>{state.taxonomy!.types.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</Select></label>}
-                  <label className="field"><span>Tags</span><input defaultValue={(task.tags ?? []).join(' ')} placeholder="permits safety" onBlur={event => { const tags = event.target.value.split(/[\s,]+/).map(tag => tag.replace(/^#/, '').toLowerCase()).filter(Boolean); if (tags.join(' ') !== (task.tags ?? []).join(' ')) void update({ tags }); }} /></label>
-                </>}
-              </div>
-              <details className="deps">
-                <summary>Depends on ({task.dependsOn.length})</summary>
-                {candidates.map(item => <label key={item.id} className={`dep-check ${item.status === 'done' ? 'is-completed' : ''}`}><input type="checkbox" checked={task.dependsOn.includes(item.id)} onChange={() => void update({ dependsOn: toggle(task.dependsOn, item.id) })} />{item.title}</label>)}
-              </details>
-              {task.dependsOn.some(id => !taskById(state, id)) && <p className="muted">A dependency was removed.</p>}
-            </details>
-          )}
+          <details className="tp-card drawer-details">
+            <summary>More details <small>routing, lifecycle{editable ? ', time, tags, dependencies' : ''}</small></summary>
+            <section className="tp-routing" aria-label="Advanced routing">
+              <h3 className="ctx-label tp-sub">Advanced routing</h3>
+              <dl className="tp-people">
+                <div><dt>Next-step owner</dt><dd>{editable ? <PersonSelect state={state} label="Next-step owner" value={task.nextOwner} onChange={id => void update({ nextOwner: id })} /> : task.nextOwner ? nameOf(state, task.nextOwner) : '—'}</dd></div>
+                <div><dt>Approver</dt><dd>{editable ? <PersonSelect state={state} label="Approver" value={task.approver} emptyLabel="No approval needed" onChange={id => void update({ approver: id })} /> : task.approver ? nameOf(state, task.approver) : 'None'}</dd></div>
+                {(editable || task.decisionOwner) && <div><dt>Decision owner</dt><dd>{editable ? <PersonSelect state={state} label="Decision owner" value={task.decisionOwner} onChange={id => void update({ decisionOwner: id })} /> : nameOf(state, task.decisionOwner)}</dd></div>}
+              </dl>
+            </section>
+            <LifecycleReference task={task} />
+            {editable && <>
+                <div className="roles">
+                  {quest.backend.supports?.taskTaxonomy !== false && <>
+                    <label className="field"><span>Time</span><input type="time" value={task.dueTime ?? ''} disabled={!task.due || locked} onChange={event => void update({ dueTime: event.target.value || undefined })} /></label>
+                    {(state.taxonomy?.types.length ?? 0) > 0 && <label className="field"><span>Type</span><Select value={task.type ?? ''} onChange={event => void update({ type: event.target.value || undefined })}><option value="">No type</option>{state.taxonomy!.types.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</Select></label>}
+                    <label className="field"><span>Tags</span><input defaultValue={(task.tags ?? []).join(' ')} placeholder="permits safety" onBlur={event => { const tags = event.target.value.split(/[\s,]+/).map(tag => tag.replace(/^#/, '').toLowerCase()).filter(Boolean); if (tags.join(' ') !== (task.tags ?? []).join(' ')) void update({ tags }); }} /></label>
+                  </>}
+                </div>
+                <details className="deps">
+                  <summary>Depends on ({task.dependsOn.length})</summary>
+                  {candidates.map(item => <label key={item.id} className={`dep-check ${item.status === 'done' ? 'is-completed' : ''}`}><input type="checkbox" checked={task.dependsOn.includes(item.id)} onChange={() => void update({ dependsOn: toggle(task.dependsOn, item.id) })} />{item.title}</label>)}
+                </details>
+                {task.dependsOn.some(id => !taskById(state, id)) && <p className="muted">A dependency was removed.</p>}
+            </>}
+          </details>
         </div>
 
         <aside className="tp-col tp-conversation" aria-label="Conversation">
@@ -267,9 +270,16 @@ export function ResponsibilityCard({ quest, task, onOpen }: { quest: Quest; task
   const action = dependency ? plan.current : task.status === 'review' ? `Review the work${task.approver ? ` · Approver: ${nameOf(state, task.approver)}` : ''}` : task.status === 'blocked' ? `Resolve blocker: ${task.blocker?.note || 'Needs help'}` : task.nextAction || (task.status === 'ready' ? 'Start the work' : 'Finish the work');
   const handoff = task.status !== 'review' && task.status !== 'done' && task.approver ? `Next: review by ${nameOf(state, task.approver)}` : task.nextOwner ? `Next handoff: ${nameOf(state, task.nextOwner)}` : 'Next handoff not assigned';
   return <section className={`tp-story tp-actions ${task.status === 'done' ? 'is-done' : ''}`} aria-labelledby="tp-story-title">
-    <div className="tp-story-person">{responsible && task.status !== 'done' && <Avatar state={state} id={responsible} size="md" />}<div><p className="tp-story-label">Action story</p><h2 id="tp-story-title">{heading}</h2></div></div>
-    {task.status === 'done' ? <Completed quest={quest} task={task} /> : <><p className="tp-story-action">{action}</p>{task.waitingOn && <p>External wait: {task.waitingOn}</p>}<TaskSituation key={task.id} quest={quest} taskId={task.id} onOpen={onOpen} actionsOnly /></>}
+    <div className="tp-story-person">{responsible && task.status !== 'done' && <Avatar state={state} id={responsible} size="md" />}<div><p className="tp-story-label">Who acts next</p><h2 id="tp-story-title">{heading}</h2></div></div>
+    {task.status === 'done' ? <Completed quest={quest} task={task} /> : <><p className="tp-story-action"><span className="tp-story-k">What to do</span>{action}</p>{task.waitingOn && <p>External wait: {task.waitingOn}</p>}<TaskSituation key={task.id} quest={quest} taskId={task.id} onOpen={onOpen} actionsOnly /></>}
     <p className="tp-story-handoff">{handoff}</p>
+  </section>;
+}
+
+/** Where the task sits in the usual lifecycle. A reference only, so it lives under "More details". */
+function LifecycleReference({ task }: { task: Task }) {
+  return <section className="tp-lifecycle" aria-label="Lifecycle reference">
+    <h3 className="ctx-label tp-sub">Lifecycle</h3>
     <ol className="tp-journey" aria-label="Lifecycle reference, not a record of visited states">{(['ready', 'working', 'review', 'done'] as const).map(status => <li key={status} aria-current={task.status === status ? 'step' : undefined}>{({ ready: 'Ready', working: 'Working', review: 'In Review', done: 'Done' })[status]}{status === 'review' && <small>{task.approver ? 'When approval is required' : 'Optional · no approver set'}</small>}</li>)}</ol>
     <p className="tp-story-note">{task.status === 'blocked' ? 'Currently blocked. ' : ''}Lifecycle reference only; steps may be skipped. See History for actual transitions.</p>
   </section>;

@@ -1,5 +1,5 @@
 import { Select } from '../ui/Select.tsx';
-// People & Roles — staging tools for owners/admins: add or edit a person (directory
+// People & Access — staging tools for owners/admins: add or edit a person (directory
 // only), plan their work, and review invitations. Every write is a server function that
 // re-checks the caller's role; nothing here creates an account, a membership or an
 // invitation except the explicit "Prepare invitations" step, and nothing sends email.

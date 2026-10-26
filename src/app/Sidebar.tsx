@@ -122,6 +122,8 @@ export interface SidebarItem {
   /** Unit of the badge, so task totals are not mistaken for project totals. */
   countLabel?: string;
   hot?: boolean;
+  /** Not ready for daily use: listed under Previews instead of the everyday items. */
+  preview?: boolean;
   active: boolean;
   /** Short, role-appropriate line shown under the section in the panel. */
   info?: string;
@@ -160,6 +162,38 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
     onMouseLeave: () => setHint(null),
     onBlur: () => setHint(null),
   });
+
+  // Everyday pages first. Preview modules stay one click away in a collapsed group, and the
+  // group opens by itself while one of them is the current page so you never lose your place.
+  const everyday = items.filter(item => !item.preview);
+  const previews = items.filter(item => item.preview);
+  const [previewsOpen, setPreviewsOpen] = useState(false);
+  const showPreviews = previewsOpen || previews.some(item => item.active);
+
+  const itemName = (item: SidebarItem, unread = 0) => `${item.label}${item.preview ? ', preview' : ''}${item.count ? `, ${item.count}${item.countLabel ? ` ${item.countLabel}` : item.hot ? ' need attention' : ''}` : ''}${unread ? `, ${unread} unread` : ''}`;
+  const railItem = (item: SidebarItem) => {
+    const unread = unreadIn(notifications, read, item.id);
+    return (
+      <button key={item.id} type="button" className={`nav-item ${item.active ? 'is-active' : ''}`}
+        aria-current={item.active ? 'page' : undefined} aria-label={itemName(item, unread)}
+        {...hintFor(item.label, [item.preview ? 'Preview' : '', item.info?.replace(/\.$/, ''), item.count && item.countLabel ? `${item.count} ${item.countLabel}` : '', unread ? `${unread} unread` : ''].filter(Boolean).join(' · ') || undefined)}
+        onClick={() => { setHint(null); onSelect(item.id); control.afterNavigate(); }}>
+        <span className="nav-icon">
+          {item.icon}
+          {unread > 0 ? <span className="rail-unread" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>
+            : item.hot && <i className="nav-pip" aria-hidden="true" />}
+        </span>
+      </button>
+    );
+  };
+  const panelItem = (item: SidebarItem) => (
+    <button key={item.id} type="button" className={item.active ? 'is-active' : ''} aria-current={item.active ? 'page' : undefined}
+      aria-label={item.preview || (item.count && item.countLabel) ? `${item.label}${item.preview ? ', preview' : ''}${item.count && item.countLabel ? `, ${item.count} ${item.countLabel}` : ''}` : item.label}
+      onClick={() => { onSelect(item.id); control.afterNavigate(); }}>
+      {item.icon}<span>{item.label}</span>
+      {item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`} title={item.countLabel ? `${item.count} ${item.countLabel}` : undefined}>{item.count}</span> : null}
+    </button>
+  );
 
   useEffect(() => {
     const node = panel.current;
@@ -215,22 +249,18 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
       <aside className="rail" aria-label="Instrument Rail">
         <div className="sidebar-brand">{brand}</div>
         <nav className="nav" aria-label="Task-HQ sections">
-          {items.map(item => {
-            const unread = unreadIn(notifications, read, item.id);
-            const name = `${item.label}${item.count ? `, ${item.count}${item.countLabel ? ` ${item.countLabel}` : item.hot ? ' need attention' : ''}` : ''}${unread ? `, ${unread} unread` : ''}`;
-            return (
-              <button key={item.id} type="button" className={`nav-item ${item.active ? 'is-active' : ''}`}
-                aria-current={item.active ? 'page' : undefined} aria-label={name}
-                {...hintFor(item.label, [item.info?.replace(/\.$/, ''), item.count && item.countLabel ? `${item.count} ${item.countLabel}` : '', unread ? `${unread} unread` : ''].filter(Boolean).join(' · ') || undefined)}
-                onClick={() => { setHint(null); onSelect(item.id); control.afterNavigate(); }}>
-                <span className="nav-icon">
-                  {item.icon}
-                  {unread > 0 ? <span className="rail-unread" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>
-                    : item.hot && <i className="nav-pip" aria-hidden="true" />}
-                </span>
+          {everyday.map(railItem)}
+          {previews.length > 0 && (
+            <>
+              <button type="button" className={`nav-item nav-group-toggle ${showPreviews ? 'is-open' : ''}`} aria-expanded={showPreviews} aria-controls="nav-previews"
+                aria-label={`Previews, ${previews.length} modules not ready for daily use`}
+                {...hintFor('Previews', `${previews.length} modules not ready for daily use`)}
+                onClick={() => { setHint(null); setPreviewsOpen(open => !open); }}>
+                <span className="nav-icon"><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={showPreviews ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} /></svg></span>
               </button>
-            );
-          })}
+              {showPreviews && <div id="nav-previews" className="nav-previews" role="group" aria-label="Previews">{previews.map(railItem)}</div>}
+            </>
+          )}
         </nav>
         <div className="sidebar-foot">
           <RailMenu label="Settings" className="rail-settings" hint={hintFor('Settings', 'Look and workspace')} icon={<svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>}>{settings}</RailMenu>
@@ -259,14 +289,17 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
               <button type="button" className="nav-create panel-create" disabled={!create.enabled} onClick={() => { create.onCreate(); control.afterNavigate(); }}>
                 <span aria-hidden="true">+</span> New task
               </button>
-              {items.map(item => (
-                <button key={item.id} type="button" className={item.active ? 'is-active' : ''} aria-current={item.active ? 'page' : undefined}
-                  aria-label={item.count && item.countLabel ? `${item.label}, ${item.count} ${item.countLabel}` : item.label}
-                  onClick={() => { onSelect(item.id); control.afterNavigate(); }}>
-                  {item.icon}<span>{item.label}</span>
-                  {item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`} title={item.countLabel ? `${item.count} ${item.countLabel}` : undefined}>{item.count}</span> : null}
-                </button>
-              ))}
+              {everyday.map(panelItem)}
+              {previews.length > 0 && (
+                <>
+                  <button type="button" className={`panel-group-toggle ${showPreviews ? 'is-open' : ''}`} aria-expanded={showPreviews} aria-controls="panel-previews"
+                    onClick={() => setPreviewsOpen(open => !open)}>
+                    <span>Previews <small>not ready for daily use</small></span>
+                    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={showPreviews ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} /></svg>
+                  </button>
+                  {showPreviews && <div id="panel-previews" className="panel-previews" role="group" aria-label="Previews">{previews.map(panelItem)}</div>}
+                </>
+              )}
             </nav>
           )}
           {awareness}
