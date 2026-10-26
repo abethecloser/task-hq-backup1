@@ -898,6 +898,13 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .panel-nav button .icon { width: 18px; height: 18px; }
 .panel-nav .panel-count { margin-left: auto; }
 .panel-nav .panel-create { margin-bottom: 6px; }
+/* Previews: modules that are not ready for daily use stay reachable, collapsed under their own heading. */
+.rail .nav-group-toggle { opacity: .75; }
+.rail .nav-previews { display: grid; gap: inherit; padding-top: 2px; border-top: 1px dashed var(--hair-2); }
+.panel-nav button.panel-group-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: var(--ctl-m); margin-top: 6px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.panel-nav .panel-group-toggle small { margin-left: 6px; font-weight: 500; color: var(--faint); }
+.panel-nav .panel-group-toggle .icon { width: 16px; height: 16px; }
+.panel-nav .panel-previews { display: grid; gap: 2px; }
 
 .aware-kind b { flex: none; font-weight: 800; white-space: nowrap; }
 .aware-kind em { flex: 1 1 auto; min-width: 0; }
@@ -1223,6 +1230,10 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .tp-story-label { margin: 0 0 4px; font-size: 14px; color: var(--muted); }
 :root:root .tp-story h2 { margin: 0; font-size: clamp(24px, 3vw, 30px); line-height: 1.2; }
 :root:root .tp-story-action { margin: 0; font-size: 20px; line-height: 1.45; font-weight: 650; }
+.tp-story-k { display: block; margin-bottom: 2px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.drawer-details > summary small { margin-left: 8px; font-weight: 500; color: var(--faint); }
+.tp-routing, .tp-lifecycle { margin-top: 12px; }
+.tp-routing:first-of-type { margin-top: 8px; }
 .tp-story-handoff { margin: 0; padding-top: 14px; border-top: 1px solid var(--hair-2); font-size: 16px; }
 .tp-journey { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; list-style: none; margin: 0; padding: 0; }
 .tp-journey li { padding: 10px 8px; border-top: 2px solid var(--hair-2); font-size: 15px; font-weight: 700; }

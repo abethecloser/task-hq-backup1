@@ -27,7 +27,8 @@ try {
   assert.match(render('jordan'),/Approver: Maya Chen/);
   task.approver=''; task.status='working';
   assert.match(render('alex'),/Next handoff not assigned/);
-  assert.match(render('alex'),/Optional · no approver set/);
+  assert.match(render('alex'),/What to do/);
+  assert.match(render('alex',TaskPage),/Optional · no approver set/);
   task.status='done'; task.completedAt=now;
   assert.match(render('alex'),/Completion actor unavailable/);
   assert.match(render('alex'),/Completed/);
@@ -36,7 +37,20 @@ try {
   assert.match(render('maya'),/Your turn/);
   task.status='working'; task.blocker=null;
   const page=render('alex',TaskPage);
-  assert.equal((page.match(/Action story/g)||[]).length,1);
+  assert.equal((page.match(/Who acts next/g)||[]).length,1);
+  // Advanced routing and the lifecycle reference stay available, but under "More details".
+  assert.match(page,/<summary>More details/);
+  assert.match(page,/Advanced routing/);
+  assert.match(page,/Next-step owner/);
+  assert.match(page,/Lifecycle reference/);
+  assert.doesNotMatch(render('alex'),/Lifecycle reference/, 'the action card no longer carries the lifecycle strip');
+  // A person who cannot edit still sees who the approver and next-step owner are, as plain text.
+  task.approver='maya'; task.nextOwner='riley';
+  const readOnly=render('sam',TaskPage);
+  assert.match(readOnly,/Advanced routing/);
+  assert.match(readOnly,/Maya Chen/);
+  assert.match(readOnly,/Riley Brooks/);
+  task.approver=''; task.nextOwner='';
   assert.doesNotMatch(page,/Quick actions/);
   // Build the harness separately into the existing local dist folder. No srcdoc,
   // postMessage listener, extension-message rendering, or nested Vite HTML transforms.

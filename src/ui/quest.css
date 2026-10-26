@@ -239,6 +239,15 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 .group { display: grid; gap: 10px; }
 .group-title { display: flex; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 800; letter-spacing: .01em; color: var(--ink-2); }
 .group-title span { color: var(--faint); font-weight: 650; }
+/* Needs Attention: one block per task, its conditions beneath. */
+.attn-summary { margin: 4px 0 14px; font-size: 13px; color: var(--ink-2); }
+.attn-group { margin-bottom: 18px; }
+.attn-group .group-title { flex-wrap: wrap; font-size: 15px; color: var(--ink); }
+button.attn-title { padding: 0; font: inherit; font-weight: 800; text-align: left; color: var(--ink); background: none; border: 0; cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+button.attn-title:hover { text-decoration-color: currentColor; }
+span.attn-title { color: var(--ink); font-weight: 800; }
+.attn-context { color: var(--faint); font-weight: 650; }
+
 .seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--sunk); }
 .seg button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; font-weight: 650; font-size: 12.5px; color: var(--muted); }
 .seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: var(--shadow); }
