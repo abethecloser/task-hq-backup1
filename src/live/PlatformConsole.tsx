@@ -73,7 +73,7 @@ export function PlatformConsole({ client, context, onOpen, onSignOut, onRefresh 
               const pending = context.requests.find(item => item.org_name === org.name && item.status === 'pending');
               return (
                 <li key={org.id}>
-                  <span><b>{org.name}</b><br /><small>{pending ? `Request pending since ${new Date(pending.created_at).toLocaleDateString()} · waiting for an owner or admin of ${org.name} to approve in People & Roles.` : 'Not a member. Requires approval from an owner or admin of this organization.'}</small></span>
+                  <span><b>{org.name}</b><br /><small>{pending ? `Request pending since ${new Date(pending.created_at).toLocaleDateString()} · waiting for an owner or admin of ${org.name} to approve in People & Access.` : 'Not a member. Requires approval from an owner or admin of this organization.'}</small></span>
                   {!pending && (org.owners > 0
                     ? <form className="console-inline" onSubmit={event => { event.preventDefault(); void run(() => client.rpc('request_access', { p_workspace: org.slug, p_message: accessNote.trim() || 'Platform admin requesting operational membership. Please choose my roles.' }), `Request sent to ${org.name}. Nothing is granted until an owner or admin approves it.`).then(ok => { if (ok) { setAccessNote(''); void onRefresh?.(); } }); }}>
                         <input value={accessNote} maxLength={500} placeholder="Note for the owner (optional)" onChange={event => setAccessNote(event.target.value)} aria-label={`Note for ${org.name} owner`} />

@@ -65,7 +65,7 @@ export function Settings({ quest, onPeople }: { quest: Quest; onPeople?: () => v
       <header className="view-head"><div><p className="eyebrow">{backend.kind === 'live' ? state.workspace.name : 'Configurable · demo defaults'}</p><h1>Policy & data</h1><p className="lede">{backend.kind === 'live' ? 'Policy applies to everyone in this workspace. ' : 'These are starting points to try, not company policy. '}{isManager ? 'You can change them as a manager.' : 'Only a manager can change them.'}</p></div></header>
 
       {backend.kind === 'live'
-        ? <section className="panel settings"><h3>Members & access</h3><p className="muted">Members, invitations, access requests and roles{live ? ` for ${live.org.name}` : ''} live in People & Roles.</p>{onPeople && <button type="button" className="btn btn-ghost" onClick={onPeople}>Open People & Roles</button>}</section>
+        ? <section className="panel settings"><h3>Members & access</h3><p className="muted">Members, invitations, access requests and roles{live ? ` for ${live.org.name}` : ''} live in People & Access.</p>{onPeople && <button type="button" className="btn btn-ghost" onClick={onPeople}>Open People & Access</button>}</section>
         : <WorkspacePanel quest={quest} isManager={isOwner} />}
 
       <TaxonomyPanel quest={quest} isManager={isManager} />

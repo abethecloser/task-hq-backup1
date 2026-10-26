@@ -18,11 +18,11 @@ export function NeedsAttention({ quest, onOpen }: { quest: Quest; onOpen: (id: s
         <div>
           <p className="eyebrow">Rule-based guidance · no AI required</p>
           <h1>Needs Attention</h1>
-          <p className="lede">Each item says what happened, why it matters, what to do, and who acts next.</p>
+          <p className="lede">Each item is an attention condition, not a separate task. One task may have several conditions. Each condition says who acts next.</p>
         </div>
         <div className="seg" role="group" aria-label="Whose items">
-          <button type="button" aria-pressed={scope === 'all'} onClick={() => setScope('all')}>Everyone <span>{all.length}</span></button>
-          <button type="button" aria-pressed={scope === 'mine'} onClick={() => setScope('mine')}>For me <span>{all.filter(item => item.who === actor).length}</span></button>
+          <button type="button" aria-pressed={scope === 'all'} onClick={() => setScope('all')}>Everyone <span>{all.length} conditions</span></button>
+          <button type="button" aria-pressed={scope === 'mine'} onClick={() => setScope('mine')}>For me <span>{all.filter(item => item.who === actor).length} conditions</span></button>
         </div>
       </header>
       <FocusControl quest={quest} onOpen={onOpen} />

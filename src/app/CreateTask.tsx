@@ -105,7 +105,8 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
         <header className="modal-head"><div><span className="kicker">NEW TASK</span><h2 id="create-title">Create a task</h2></div><button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>×</button></header>
         <div className="cx">
           <div className="cx-form">
-            <section className="cx-card cx-hero" aria-label="Describe the task">
+            <section className="cx-card cx-hero" aria-label="Describe it for me (optional)">
+              <p className="muted">Describe it for me (optional) · Fill task details from plain words.</p>
               <div className="cx-hero-row">
                 <div className="cx-hero-input create-composer"><Composer quest={quest} variant="form" value={entryText} onTextChange={setEntryText} onFill={fill} /></div>
                 {Recognition && <button type="button" className={`cx-mic ${listening ? 'is-on' : ''}`} aria-label={listening ? 'Listening…' : 'Dictate the task'} aria-pressed={listening} onClick={listen}>
@@ -115,7 +116,7 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
             </section>
 
             <form id="create-task-form" className="cx-fields" onSubmit={submit}>
-              <label className="field cx-title"><span>What needs to get done?</span><ReferenceInput autoFocus required maxLength={160} value={draft.title} onChange={event => set({ title: event.target.value })} placeholder="e.g. Confirm the dumpster drop-off for Maple Ave" /></label>
+              <label className="field cx-title"><span>Task title</span><ReferenceInput autoFocus required maxLength={160} value={draft.title} onChange={event => set({ title: event.target.value })} placeholder="e.g. Confirm the dumpster drop-off for Maple Ave" /></label>
 
               <section className="cx-card" aria-labelledby="cx-routing">
                 <h3 id="cx-routing" className="cx-sec"><i>01</i> Routing</h3>

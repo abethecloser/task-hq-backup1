@@ -465,7 +465,7 @@ function DemoPeople({ quest }: { quest: Quest }) {
       <header className="view-head">
         <div>
           <p className="eyebrow">Task-HQ Demo · synthetic team</p>
-          <h1>People & Roles</h1>
+          <h1>People & Access</h1>
           <p className="lede">A complete fictional team so you can experience the whole organization before real employees are onboarded. Nobody here can sign in, and nothing here touches the live workspace.</p>
         </div>
       </header>
