@@ -257,7 +257,6 @@ function Metric({ value, label, sub, tone, icon, onClick }: { value: number; lab
       <span className="hd-metric-top"><b>{value}</b><svg className="icon" viewBox="0 0 24 24" aria-hidden="true">{icon}</svg></span>
       <span className="lbl">{label}</span>
       {sub && <span className="sub">{sub}</span>}
-      <span className="bar" aria-hidden="true" />
     </button>
   );
 }
