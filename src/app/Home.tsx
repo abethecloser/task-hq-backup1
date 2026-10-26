@@ -87,7 +87,7 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
           <Metric value={metrics.completedToday} label="Completed today" tone="ok" sub={progress.total ? `${progress.done} of ${progress.total} on today’s plate` : undefined}
             icon={<path d="M3 17l6-6 4 4 8-8M15 7h6v6" />} onClick={() => onRegistry('all', { scope: 'mine', status: 'done' })} />
           <Metric value={metrics.overdue} label="Overdue" tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />} onClick={() => onRegistry('overdue', { scope: 'mine' })} />
-          <Metric value={metrics.blocked} label="Blocked" tone="warn" sub="or waiting on a dependency" icon={<path d="M5 12h14" />} onClick={() => onRegistry('all', { scope: 'mine', status: 'blocked' })} />
+          <Metric value={metrics.blocked} label="Blocked" tone="warn" sub="marked blocked" icon={<path d="M5 12h14" />} onClick={() => onRegistry('all', { scope: 'mine', status: 'blocked' })} />
         </div>
       </div>
 

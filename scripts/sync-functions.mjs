@@ -13,4 +13,7 @@ mkdirSync(automation, { recursive: true });
 for (const file of ['contract.ts', 'project.ts', 'executive-interface.ts']) copyFileSync(new URL(`../src/automation/${file}`, import.meta.url), new URL(file, automation));
 
 // deploy/dispatch-live/v5 is live in production (deployed 2026-10-21) and frozen: it is not
-// synced. Start the next server engine change as deploy/dispatch-live/v6; see its README.
+// synced. v6 (completion state: completedBy, archive) is the next candidate and keeps the
+// same nine engine files in sync with src/core.
+const v6 = new URL('../deploy/dispatch-live/v6/core/', import.meta.url);
+for (const file of readdirSync(v6)) copyFileSync(new URL(`../src/core/${file}`, import.meta.url), new URL(file, v6));

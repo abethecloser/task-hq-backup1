@@ -8,7 +8,6 @@ import { referenceScope } from '../core/references.ts';
 import type { ReferenceDocument } from '../core/references.ts';
 import { searchReferences, workspaceIndex } from '../core/reference-index.ts';
 import type { SearchKind, SearchQuery, SearchResult } from '../core/reference-index.ts';
-import { UNDER_CONSTRUCTION } from '../core/navigation.ts';
 import { ReferenceInput, SEARCH_EVENT } from '../ui/ReferenceEditor.tsx';
 import type { SearchRequest } from '../ui/ReferenceEditor.tsx';
 import { useDropdown } from '../ui/useDropdown.tsx';
@@ -22,7 +21,7 @@ function Highlight({ text, ranges }: { text: string; ranges: [number, number][] 
   out.push(text.slice(at)); return <>{out}</>;
 }
 /** One search for the whole app, in the top bar: results drop down under the field and open in place. */
-export function TopSearch({ quest, data, tools, open: allowed, onOpen, onBlocked }: { quest: Quest; data: InboxData; tools?: ToolsState | null; open: boolean; onOpen: (result: SearchResult) => void; onBlocked: () => void }) {
+export function TopSearch({ quest, data, tools, onOpen }: { quest: Quest; data: InboxData; tools?: ToolsState | null; onOpen: (result: SearchResult) => void }) {
   const live = useLive();
   const [text, setText] = useState('');
   const [reference, setReference] = useState<SearchRequest>({});
@@ -70,7 +69,7 @@ export function TopSearch({ quest, data, tools, open: allowed, onOpen, onBlocked
     }, 250);
     return () => { alive = false; clearTimeout(timer); };
   }, [live, signature]);
-  const searching = allowed && (!!text.trim() || !!reference.person || !!reference.tag);
+  const searching = !!text.trim() || !!reference.person || !!reference.tag;
   const local = searching ? searchReferences(index, query) : [];
   const results = [...new Map([...local, ...remote].map(r => [`${r.workspaceId}:${r.id}`, r])).values()].sort((a, b) => b.updatedAt - a.updatedAt);
   const groups = GROUPS.map(g => { const all = results.filter(r => r.kind === g.id); return { ...g, total: all.length, rows: all.slice(0, PER_GROUP) }; }).filter(g => g.total);
@@ -85,14 +84,14 @@ export function TopSearch({ quest, data, tools, open: allowed, onOpen, onBlocked
     onOpen(result);
   }
   return (
-    <form ref={root} className={`search-field top-search ${allowed ? '' : 'is-restricted'} ${label ? 'has-reference' : ''}`} role="search" title={allowed ? undefined : UNDER_CONSTRUCTION}
-      onSubmit={event => { event.preventDefault(); if (!allowed) onBlocked(); else pick(flat[active] ?? flat[0]); }}>
+    <form ref={root} className={`search-field top-search ${label ? 'has-reference' : ''}`} role="search"
+      onSubmit={event => { event.preventDefault(); pick(flat[active] ?? flat[0]); }}>
       <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 16l5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg>
       {label && <button type="button" className="top-search-ref" aria-label={`Remove ${label}`} onClick={() => { setReference({}); input.current?.focus(); }}>{label} <span aria-hidden="true">×</span></button>}
-      <ReferenceInput ref={input} referenceScope={{ ...scope, canCreateTags: false }} type="text" value={text} readOnly={!allowed}
-        placeholder={allowed ? 'Search tasks, people, projects' : 'Search · under construction :)'} aria-label={allowed ? 'Search' : 'Search, under construction'}
+      <ReferenceInput ref={input} referenceScope={{ ...scope, canCreateTags: false }} type="text" value={text}
+        placeholder="Search tasks, people, projects" aria-label="Search"
         role="combobox" aria-expanded={shown && searching} aria-controls="top-search-results" aria-autocomplete="list" aria-activedescendant={shown && flat[active] ? `top-search-${active}` : undefined}
-        onReferencesChange={setDocument} onFocus={() => { if (allowed) setShown(true); }} onClick={() => { if (!allowed) onBlocked(); }}
+        onReferencesChange={setDocument} onFocus={() => setShown(true)}
         onChange={event => { setText(event.target.value); setShown(true); setActive(0); }}
         onKeyDown={event => {
           if (event.key === 'Escape') { if (shown && searching) { event.preventDefault(); close(); } else input.current?.blur(); }

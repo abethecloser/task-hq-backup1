@@ -11,7 +11,9 @@ This module adds no shared routing, navigation, auth-screen, dispatch or core ed
 - Source during Vite development: `/src/activation/index.html`
 - `node src/activation/build.mjs` rebuilds only `public/activate/`. These static files are copied by the existing production Vite build, without editing its configuration. Rebuild after source changes. Browser configuration uses existing publishable Supabase settings only.
 
-Admin: select workspace and existing employee, confirm affiliation in existing People & Roles first, generate a 24-hour code, copy privately. Regeneration revokes the previous code. Revocation is immediate. Owners alone may issue admin access; owner access cannot be issued by this flow. Codes are displayed once and never recoverable from the database.
+Admin: use People & Access → Invite or the existing employee row, and confirm affiliation before issuing access. The server sends the employee-bound setup link through Resend and records `pending`, `sent`, or `failed` delivery state. A retry in the same browser session reuses the current code; when its plaintext is no longer available, the administrator must explicitly replace the active link. Replacement revokes the previous code. Revocation is immediate. Owners alone may issue admin access; owner access cannot be issued by this flow. Only code hashes are stored in the database.
+
+Email delivery uses the Edge Function secrets `RESEND_API_KEY` and `RESEND_FROM_EMAIL`; neither is available to the browser. Apply `20261022010000_activation_delivery.sql` and deploy the updated `employee-activation` function before deploying the frontend delivery controls.
 
 Employee: code → employee/company confirmation → email and password (12–128 characters) → confirmed account → password sign-in → normal Task HQ. Authentication never starts a shift. The isolated ShiftBridge still requires Claude's coordinated application integration; this module does not mount it or deploy its separate schema.
 
@@ -61,3 +63,18 @@ The administrator signs in through the normal app, then opens `/activate/index.h
 Isolated HTTPS preview: https://task-ox50kthsu-novum-systems.vercel.app/activate/index.html (no production alias changed).
 
 The isolated preview signs in on its own origin. Continuing to the existing production application requires sign-in there again. The normal same-origin `/activate/index.html` release shares the existing Auth session automatically. Do not transfer sessions through URL parameters.
+
+## Deferred improvement: onboarding pass
+
+Not scheduled and not implemented. Idea: after activation, give a new employee a short, role-aware "onboarding pass" (what they can open, what is preview-only, who to ask) instead of landing directly in the workspace. The activation flow itself stays unchanged until the pilot has run.
+
+## Deferred architecture decision: Tools drawer
+
+Not scheduled and not implemented. The primary sidebar stays unchanged during employee onboarding; no links are moved or removed.
+
+Future idea: an expandable **Tools** drawer as a secondary navigation layer for modular capabilities (Estimates, First Response, Relationships, Operations Workbook).
+
+Requirements to honor when it is built:
+- Keep existing routes and server-enforced permissions exactly as they are.
+- Each entry carries a status label: Live, Preview or Unavailable.
+- Tools are registered from one list, so adding a tool does not require editing primary navigation.

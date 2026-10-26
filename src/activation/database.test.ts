@@ -6,6 +6,7 @@ async function setup(){
  await db.pg.exec(`alter table auth.users add column raw_app_meta_data jsonb default '{}';create table public.team_activation_codes(id uuid primary key default gen_random_uuid(),employee_name text not null,employee_ref text,code_hash text not null unique,created_at timestamptz default now(),expires_at timestamptz not null default now()+interval '7 days',redeemed_at timestamptz,redeemed_by uuid references auth.users(id));alter table public.team_activation_codes enable row level security;`);
  await db.pg.exec(`insert into public.team_activation_codes(employee_name,code_hash) values('Preserved legacy employee',repeat('f',64));`);
  await db.pg.exec(read('supabase/migrations/20261019115203_employee_activation_v1.sql'));
+ await db.pg.exec(read('supabase/migrations/20261022010000_activation_delivery.sql'));
  const org=await addOrg(db,'activation-test','Activation Test'),owner=await addUser(db,'owner@test.invalid'),admin=await addUser(db,'admin@test.invalid'),outsider=await addUser(db,'outsider@test.invalid');
  await addMember(db,org,owner,'owner','manager');await addMember(db,org,admin,'admin','manager');
  const employee=uuid();await db.pg.query(`insert into public.staged_contacts(id,org_id,staging_key,full_name,affiliation_confirmed,provisional_role) values($1,$2,'test-employee','Test Employee',true,'member')`,[employee,org]);
@@ -75,5 +76,37 @@ test('onboarding: status follows the records, expired setup link recovers by rei
  assert.equal((await rpcAs(s.db,s.outsider,'accept_invitation',{p_invitation:inv.data})).error,null);
  assert.equal((await status(existing)).status,'active');
  assert.equal((await s.db.pg.query<any>(`select count(*)::int n from auth.users where email='outsider@test.invalid'`)).rows[0].n,1,'linking never duplicates the account');
+ }finally{await s.db.close();}
+});
+
+test('activation delivery SQL: permissions, retry reuse and explicit replacement',async()=>{
+ const s=await setup();try{
+  await s.db.pg.query(`update public.staged_contacts set email='delivery@test.invalid' where id=$1`,[s.employee]);
+  const firstHash='b'.repeat(64),replacementHash='c'.repeat(64);
+  const membershipsBefore=(await s.db.pg.query<any>(`select count(*)::int n from public.memberships where org_id=$1`,[s.org])).rows[0].n;
+  const issued=await rpcAs(s.db,s.owner,'employee_activation_issue',{p_org:s.org,p_employee:s.employee,p_hash:firstHash,p_replace:false});
+  assert.equal(issued.error,null);
+  assert.ok((await rpcAs(s.db,s.outsider,'employee_activation_issue',{p_org:s.org,p_employee:s.employee,p_hash:replacementHash,p_replace:true})).error,'non-admins cannot issue or replace links');
+  const duplicate=await rpcAs(s.db,s.owner,'employee_activation_issue',{p_org:s.org,p_employee:s.employee,p_hash:replacementHash,p_replace:false});
+  assert.match(String(duplicate.error?.message),/active setup link/i);
+  assert.equal((await s.db.pg.query<any>(`select count(*)::int n from public.team_activation_codes where employee_id=$1 and revoked_at is null`,[s.employee])).rows[0].n,1);
+
+  const prepared=await rpcAs(s.db,s.owner,'employee_activation_delivery',{p_action:'prepare',p_org:s.org,p_employee:s.employee,p_hash:firstHash});
+  assert.equal(prepared.error,null);assert.equal(prepared.data.email,'delivery@test.invalid');
+  const retry=await rpcAs(s.db,s.owner,'employee_activation_delivery',{p_action:'prepare',p_org:s.org,p_employee:s.employee,p_hash:firstHash});
+  assert.equal(retry.data.id,prepared.data.id,'retry reuses the original activation record');
+  assert.equal((await s.db.pg.query<any>(`select count(*)::int n from public.team_activation_codes where employee_id=$1`,[s.employee])).rows[0].n,1);
+  const listed=await rpcAs(s.db,s.owner,'employee_activation_delivery',{p_action:'list',p_org:s.org});
+  assert.equal(listed.error,null,String(listed.error));
+  assert.equal(listed.data[0].status,'pending');
+  assert.ok((await rpcAs(s.db,s.owner,'employee_activation_delivery',{p_action:'record',p_activation:prepared.data.id,p_status:'sent'})).error,'browser-authenticated callers cannot forge delivery outcomes');
+  assert.ok((await rpcAs(s.db,s.outsider,'employee_activation_delivery',{p_action:'list',p_org:s.org})).error,'non-admins cannot read delivery status');
+
+  const replaced=await rpcAs(s.db,s.owner,'employee_activation_issue',{p_org:s.org,p_employee:s.employee,p_hash:replacementHash,p_replace:true});
+  assert.equal(replaced.error,null);
+  assert.notEqual(replaced.data.id,prepared.data.id);
+  assert.ok((await s.db.pg.query<any>(`select revoked_at from public.team_activation_codes where id=$1`,[prepared.data.id])).rows[0].revoked_at);
+  assert.equal((await s.db.pg.query<any>(`select count(*)::int n from public.team_activation_codes where employee_id=$1 and revoked_at is null and redeemed_at is null`,[s.employee])).rows[0].n,1);
+  assert.equal((await s.db.pg.query<any>(`select count(*)::int n from public.memberships where org_id=$1`,[s.org])).rows[0].n,membershipsBefore,'delivery never creates a membership');
  }finally{await s.db.close();}
 });

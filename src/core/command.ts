@@ -11,7 +11,9 @@
 //   then …       a following task that depends on the previous one
 //   assign … to Name / ask Name to … / owner Name     a PROPOSED owner (needs confirmation)
 //   review by Name / approval from Name               a PROPOSED approver (review point)
-// A mention alone ("with @Maya") is never an assignment: it only adds a watcher.
+// General command mentions link identities without assigning or subscribing anyone.
+// New Task primary entry opts into exact @assignment via parseTaskEntry only.
+import { canAssignOthers } from './permissions.ts';
 import type { ReferenceDocument } from './references.ts';
 import type { NewTask, Person, QuestState } from './contract.ts';
 import { canonicalTag, projectReferences, referenceDocument, referenceScope, referenceSuggestions } from './references.ts';
@@ -293,6 +295,34 @@ export function parseCommand(input: string, state: QuestState, now: number, stag
     });
   });
   return drafts;
+}
+
+/** Only the New Task primary entry offers people the actor may assign. Notes and
+ * comments continue to use the ordinary reference scope and parser semantics. */
+export function taskEntryScope(state: QuestState, actor: string) {
+  const scope = referenceScope(state, actor);
+  const me = state.people.find(person => person.id === actor);
+  return { ...scope, people: scope.people.filter(person => me && me.role !== 'reviewer' && me.authority !== 'reviewer' && person.role !== 'reviewer' && person.authority !== 'reviewer' && (person.id === actor || canAssignOthers(state, actor))) };
+}
+
+/** Exact, unambiguous @references assign only in the New Task primary input.
+ * Use the full workspace to resolve ambiguity before checking assignment rights.
+ * Explicitly selected identities are validated by the shared reference parser. */
+export function parseTaskEntry(input: string, state: QuestState, actor: string, now: number, documents: ReferenceDocument[] = []): Draft | undefined {
+  const draft = parseCommand(input, state, now, [], { single: true, documents })[0];
+  if (!draft) return undefined;
+  const doc = referenceDocument(input, referenceScope(state, actor), undefined, documents);
+  const mentions = [...input.matchAll(/(?:^|[\s(])@[\p{L}\p{N}][\p{L}\p{N}_'-]*/gu)];
+  const people = doc.spans.filter(span => span.kind === 'person');
+  const ids = [...new Set(people.map(span => span.id))];
+  const id = ids.length === 1 && mentions.length === people.length ? ids[0] : undefined;
+  // A reviewer named in an explicit approval phrase is not the execution owner.
+  const approverOnly = draft.approver?.ref.kind === 'member' && draft.approver.ref.id === id && !draft.owner;
+  if (id && !approverOnly && taskEntryScope(state, actor).people.some(person => person.id === id)) {
+    const person = state.people.find(person => person.id === id)!;
+    draft.owner = { ref: { kind: 'member', id, name: person.name }, from: 'Primary @reference', confirmed: true };
+  }
+  return draft;
 }
 
 /** The engine action input for one reviewed draft. Proposals count only once confirmed. */

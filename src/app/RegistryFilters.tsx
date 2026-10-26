@@ -23,7 +23,7 @@ const FIELDS = Object.keys(FILTER_DEFAULTS) as (keyof FilterFields)[];
 const withoutAny = <T extends string>(values: T[]) => values.filter(value => value !== 'any');
 const same = (a: string | string[], b: string | string[]) => (Array.isArray(a) && Array.isArray(b) ? a.length === b.length && a.every(value => b.includes(value)) : a === b);
 
-const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [{ value: 'open', label: 'Open' }, ...BOARD_ORDER.map(status => ({ value: status, label: STATUS_LABELS[status] }))];
+const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [{ value: 'open', label: 'Open' }, ...BOARD_ORDER.map(status => ({ value: status, label: status === 'done' ? 'Completed' : STATUS_LABELS[status] })), { value: 'archived', label: 'Archived' }];
 const PRIORITY_CHIPS: { value: PriorityFilter; label: string }[] = [{ value: 'ultra', label: 'Ultra Priority' }, { value: 'high', label: 'High' }, { value: 'normal', label: 'Normal' }];
 const DUE_CHIPS: { value: DueFilter; label: string }[] = [{ value: 'overdue', label: 'Overdue' }, { value: 'today', label: 'Due today' }, { value: 'week', label: 'Next 7 days' }, { value: 'none', label: 'No due date' }];
 

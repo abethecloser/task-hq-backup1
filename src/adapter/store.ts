@@ -43,6 +43,8 @@ export interface BackendSupports {
   taskTaxonomy: boolean;
   /** `task/reopen` for completed work. */
   taskReopen: boolean;
+  /** `task/archive` and `task/unarchive`, plus the saved completedBy. */
+  taskArchive: boolean;
   /** `lead/claim` and `lead/tags`. */
   leadOwnership: boolean;
   /** `roles/label` work-role descriptions. */

@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { UNDER_CONSTRUCTION } from '../core/navigation.ts';
 import type { ReactNode } from 'react';
 import { useDropdown } from '../ui/useDropdown.tsx';
 import { firstName, person } from '../core/selectors.ts';
@@ -10,13 +9,13 @@ import { useWorkday } from '../shifts/Workday.tsx';
 
 // Primary destinations share one persistent, horizontally scrollable navigation.
 // Task tabs reuse the registry lenses; other destinations keep their existing routes.
-export interface TopTab { id: string; label: string; count?: number; hot: boolean; active: boolean; allowed: boolean; restricted?: boolean }
+export interface TopTab { id: string; label: string; count?: number; hot: boolean; active: boolean }
 
 export function TopBar({ quest, demo, focused, unread, askOpen, mode, tabs, onTab, search, onAsk, onBell, onMenu, menuOpen }: {
   quest: Quest; demo: boolean; focused: boolean; unread: number;
   askOpen: boolean; tabs: TopTab[];
-  /** Work / Manage switch, only for accounts with the Manage permission. `entry` is false while every Manage section is under construction. */
-  mode?: { current: 'work' | 'manage'; entry: boolean; onChange: (next: 'work' | 'manage') => void };
+  /** Optional workspace grouping control. It does not change page availability. */
+  mode?: { current: 'work' | 'manage'; onChange: (next: 'work' | 'manage') => void };
   onTab: (id: string) => void; /** The app-wide search field (TopSearch). */ search: ReactNode; onAsk: () => void; onBell: () => void; onMenu: () => void; menuOpen: boolean;
 }) {
   return (
@@ -26,15 +25,13 @@ export function TopBar({ quest, demo, focused, unread, askOpen, mode, tabs, onTa
       {mode && (
         <div className="mode-switch" role="group" aria-label="Workspace">
           <button type="button" className={mode.current === 'work' ? 'is-on' : ''} aria-pressed={mode.current === 'work'} onClick={() => mode.onChange('work')}>Work</button>
-          <button type="button" className={`${mode.current === 'manage' ? 'is-on' : ''} ${mode.entry ? '' : 'is-restricted'}`} aria-pressed={mode.current === 'manage'}
-            aria-disabled={!mode.entry || undefined} title={mode.entry ? undefined : UNDER_CONSTRUCTION} onClick={() => { if (mode.entry) mode.onChange('manage'); }}>Manage</button>
+          <button type="button" className={mode.current === 'manage' ? 'is-on' : ''} aria-pressed={mode.current === 'manage'} onClick={() => mode.onChange('manage')}>Manage</button>
         </div>
       )}
       <nav className="top-nav top-tabs" aria-label="Primary navigation" tabIndex={0}>
         {tabs.map(tab => (
-          <button key={tab.id} type="button" className={`top-tab ${tab.active ? 'is-active' : ''} ${tab.restricted ? 'is-restricted' : ''}`} aria-current={tab.active ? 'page' : undefined} disabled={!tab.allowed}
-            aria-disabled={tab.restricted || undefined} aria-label={tab.restricted ? `${tab.label}, under construction` : undefined} title={tab.restricted ? UNDER_CONSTRUCTION : undefined} onClick={() => onTab(tab.id)}>
-            {tab.label}{tab.count !== undefined && !tab.restricted && <span className={tab.hot ? 'is-hot' : ''}>{tab.count}</span>}
+          <button key={tab.id} type="button" className={`top-tab ${tab.active ? 'is-active' : ''}`} aria-current={tab.active ? 'page' : undefined} onClick={() => onTab(tab.id)}>
+            {tab.label}{tab.count !== undefined && <span className={tab.hot ? 'is-hot' : ''}>{tab.count}</span>}
           </button>
         ))}
       </nav>

@@ -44,3 +44,9 @@
   [data-feedback], [data-feedback] .feedback-symbol { animation: none !important; transition: none !important; }
   .feedback-bar[data-feedback-phase="processing"] .feedback-symbol { font-weight: 900; }
 }
+
+/* Completion keeps its motion and adds a readable route to the retained record. */
+.feedback-message-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.feedback-bar.is-completion .feedback-message-line strong { font-size: 14px; }
+.feedback-message-line button { min-height: 44px; max-width: 100%; font-size: 14px; white-space: normal; }
+@media (max-width: 600px) { .feedback-bar.is-completion { flex-wrap: wrap; } }

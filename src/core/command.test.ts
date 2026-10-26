@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { QuestState } from './contract.ts';
 import { apply } from './engine.ts';
-import { newTaskFrom, parseCommand, readWhen, resolvePerson, directoryFor, suggestAt } from './command.ts';
+import { newTaskFrom, parseCommand, readWhen, resolvePerson, directoryFor, suggestAt, parseTaskEntry, taskEntryScope } from './command.ts';
+import { referenceSuggestions } from './references.ts';
 import { seedState } from './seed.ts';
 
 // Saturday 2026-10-17, 09:00 local.
@@ -164,4 +165,65 @@ test('single mode reads a chat message as one task', () => {
   const [one, ...rest] = parseCommand(text, state, T0, [], { single: true });
   assert.equal(rest.length, 0);
   assert.match(one!.title, /^Crew is on the Northside staging area\. Driveway is tight/);
+});
+
+function assignmentWorld() {
+  const state = world();
+  state.people = state.people.filter(p => p.id !== 'abraham');
+  state.people.forEach(p => { p.authority = p.id === 'jordan' ? 'admin' : 'member'; });
+  state.people.push({ id:'abraham-member', name:'Abraham', role:'manager', authority:'admin', title:'Operations' });
+  return state;
+}
+
+test('New Task primary entry assigns exact @names immediately, without changing general command semantics', () => {
+  const state = assignmentWorld();
+  for (const text of ['Call the supplier @Abraham', '@abraham inspect the roof', 'Call @Abraham tomorrow !high']) {
+    const draft = parseTaskEntry(text, state, 'jordan', T0)!;
+    assert.equal(newTaskFrom(draft, {}, {taxonomy:true}).owner, 'abraham-member');
+    assert.equal(draft.owner?.confirmed, true);
+  }
+  assert.equal(parseTaskEntry('Call @Abra', state, 'jordan', T0)?.owner, null, 'prefixes only suggest; they never auto-assign');
+  assert.equal(parseTaskEntry('Call @Unknown', state, 'jordan', T0)?.owner, null);
+  assert.equal(parseTaskEntry('Call Abraham', state, 'jordan', T0)?.owner, null, 'ordinary text is not an assignment instruction');
+  assert.equal(parseCommand('Call @Abraham', state, T0)[0]?.owner, null, 'notes/message command behavior remains unchanged');
+  assert.equal(parseTaskEntry('Call the supplier', state, 'jordan', T0)?.owner, null, 'removing the reference removes inference');
+  assert.equal(parseTaskEntry('', state, 'jordan', T0), undefined);
+  assert.equal(parseTaskEntry('Check pricing review by @Abraham', state, 'jordan', T0)?.owner, null, 'approval reference is not execution ownership');
+});
+
+test('New Task suggestions and inference stay within current membership and assignment permissions', () => {
+  const state = assignmentWorld();
+  const suggested = (actor: string) => referenceSuggestions('@', 1, taskEntryScope(state, actor))?.items.map(p=>p.id) ?? [];
+  assert.ok(suggested('jordan').includes('abraham-member'));
+  assert.deepEqual(suggested('alex'), ['alex']);
+  assert.deepEqual(suggested('not-a-member'), []);
+  assert.equal(parseTaskEntry('Call @Abraham', state, 'alex', T0)?.owner, null);
+  assert.equal(parseTaskEntry('Call @Alex', state, 'alex', T0)?.owner?.confirmed, true);
+  state.people.push({id:'observer',name:'Observer',role:'reviewer',authority:'reviewer',title:'Observer'});
+  assert.deepEqual(suggested('observer'), []);
+  assert.ok(!suggested('jordan').includes('observer'));
+  assert.equal(parseTaskEntry('Call @Observer', state, 'jordan', T0)?.owner, null);
+  assert.equal(parseTaskEntry('Call @Abraham', state, 'not-a-member', T0)?.owner, null);
+  const denied = apply(state, {type:'task/create',task:{title:'Unauthorized',owner:'abraham-member'}}, {actor:'alex',now:T0});
+  assert.equal(denied.ok, false, 'engine still rejects unauthorized assignment');
+});
+
+test('duplicate names require an explicit valid selection; foreign-workspace hints cannot assign', () => {
+  const state = assignmentWorld();
+  state.people.push({id:'abraham-two',name:'Abraham',role:'field',authority:'member',title:'Crew'});
+  const text = 'Call @Abraham';
+  assert.equal(parseTaskEntry(text, state, 'jordan', T0)?.owner, null);
+  const selected = {text,spans:[{kind:'person' as const,id:'abraham-two',workspaceId:state.workspace.tenantId,start:5,end:13,label:'@Abraham'}]};
+  assert.equal(parseTaskEntry(text, state, 'jordan', T0, [selected])?.owner?.ref.kind, 'member');
+  assert.equal(newTaskFrom(parseTaskEntry(text, state, 'jordan', T0, [selected])!, {}, {taxonomy:true}).owner, 'abraham-two');
+  assert.equal(parseTaskEntry(text, state, 'jordan', T0, [{...selected,spans:selected.spans.map(s=>({...s,workspaceId:'foreign-workspace'}))}])?.owner, null);
+  assert.equal(parseTaskEntry('Call the supplier', state, 'jordan', T0, [selected])?.owner, null, 'deleted selected reference is not reused');
+});
+
+test('multiple distinct or unresolved primary references do not silently choose an assignee', () => {
+  const state = assignmentWorld();
+  assert.equal(parseTaskEntry('Call @Abraham with @Maya', state, 'jordan', T0)?.owner, null);
+  assert.equal(parseTaskEntry('Call @Abraham with @Unknown', state, 'jordan', T0)?.owner, null);
+  assert.equal(parseTaskEntry('Call @Abraham and ask @Abraham for the code', state, 'jordan', T0)?.owner?.confirmed, true);
+  assert.equal(parseTaskEntry('Email person@Abraham.example', state, 'jordan', T0)?.owner, null);
 });

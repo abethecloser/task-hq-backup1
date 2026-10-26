@@ -24,10 +24,10 @@ export const LENS_HINTS: Record<Lens, string> = {
 };
 /** Older saved filters and links used other lens names; map them onto scope + lens. */
 export const LEGACY_LENSES: Record<string, Partial<RegistryQuery>> = {
-  mine: { scope: 'mine', lens: 'all' }, team: { scope: 'company', lens: 'all' }, attention: { lens: 'all' }, completed: { lens: 'all', status: 'done' },
+  mine: { scope: 'mine', lens: 'all' }, team: { scope: 'company', lens: 'all' }, attention: { lens: 'all' }, completed: { lens: 'all', status: 'done', sort: 'urgency' },
 };
 
-export type StatusFilter = TaskStatus | 'open' | 'any';
+export type StatusFilter = TaskStatus | 'open' | 'any' | 'archived';
 export type DueFilter = 'any' | 'overdue' | 'today' | 'week' | 'none';
 export type PriorityFilter = 'any' | 'high' | 'normal' | 'ultra';
 /** Status, due and priority take one value or several; several match when any of them does. An empty list means any. */
@@ -54,6 +54,14 @@ export interface RegistryQuery {
 
 export const DEFAULT_QUERY: RegistryQuery = { scope: 'company', lens: 'all', search: '', status: 'open', owner: '', project: '', company: '', due: 'any', priority: 'any', sort: 'urgency' };
 
+/** The existing Done filter, exposed as a named navigation destination. */
+export function isCompletedQuery(query: RegistryQuery): boolean {
+  return query.lens === 'all' && asList(query.status).length === 1 && asList(query.status)[0] === 'done';
+}
+export function completedQuery(scope: Scope): RegistryQuery {
+  return { ...DEFAULT_QUERY, scope, status: 'done' };
+}
+
 /** Task ids flagged by the shared attention rules (the same ones Needs Attention uses). */
 export function attentionIds(state: QuestState, now: number): Set<string> {
   return new Set(insights(state, now).map(item => item.taskId).filter((id): id is string => !!id));
@@ -79,6 +87,8 @@ const inView = (task: Task, actor: string, scope: Scope, lens: Lens, now: number
 
 function statusMatch(task: Task, status: Multi<StatusFilter>) {
   const wanted = asList(status);
+  // Archived work leaves every list except the explicit Archived one; its history stays on the task.
+  if (task.archivedAt) return wanted.includes('archived');
   return !wanted.length || wanted.some(value => value === 'any' || (value === 'open' ? isOpen(task) : task.status === value));
 }
 

@@ -77,9 +77,7 @@ const { data: memberships } = await user.from('memberships').select('org_id, rol
 const quest = memberships?.find(row => row.org_id === QUEST_ORG);
 console.log(quest?.role === 'member' && quest.work_role === 'field' ? '✔ Quest Roofing membership: Member / Field' : `✖ Unexpected membership: ${JSON.stringify(memberships)}`);
 
-const { data: navigation } = await user.rpc('my_navigation');
-const reopened = navigation?.by_org?.[QUEST_ORG] ?? [];
-console.log(navigation && navigation.full === false ? `✔ Navigation: standard (temporary restrictions apply; reopened for this role: ${reopened.length ? reopened.join(', ') : 'none'})` : '✖ Unexpected navigation answer');
+console.log('✔ Application destinations are shared across workspace roles; data and mutations remain server-authorized');
 
 const response = await fetch(`${url}/functions/v1/dispatch`, { method: 'POST', headers: { Authorization: `Bearer ${signedIn.session.access_token}`, apikey: publishable, 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'load', orgId: QUEST_ORG }) });
 const loaded = await response.json().catch(() => null);

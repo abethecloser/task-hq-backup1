@@ -22,3 +22,10 @@ To roll back, redeploy the `v3-original/` files as `dispatch` (same layout, veri
 - `v5-parity.test.ts` (part of `npm test`) runs every action type through v4 and v5 for owner, admin, supervisor, a member titled "manager", a member and a reviewer. Shared actions must match in verdict and stored facts; the added actions are checked against the org-role matrix. It also checks that v4 still loads and acts on state written by v5.
 - Deploy: the 11 files in `v5/` as `dispatch`, verify_jwt true. Read them back after deploying. Roll back by redeploying `v4/`. Once deployed, freeze `v5/` (remove it from `sync-functions.mjs`) and start any further change as `v6/`.
 - The repository `supabase/functions/dispatch` does not advertise a contract yet; add `contract: 5` (or later) to its replies before it replaces v5.
+
+## v6 (deployed as dispatch v7, 2026-10-22)
+
+- `v6/`: v5's write path with the engine from `src/core` (kept in sync by `npm run sync:functions`; `v6.test.ts` checks it byte for byte). `v5/` is now frozen as the rollback copy.
+- Adds `completedBy` (saved at completion), `task/archive` and `task/unarchive` (archive is a flag on a completed task, not a new status; same people who may reopen; history kept). Reopen clears completion and archive state. There is no delete action.
+- Replies carry `contract: 6`. The client offers Archive only after a reply advertises 6, so a rollback to v5 closes it on the next reply; v5 answers 400 for the new actions and leaves stored work untouched.
+- Deploy: the 11 files in `v6/` as `dispatch`, verify_jwt true. Roll back by redeploying `v5/`.
