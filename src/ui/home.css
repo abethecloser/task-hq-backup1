@@ -31,7 +31,7 @@
 
 /* Top strip: Comments & mentions, then the four plate metrics. */
 .hd-top { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(0, 2fr); gap: 16px; align-items: stretch; }
-.hd-panel { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 10px; min-width: 0; padding: 16px 18px; border: 1px solid var(--hair); border-radius: 16px; background: var(--card); box-shadow: var(--shadow); scroll-margin: 90px; }
+.hd-panel { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 10px; min-width: 0; padding: 16px 18px; border: 1px solid var(--hair); border-radius: 16px; background: var(--card); scroll-margin: 90px; }
 .hd-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .hd-head > div { min-width: 0; }
 .hd-head h2 { font: 800 16px/1.15 var(--display); letter-spacing: -.02em; }
@@ -44,7 +44,7 @@
 .hd-more, .hd-unread { display: inline-flex; flex: none; align-items: center; gap: 4px; margin-left: auto; padding: 6px 8px; border: 0; border-radius: 8px; background: none; color: var(--ink-2); font-size: 12.5px; font-weight: 650; white-space: nowrap; }
 .hd-more:hover, .hd-unread:hover { background: var(--sunk); color: var(--ink); }
 .hd-unread b { font-weight: 800; }
-.hd-unread.has-unseen { background: var(--accent-pale); color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.hd-unread.has-unseen { background: var(--accent-pale); color: var(--accent-ink); }
 .hd-quiet { padding: 10px 12px; border: 1px dashed var(--line-2); border-radius: 10px; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
 .hd-fine { color: var(--faint); font-size: 11px; }
 
@@ -317,19 +317,18 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .top-tab { position: relative; display: inline-flex; flex: none; align-items: center; gap: 7px; min-height: 36px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-2); font-size: 13.5px; font-weight: 650; white-space: nowrap; transition: background .2s, color .2s; }
 .top-tab .icon { color: var(--muted); transition: color .2s; }
 .top-tab span { min-width: 20px; padding: 1px 6px; border-radius: 999px; background: rgb(17 18 20 / 6%); color: var(--muted); font-size: 11px; font-weight: 750; text-align: center; font-variant-numeric: tabular-nums; }
-.top-tab span.is-hot { background: var(--accent-pale); color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.top-tab span.is-hot { background: var(--accent-pale); color: var(--accent-ink); }
 .top-tab:hover:not(:disabled) { background: var(--sunk); color: var(--ink); }
 .top-tab:hover:not(:disabled) .icon { color: var(--ink); }
 .top-tab.is-active { color: var(--accent-ink); }
 .top-tab.is-active .icon { color: var(--accent-ink); }
-.top-tab.is-active::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px; border-radius: 2px; background: var(--accent); }
 .top-tab:disabled { opacity: .4; }
 
 /* Work / Manage: one app, two permission-based experiences. */
 .mode-switch { display: inline-flex; flex: none; gap: 2px; padding: 3px; border-radius: 10px; background: var(--sunk); }
 .mode-switch button { min-height: 30px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font-size: 13px; font-weight: 700; }
 .mode-switch button:hover:not(.is-on) { color: var(--ink); }
-.mode-switch button.is-on { background: var(--card); color: var(--accent-ink); box-shadow: 0 1px 2px rgb(17 18 20 / 12%); }
+.mode-switch button.is-on { background: var(--card); color: var(--accent-ink); }
 
 .top-link { display: inline-flex; align-items: center; gap: 4px; padding: 8px 12px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font-size: 13.5px; font-weight: 650; white-space: nowrap; }
 .top-link:hover:not(:disabled), .top-link[aria-expanded="true"] { background: var(--sunk); color: var(--ink); }
@@ -356,7 +355,7 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .top-icon { position: relative; display: grid; place-items: center; width: 38px; height: 38px; flex: none; padding: 0; border: 1px solid var(--hair-2); border-radius: 10px; background: var(--card); color: var(--ink); }
 .top-icon:hover:not(:disabled) { border-color: var(--ink-2); }
 .top-icon:disabled { color: var(--faint); cursor: not-allowed; }
-.top-icon.is-on { border-color: var(--accent); background: var(--accent-pale); color: var(--accent-ink); box-shadow: 0 0 0 3px var(--accent-pale); }
+.top-icon.is-on { border-color: var(--accent); background: var(--accent-pale); color: var(--accent-ink); }
 .top-icon .rail-unread { top: -6px; right: -6px; }
 .top-pop { position: relative; }
 .top-menu { position: absolute; top: calc(100% + 6px); z-index: 70; display: grid; gap: 2px; min-width: 200px; max-height: 70vh; padding: 6px; overflow-y: auto; border: 1px solid var(--hair-2); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-lift); animation: unfold .14s var(--ease-out); }
@@ -448,3 +447,16 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .preview-notice { margin: 0 0 12px; padding: 10px 14px; border: 1px solid var(--line, rgba(128,128,128,.3)); border-radius: 10px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
 .preview-notice strong { display: inline-block; margin-bottom: 4px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text, inherit); }
 .preview-notice ul { margin: 0; padding-left: 18px; }
+
+/* ── Top bar: section title, task filters (Tasks only), global controls ─────────────────────────── */
+.topbar > .topbar-title { display: inline; font-size: 17px; font-weight: 800; letter-spacing: -.02em; color: var(--ink); }
+.task-filters { display: flex; flex: 0 1 auto; align-items: center; gap: 4px; min-width: 0; }
+.filter-more { position: relative; flex: none; }
+.filter-more .top-menu { min-width: 180px; }
+.filter-more .top-menu small { margin-left: auto; color: var(--muted); }
+/* One labeled dropdown replaces the tabs when the bar is narrow, so nothing is clipped or scrolls sideways. */
+.filter-select { display: none; flex: 0 1 auto; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 12px; font-weight: 700; }
+.filter-select select { min-height: 36px; max-width: 100%; padding: 0 10px; border: 1px solid var(--hair-2); border-radius: 9px; background: var(--card); color: var(--ink); font: inherit; font-size: 13px; font-weight: 650; }
+.filter-select select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@container topbar (max-width: 860px) { .task-filters { display: none; } .filter-select { display: inline-flex; } }
+@media (max-width: 1000px) { .topbar > .task-filters, .topbar > .filter-select { order: 3; } .topbar > .filter-select { flex: 1 0 100%; } .topbar > .filter-select select { flex: 1 1 auto; } }

@@ -6,14 +6,17 @@ import type { Quest } from '../ui/useQuest.ts';
 import { SPARK } from './AskTasks.tsx';
 import { ROLE_LABELS, useLive } from './LiveContext.tsx';
 import { useWorkday } from '../shifts/Workday.tsx';
+import { splitFilters } from '../core/task-filters.ts';
 
-// Primary destinations share one persistent, horizontally scrollable navigation.
-// Task tabs reuse the registry lenses; other destinations keep their existing routes.
+// The top bar names the current section and carries the global search and notifications.
+// Task filters (the registry lenses plus Completed) appear only inside Tasks: a short set stays
+// visible, the rest sit under More, and a narrow bar uses one labeled dropdown instead.
 export interface TopTab { id: string; label: string; count?: number; hot: boolean; active: boolean }
 
-export function TopBar({ quest, demo, focused, unread, askOpen, mode, tabs, onTab, search, onAsk, onBell, onMenu, menuOpen }: {
+export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title, mode, tabs, onTab, search, onAsk, onBell, onMenu, menuOpen }: {
   quest: Quest; demo: boolean; focused: boolean; unread: number;
-  askOpen: boolean; tabs: TopTab[];
+  askOpen: boolean; notifOpen: boolean; /** The current section's name. */ title: string;
+  /** Task filters; only passed while Tasks is the page. */ tabs?: TopTab[];
   /** Optional workspace grouping control. It does not change page availability. */
   mode?: { current: 'work' | 'manage'; onChange: (next: 'work' | 'manage') => void };
   onTab: (id: string) => void; /** The app-wide search field (TopSearch). */ search: ReactNode; onAsk: () => void; onBell: () => void; onMenu: () => void; menuOpen: boolean;
@@ -28,18 +31,13 @@ export function TopBar({ quest, demo, focused, unread, askOpen, mode, tabs, onTa
           <button type="button" className={mode.current === 'manage' ? 'is-on' : ''} aria-pressed={mode.current === 'manage'} onClick={() => mode.onChange('manage')}>Manage</button>
         </div>
       )}
-      <nav className="top-nav top-tabs" aria-label="Primary navigation" tabIndex={0}>
-        {tabs.map(tab => (
-          <button key={tab.id} type="button" className={`top-tab ${tab.active ? 'is-active' : ''}`} aria-current={tab.active ? 'page' : undefined} onClick={() => onTab(tab.id)}>
-            {tab.label}{tab.count !== undefined && <span className={tab.hot ? 'is-hot' : ''}>{tab.count}</span>}
-          </button>
-        ))}
-      </nav>
+      <span className="topbar-title">{title}</span>
+      {tabs && <TaskFilters tabs={tabs} onTab={onTab} />}
       <div className="topbar-right">
         {focused && <span className="focus-chip">Critical Focus</span>}
         {search}
         {!focused && <button type="button" className={`top-icon ${askOpen ? 'is-on' : ''}`} aria-label="Ask your tasks" aria-expanded={askOpen} onClick={onAsk}><TopIcon d={SPARK} /></button>}
-        <button type="button" className="top-icon" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'} onClick={onBell}>
+        <button type="button" className={`top-icon ${notifOpen ? 'is-on' : ''}`} aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'} aria-expanded={notifOpen} onClick={onBell}>
           <TopIcon d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0" />
           {unread > 0 && <span className="rail-unread" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>}
         </button>
@@ -111,4 +109,37 @@ function Popover({ open, setOpen, trigger, triggerClass, triggerLabel, align = '
 
 function TopIcon({ d, small = false }: { d: string; small?: boolean }) {
   return <svg className={`icon ${small ? 'icon-sm' : ''}`} viewBox="0 0 24 24" aria-hidden="true"><path d={d} /></svg>;
+}
+
+function TaskFilters({ tabs, onTab }: { tabs: TopTab[]; onTab: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const { primary, more, activeInMore } = splitFilters(tabs);
+  const tabButton = (tab: TopTab) => (
+    <button key={tab.id} type="button" className={`top-tab ${tab.active ? 'is-active' : ''}`} aria-current={tab.active ? 'true' : undefined} onClick={() => onTab(tab.id)}>
+      {tab.label}{tab.count !== undefined && <span className={tab.hot ? 'is-hot' : ''}>{tab.count}</span>}
+    </button>
+  );
+  return (
+    <>
+      <nav className="task-filters" aria-label="Task filters">
+        {primary.map(tabButton)}
+        {more.length > 0 && (
+          <Popover open={open} setOpen={setOpen} align="start" rootClass="filter-more" triggerClass={`top-tab filter-more-btn ${activeInMore ? 'is-active' : ''}`}
+            triggerLabel={activeInMore ? `More filters, showing ${activeInMore.label}` : 'More filters'}
+            trigger={<>{activeInMore ? activeInMore.label : 'More'}{activeInMore?.count !== undefined && <span className={activeInMore.hot ? 'is-hot' : ''}>{activeInMore.count}</span>}<TopIcon d="M6 9l6 6 6-6" small /></>}>
+            {more.map(tab => (
+              <button key={tab.id} type="button" role="menuitemradio" aria-checked={tab.active} className={tab.active ? 'is-on' : ''} onClick={() => { setOpen(false); onTab(tab.id); }}>
+                {tab.label}{tab.count !== undefined && <small>{tab.count}</small>}
+              </button>
+            ))}
+          </Popover>
+        )}
+      </nav>
+      <label className="filter-select"><span>Filter</span>
+        <select value={tabs.find(tab => tab.active)?.id ?? 'all'} onChange={event => onTab(event.target.value)}>
+          {[...primary, ...more].map(tab => <option key={tab.id} value={tab.id}>{tab.label}{tab.count !== undefined ? ` (${tab.count})` : ''}</option>)}
+        </select>
+      </label>
+    </>
+  );
 }

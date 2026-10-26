@@ -1,8 +1,9 @@
 // Persistent workspace sidebar: a 56px Instrument Rail that is always visible, plus
 // a resizable pullout beside it. On desktop the pullout reflows the main content (the
 // shell reserves its width) and never covers it. On mobile it is a dismissible drawer.
-// The rail navigates; the pullout is live awareness (Inbox · Attention · Activity — see
-// Awareness.tsx). On mobile the rail is hidden, so the drawer also carries navigation.
+// The rail navigates; the left pullout is the calendar quick view, opened by the Calendar icon.
+// Notifications live in a drawer on the right (NotificationDrawer.tsx). On mobile the rail is
+// hidden, so this drawer carries navigation instead.
 // Open state, width, tab, read items and snoozes are saved per person in localStorage;
 // they are presentation preferences on this device, not backend records.
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -29,7 +30,8 @@ function loadPrefs(actor: string): Prefs {
     const raw = JSON.parse(localStorage.getItem(storageKey(actor)) ?? 'null');
     if (!raw || typeof raw !== 'object') return fallback;
     return {
-      open: raw.open === true,
+      // The calendar pullout always starts closed; width, read items, snoozes and the tab are what persist.
+      open: false,
       width: typeof raw.width === 'number' ? clampWidth(raw.width) : PANEL_DEFAULT,
       read: Array.isArray(raw.read) ? raw.read.filter((id: unknown): id is string => typeof id === 'string') : [],
       tab: TABS.includes(raw.tab) ? raw.tab : 'inbox',
@@ -133,7 +135,7 @@ function unreadIn(notes: Notification[], read: Set<string>, section?: string) {
   return notes.filter(note => (!section || note.section === section) && !read.has(note.id)).length;
 }
 
-export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, awareness, settings, account }: {
+export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, pullout, pulloutTitle, settings, account }: {
   control: SidebarControl;
   items: SidebarItem[];
   brand: ReactNode;
@@ -142,8 +144,9 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
   footer: ReactNode;
   /** Task notifications, for per-section unread pips on the rail. */
   notifications: Notification[];
-  /** The pullout body: Inbox · Attention · Activity. */
-  awareness: ReactNode;
+  /** The left pullout's body (the calendar quick view), shown on desktop only. */
+  pullout: ReactNode;
+  pulloutTitle: string;
   /** The settings menu at the foot of the rail; `close` dismisses it after a choice. */
   settings: (close: () => void) => ReactNode;
   /** Who is signed in: their mark on the rail, and the account menu. */
@@ -277,8 +280,8 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
         style={isMobile ? undefined : { width: control.width }}
         onKeyDown={event => { if (isMobile && event.key === 'Escape') { event.stopPropagation(); control.closeMobile(); } }}>
         <div className="panel-head">
-          <span className="panel-title">Task-<b>HQ</b></span>
-          <button type="button" className="icon-btn panel-close" aria-label={isMobile ? 'Close navigation' : 'Collapse sidebar'} onClick={isMobile ? control.closeMobile : control.toggle}>
+          <span className="panel-title">{isMobile ? <>Task-<b>HQ</b></> : pulloutTitle}</span>
+          <button type="button" className="icon-btn panel-close" aria-label={isMobile ? 'Close navigation' : `Close ${pulloutTitle.toLowerCase()}`} onClick={isMobile ? control.closeMobile : control.toggle}>
             <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={isMobile ? 'M6 6l12 12M18 6 6 18' : 'M15 6l-6 6 6 6'} /></svg>
           </button>
         </div>
@@ -302,7 +305,7 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
               )}
             </nav>
           )}
-          {awareness}
+          {!isMobile && pullout}
         </div>
 
         <div className="panel-foot">{footer}</div>

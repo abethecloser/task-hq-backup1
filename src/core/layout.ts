@@ -35,3 +35,52 @@ export function panelLayout(input: PanelInput): PanelLayout {
   if (room < narrowest) return { left, right: 'drawer' };
   return { left: input.leftOpen ? Math.min(input.leftWidth, room) : 0, right: 'docked' };
 }
+
+// ── Pullouts ──────────────────────────────────────────────────────────────────────────────────
+// Two pullouts, one each side of the center: the calendar quick view (left, opened by the rail's
+// Calendar icon) and notifications (right, opened by the bell). Both start closed. Both may be
+// open on a wide desktop only while the center stays usable; otherwise opening one closes the
+// other. On a phone only one panel (these two, or the navigation menu) is ever shown at a time.
+
+export type Pullout = 'calendar' | 'notifications';
+export interface Pullouts { calendar: boolean; notifications: boolean }
+export const PULLOUTS_CLOSED: Pullouts = { calendar: false, notifications: false };
+
+export interface PulloutRoom {
+  viewport: number;
+  mobile: boolean;
+  /** Widths each pullout takes when docked. */
+  calendarWidth: number;
+  notificationsWidth: number;
+  /** Narrowest center canvas with both pullouts docked. */
+  minCanvasBoth: number;
+  /** Narrowest center canvas with one pullout docked. */
+  minCanvas: number;
+}
+
+const other = (which: Pullout): Pullout => (which === 'calendar' ? 'notifications' : 'calendar');
+
+/** Both pullouts fit side by side with a usable center. */
+export function bothFit(room: PulloutRoom): boolean {
+  return !room.mobile && room.viewport - RAIL - room.calendarWidth - room.notificationsWidth >= room.minCanvasBoth;
+}
+
+export function openPullout(current: Pullouts, which: Pullout, room: PulloutRoom): Pullouts {
+  const next = { ...current, [which]: true };
+  if (current[other(which)] && !bothFit(room)) next[other(which)] = false;
+  return next;
+}
+
+export function togglePullout(current: Pullouts, which: Pullout, room: PulloutRoom): Pullouts {
+  return current[which] ? { ...current, [which]: false } : openPullout(current, which, room);
+}
+
+/** How an open pullout is shown: docked beside the center when it fits, otherwise over it. */
+export function pulloutMode(which: Pullout, current: Pullouts, room: PulloutRoom): 'closed' | 'docked' | 'drawer' {
+  if (!current[which]) return 'closed';
+  if (room.mobile) return 'drawer';
+  const width = which === 'calendar' ? room.calendarWidth : room.notificationsWidth;
+  const both = current.calendar && current.notifications;
+  const used = both ? room.calendarWidth + room.notificationsWidth : width;
+  return room.viewport - RAIL - used >= (both ? room.minCanvasBoth : room.minCanvas) ? 'docked' : 'drawer';
+}

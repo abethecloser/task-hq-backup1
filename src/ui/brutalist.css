@@ -117,7 +117,6 @@
 :root[data-look="brutalist"] .modal,
 :root[data-look="brutalist"] .offer-form,
 :root[data-look="brutalist"] .lens-bar,
-:root[data-look="brutalist"] .seam-toggle,
 :root[data-look="brutalist"] .person-chip,
 :root[data-look="brutalist"] .avatar {
   border-radius: var(--radius);
@@ -189,8 +188,6 @@
 :root[data-look="brutalist"] .segmented button.is-on { background: var(--ink-rule); color: #fff; box-shadow: none; }
 :root[data-look="brutalist"] .registry-tools select,
 :root[data-look="brutalist"] .search-field input { border-color: var(--ink-rule); }
-:root[data-look="brutalist"] .seam-toggle { border-color: var(--ink-rule); box-shadow: 2px 2px 0 var(--ink-rule); }
-:root[data-look="brutalist"] .seam-toggle:hover { box-shadow: 3px 3px 0 var(--accent); border-color: var(--ink-rule); }
 :root[data-look="brutalist"] .rail .nav-item.is-active { background: var(--ink-rule); color: #fff; box-shadow: none; }
 :root[data-look="brutalist"] .rail .nav-item.is-active .nav-pip,
 :root[data-look="brutalist"] .rail .nav-item.is-active .rail-unread { box-shadow: 0 0 0 2px var(--ink-rule); }
