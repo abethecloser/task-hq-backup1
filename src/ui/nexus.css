@@ -1240,8 +1240,8 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .pullout-calendar { display: grid; gap: 12px; padding: 4px 4px 24px; }
 .pullout-full { width: 100%; justify-content: center; }
 .pullout-note { padding: 16px; }
-.notify-drawer, .context-signals.notify-drawer { width: 360px; background: var(--card); background-image: none; animation: none; }
-.notify-drawer.is-drawer { width: min(420px, 100%); box-shadow: var(--shadow-lg); animation: slide .26s var(--ease-out); }
+.context.context-signals.notify-drawer { width: 360px; background: var(--card); background-image: none; animation: none; }
+.context.context-signals.notify-drawer.is-drawer { width: min(420px, 100%); box-shadow: var(--shadow-lg); animation: slide .26s var(--ease-out); }
 .notify-body { padding: 10px 14px 32px; }
 .thread-head { gap: 8px; padding: 0 8px 0 10px; }
 .thread-head .icon-btn { margin-left: auto; }
@@ -1254,5 +1254,5 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .field-error { margin: 0; color: var(--stop); font-size: 12.5px; font-weight: 650; }
 /* A phone shows one full-width panel; it follows the visible area so the reply box stays above the keyboard. */
 @media (max-width: 760px) {
-  .notify-drawer, .notify-drawer.is-drawer { inset: 0; width: 100%; max-width: 100%; height: var(--vvh, 100dvh); }
+  .context.context-signals.notify-drawer, .context.context-signals.notify-drawer.is-drawer { inset: 0; width: 100%; max-width: 100%; height: var(--vvh, 100dvh); }
 }

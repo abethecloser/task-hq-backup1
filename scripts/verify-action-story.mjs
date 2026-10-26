@@ -52,6 +52,23 @@ try {
   assert.match(readOnly,/Riley Brooks/);
   task.approver=''; task.nextOwner='';
   assert.doesNotMatch(page,/Quick actions/);
+  // Notifications drawer: the task conversation shows context and comments, and replies follow the same permissions.
+  const { Thread } = await server.ssrLoadModule('/src/app/NotificationDrawer.tsx');
+  state.events.unshift({ id: 'story-c1', at: now, actor: 'sam', kind: 'task', taskId: task.id, text: 'Sam Rivera commented: Access code is 4411, @Alex please confirm.' });
+  const thread = (actor, allowed = true) => renderToStaticMarkup(createElement(Thread, { quest: quest(actor), taskId: task.id, allowed, onBack: () => {}, onClose: () => {}, onOpenTask: () => {} }));
+  const asAlex = thread('alex');
+  assert.match(asAlex, /Back to notifications/); assert.match(asAlex, /Open task/); assert.match(asAlex, /Close notifications/);
+  assert.match(asAlex, /Confirm roof access/); assert.match(asAlex, /Who acts next/); assert.match(asAlex, /What to do/);
+  assert.match(asAlex, /Access code is 4411/, 'existing comments appear in the drawer');
+  assert.match(asAlex, /aria-label="Reply to this task"/, 'members get an inline reply');
+  const asReviewer = thread('abraham');
+  assert.doesNotMatch(asReviewer, /aria-label="Reply to this task"/, 'reviewers cannot reply');
+  assert.match(asReviewer, /Reviewer view: no replies/);
+  const outside = thread('alex', false);
+  assert.doesNotMatch(outside, /Access code is 4411/, 'outside Critical Focus the conversation is not shown');
+  assert.doesNotMatch(outside, /aria-label="Reply to this task"/);
+  assert.doesNotMatch(outside, /Open task/);
+  state.events.shift();
   // Build the harness separately into the existing local dist folder. No srcdoc,
   // postMessage listener, extension-message rendering, or nested Vite HTML transforms.
   await build({ configFile:false, plugins:[react()], logLevel:'error', build:{outDir:'dist',emptyOutDir:false,rollupOptions:{input:resolve('scripts/action-story-review.tsx'),output:{entryFileNames:'action-story-review/review.js',assetFileNames:'action-story-review/[name][extname]'}}} });

@@ -73,7 +73,7 @@ export function NotificationDrawer({ quest, control, inbox, attention, docked, t
   );
 }
 
-function Thread({ quest, taskId, allowed, onBack, onClose, onOpenTask }: { quest: Quest; taskId: string; allowed: boolean; onBack: () => void; onClose: () => void; onOpenTask: (id: string) => void }) {
+export function Thread({ quest, taskId, allowed, onBack, onClose, onOpenTask }: { quest: Quest; taskId: string; allowed: boolean; onBack: () => void; onClose: () => void; onOpenTask: (id: string) => void }) {
   const { state } = quest;
   const task = taskById(state, taskId);
   const who = task ? responsibility(state, task) : null;
