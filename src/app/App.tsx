@@ -299,7 +299,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     { id: 'needs-attention', label: 'Needs Attention', count: attention.length, countLabel: 'conditions', hot: myAttention > 0, icon: <Icon d="M12 4 21 20H3zM12 10v4M12 17v.5" /> },
     { id: 'company-work', label: 'Projects', count: openCompany.length, countLabel: 'open tasks', icon: <Icon d="M3 8h18v12H3zM8 8V5h8v3M3 13h18" /> },
     { id: 'people', label: 'People & Access', count: state.people.length, countLabel: 'people', icon: <Icon d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" /> },
-    { id: 'executive' as View, label: 'Owner overview', count: decisions, countLabel: decisions === 1 ? 'decision' : 'decisions', hot: decisions > 0, icon: <Icon d="M4 20V9l8-5 8 5v11M9 20v-6h6v6" /> },
+    // Oversight, not a place: the same eye the task page uses for Watch.
+    { id: 'executive' as View, label: 'Owner overview', count: decisions, countLabel: decisions === 1 ? 'decision' : 'decisions', hot: decisions > 0, icon: <Icon d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /> },
     { id: 'activity', label: 'Activity', icon: <Icon d="M4 12h4l3-7 3 14 3-7h3" /> },
     { id: 'settings', label: 'Settings', icon: <Icon d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3" /> },
     // Preview modules: still reachable, kept out of the everyday list (see the Previews group).
