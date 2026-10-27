@@ -22,7 +22,7 @@ import { CompanyWork } from './CompanyWork.tsx';
 import { CalendarPage, CalendarPullout } from './ContextPanel.tsx';
 import { TaskPage } from './TaskPage.tsx';
 import type { DeckSection } from './ContextPanel.tsx';
-import { CreateTask } from './CreateTask.tsx';
+import { CreateTask, discardCreateDraft, hasCreateDraft } from './CreateTask.tsx';
 import { ExecutiveDesk } from './ExecutiveDesk.tsx';
 import { Activity, Settings } from './Settings.tsx';
 import { Home } from './Home.tsx';
@@ -116,7 +116,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const [requested, setRequested] = useState<View>(initial.view);
   const [taskId, setTaskId] = useState<string | null>(initial.taskId);
   const [leadId, setLeadId] = useState<string | null>(initial.leadId);
-  const [creating, setCreating] = useState(false);
+  // A draft left open before a reload reopens the dialog where it was.
+  const [creating, setCreating] = useState(() => hasCreateDraft(state.workspace.tenantId, actor));
   const [attendanceDemo, setAttendanceDemo] = useState(false);
   // A due date chosen from the calendar, for the next task created.
   const [createDue, setCreateDue] = useState<string | undefined>();
@@ -156,12 +157,12 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { setTaskId(null); setCreating(false); collapseSidebar(); }
+      if (event.key === 'Escape') { setTaskId(null); setCreating(open => { if (open) discardCreateDraft(state.workspace.tenantId, actor); return false; }); collapseSidebar(); }
       if (event.key === 'n' && !event.metaKey && !event.ctrlKey && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement)) { event.preventDefault(); setCreating(true); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [collapseSidebar]);
+  }, [collapseSidebar, state.workspace.tenantId, actor]);
 
   const focused = inFocus(state, actor);
   const grant = activeGrant(state, actor, now);

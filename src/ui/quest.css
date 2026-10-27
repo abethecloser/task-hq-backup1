@@ -952,3 +952,8 @@ span.attn-title { color: var(--ink); font-weight: 800; }
   .rail .nav { gap: 0; }
   .rail .nav-item { min-height: 32px; }
 }
+
+/* Create task, expanded to a full page. */
+.modal-head-actions { display: flex; gap: 6px; align-items: center; }
+:root .modal.create-wide.is-full { top: 0; left: 0; width: 100%; height: 100dvh; max-height: none; border-radius: 0; transform: none; animation: none; box-shadow: none; }
+:root .modal.create-wide.is-full .cx { max-width: 1280px; margin: 0 auto; }
