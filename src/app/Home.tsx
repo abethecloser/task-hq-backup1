@@ -12,6 +12,7 @@ import { firstName, projectName, taskById } from '../core/selectors.ts';
 import { localDate, shortDate } from '../core/time.ts';
 import { PRODUCT } from '../core/workspace.ts';
 import { MoveForward } from '../ui/components.tsx';
+import { BannerEditor, bannerLook, useBanner } from './HeroBanner.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import type { DeckSection } from './ContextPanel.tsx';
 
@@ -34,6 +35,7 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
   culture?: CultureItem[];
 }) {
   const { state, actor, now } = quest;
+  const banner = useBanner(state.workspace.tenantId, actor);
   const minute = Math.floor(now / 60000) * 60000;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,10 +61,9 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
 
   return (
     <div className="view home-dash">
-      <Hero eyebrow={greeting.eyebrow} primary={greeting.primary} support={greeting.support}>
+      {/* New task lives in the top bar; the banner keeps only the next step. */}
+      <Hero eyebrow={greeting.eyebrow} primary={greeting.primary} support={greeting.support} banner={banner}>
         {next && <button type="button" className="btn btn-primary btn-sm" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}>{nextLabel}</button>}
-        {canCreate && <button type="button" className={`btn ${next ? '' : 'btn-primary'} btn-sm`} onClick={onCreate}>+ New task</button>}
-        {canDeck && <button type="button" className="btn btn-sm" onClick={() => onDeck('calendar')}>Calendar</button>}
       </Hero>
 
       <div className="hd-top">
@@ -216,12 +217,13 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
 const COLLAB_VERB: Record<CollabItem['kind'], string> = { comment: 'commented on', mention: 'mentioned you in', reply: 'replied on' };
 
 /** Momentum greeting with the architectural treatment, kept to a compact height. */
-function Hero({ eyebrow, primary, support, children }: { eyebrow: string; primary: string; support: string; children: ReactNode }) {
+function Hero({ eyebrow, primary, support, banner, children }: { eyebrow: string; primary: string; support: string; banner: ReturnType<typeof useBanner>; children: ReactNode }) {
+  const look = bannerLook(banner.banner);
   const [date, time] = eyebrow.split(' · ');
   const words = primary.split(' ');
   const split = words.length >= 4 ? words.length - 2 : words.length;
   return (
-    <header className="hd-hero">
+    <header className={`hd-hero ${look.className}`} style={look.style}>
       <div className="hd-hero-copy">
         <p className="hd-hero-eyebrow"><span>{date}</span>{time && <span className="hd-greet"><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={time === 'Evening' ? 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z' : 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'} /></svg>Good {time.toLowerCase()}</span>}</p>
         <h1>{words.slice(0, split).join(' ')}{split < words.length && <> <b>{words.slice(split).join(' ')}</b></>}</h1>
@@ -246,6 +248,7 @@ function Hero({ eyebrow, primary, support, children }: { eyebrow: string; primar
         </svg>
         <p className="hd-hero-tag">{PRODUCT.tagline}</p>
       </div>
+      <BannerEditor {...banner} />
     </header>
   );
 }

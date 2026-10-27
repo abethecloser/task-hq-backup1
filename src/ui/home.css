@@ -474,3 +474,57 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
   .topbar .top-search input { min-height: 44px; }
   .topbar .user-chip-text { display: none; }
 }
+
+/* Top navigation: the everyday sections, plus the New task quick action. Phones use the tab bar. */
+.top-nav { display: flex; flex: 0 1 auto; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.topbar.has-sections > .topbar-title { display: none; }
+.top-nav-item { position: relative; display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 700; white-space: nowrap; cursor: pointer; transition: background .2s, color .2s; }
+.top-nav-item:hover { background: var(--sunk); color: var(--ink); }
+.top-nav-item.is-active { color: var(--ink); }
+.top-nav-item.is-active::after { content: ''; position: absolute; right: 12px; bottom: 2px; left: 12px; height: 2px; border-radius: 2px; background: var(--accent); }
+.top-nav-item span { min-width: 18px; padding: 1px 6px; border-radius: 999px; background: rgb(17 18 20 / 6%); color: var(--muted); font-size: 11px; font-weight: 750; text-align: center; }
+.top-nav-item span.is-hot { background: var(--accent-pale); color: var(--accent-ink); }
+.top-nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.top-create { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; white-space: nowrap; }
+.top-create .icon { width: 16px; height: 16px; }
+.topbar.has-sub { flex-wrap: wrap; height: auto; min-height: 60px; padding-top: 8px; padding-bottom: 6px; row-gap: 4px; }
+.topbar-sub { display: flex; flex: 1 0 100%; order: 10; align-items: center; gap: 8px; min-width: 0; }
+@container topbar (max-width: 1100px) { .top-nav-item { padding: 0 9px; font-size: 13.5px; } }
+@container topbar (max-width: 900px) { .top-create span { display: none; } .top-create { padding: 0 11px; } }
+@media (max-width: 760px) {
+  .top-nav { display: none; }
+  .topbar.has-sections > .topbar-title { display: inline; }
+}
+
+/* Home banner: a chosen color or photo replaces the illustration; text stays legible on either. */
+.hd-hero { position: relative; }
+.hd-hero.has-banner { background-size: cover; background-position: center; }
+.hd-hero.has-banner .hd-hero-art { visibility: hidden; }
+.hd-hero.is-dark .hd-hero-copy, .hd-hero.is-dark .hd-hero-eyebrow, .hd-hero.is-dark .momentum-support { color: #fff; }
+.hd-hero.is-dark h1 b, .hd-hero.is-dark .hd-greet, .hd-hero.is-dark .momentum-support b { color: #ffd2b8; }
+.hd-banner-edit { position: absolute; right: 14px; bottom: 12px; z-index: 2; }
+.hd-banner-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid var(--hair-2); border-radius: 999px; background: rgb(255 255 255 / 88%); color: var(--ink-2); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; backdrop-filter: blur(6px); }
+.hd-banner-btn:hover { color: var(--ink); background: #fff; }
+.hd-banner-btn .icon { width: 15px; height: 15px; }
+.hd-banner-panel { position: fixed; z-index: 60; display: grid; gap: 8px; width: 248px; padding: 14px; border: 1px solid var(--hair-2); border-radius: 12px; background: #fff; color: var(--ink); box-shadow: var(--shadow-lift); }
+.hd-banner-label { margin: 0; color: var(--muted); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.hd-banner-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.hd-swatch { position: relative; width: 30px; height: 30px; padding: 0; border: 1px solid rgb(17 18 20 / 16%); border-radius: 50%; cursor: pointer; overflow: hidden; }
+.hd-swatch.is-on { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hd-swatch-custom { background: conic-gradient(#e64a19, #fbc02d, #43a047, #1e88e5, #8e24aa, #e64a19); }
+.hd-swatch-custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.hd-banner-error { margin: 0; color: var(--stop, #b42318); font-size: 12px; }
+.hd-banner-reset { justify-self: start; font-size: 12.5px; }
+.hd-banner-note { margin: 0; color: var(--muted); font-size: 11.5px; }
+@media (max-width: 760px) { .hd-banner-edit { top: 10px; bottom: auto; } .hd-banner-btn { min-height: 32px; } }
+/* Phones: New task becomes a floating action above the tab bar; the banner control shrinks to an icon. */
+.fab-create { display: none; }
+@media (max-width: 760px) {
+  .top-create { display: none; }
+  .fab-create { position: fixed; right: 16px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 30; display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; padding: 0; border: 0; border-radius: 50%; background: var(--accent); color: #fff; box-shadow: var(--shadow-lift); cursor: pointer; }
+  .fab-create .icon { width: 24px; height: 24px; }
+  .fab-create:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .hd-banner-edit { top: auto; bottom: 10px; right: 10px; }
+  .hd-banner-btn { width: 36px; padding: 0; justify-content: center; }
+  .hd-banner-btn span { display: none; }
+}

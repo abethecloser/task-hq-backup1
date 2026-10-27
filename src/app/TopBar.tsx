@@ -13,8 +13,14 @@ import { splitFilters } from '../core/task-filters.ts';
 // visible, the rest sit under More, and a narrow bar uses one labeled dropdown instead.
 export interface TopTab { id: string; label: string; count?: number; hot: boolean; active: boolean }
 
-export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title, mode, tabs, onTab, search, onAsk, onBell, onMenu, menuOpen, calendarAccess }: {
+export interface TopSection { id: string; label: string; active: boolean; count?: number; hot?: boolean }
+
+export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title, mode, tabs, onTab, search, onAsk, onBell, onMenu, menuOpen, calendarAccess, sections, onSection, onCreate }: {
   calendarAccess?: ReactNode;
+  /** The primary sections, as a top navigation. Wide screens only; phones use the tab bar. */
+  sections?: TopSection[]; onSection?: (id: string) => void;
+  /** The New task quick action; omitted when this person can't create work. */
+  onCreate?: () => void;
   quest: Quest; demo: boolean; focused: boolean; unread: number;
   askOpen: boolean; notifOpen: boolean; /** The current section's name. */ title: string;
   /** Task filters; only passed while Tasks is the page. */ tabs?: TopTab[];
@@ -23,7 +29,7 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title
   onTab: (id: string) => void; /** The app-wide search field (TopSearch). */ search: ReactNode; onAsk: () => void; onBell: () => void; onMenu: () => void; menuOpen: boolean;
 }) {
   return (
-    <header className="topbar">
+    <header className={`topbar ${sections ? 'has-sections' : ''} ${tabs ? 'has-sub' : ''}`}>
       <button type="button" className="icon-btn menu-btn" aria-label="Open navigation" aria-controls="quest-sidebar" aria-expanded={menuOpen} onClick={onMenu}><TopIcon d="M4 6h16M4 12h16M4 18h16" /></button>
       {calendarAccess}
       {demo && <span className="demo-flag" title="Synthetic people and data on this device. Not company work.">Demo · synthetic</span>}
@@ -34,10 +40,15 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title
         </div>
       )}
       <span className="topbar-title">{title}</span>
-      {tabs && <TaskFilters tabs={tabs} onTab={onTab} />}
+      {sections && onSection && <nav className="top-nav" aria-label="Sections">
+        {sections.map(item => <button key={item.id} type="button" className={`top-nav-item ${item.active ? 'is-active' : ''}`} aria-current={item.active ? 'page' : undefined} onClick={() => onSection(item.id)}>
+          {item.label}{!!item.count && <span className={item.hot ? 'is-hot' : ''}>{item.count > 99 ? '99+' : item.count}</span>}
+        </button>)}
+      </nav>}
       <div className="topbar-right">
         {focused && <span className="focus-chip">Critical Focus</span>}
         {search}
+        {onCreate && <button type="button" className="btn btn-primary top-create" onClick={onCreate} title="New task (N)" aria-label="New task"><TopIcon d="M12 5v14M5 12h14" /><span>New task</span></button>}
         {!focused && <button type="button" className={`top-icon ${askOpen ? 'is-on' : ''}`} aria-label="Ask your tasks" title={askOpen ? 'Close Ask your tasks drawer' : 'Open Ask your tasks drawer'} aria-controls="ask-edge-drawer" aria-expanded={askOpen} onClick={onAsk}><TopIcon d={SPARK} /></button>}
         <button type="button" className={`top-icon ${notifOpen ? 'is-on' : ''}`} title={notifOpen ? 'Close notifications drawer' : 'Open notifications drawer'} aria-controls="notifications-edge-drawer" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'} aria-expanded={notifOpen} onClick={onBell}>
           <TopIcon d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0" />
@@ -45,6 +56,7 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title
         </button>
         <UserChip quest={quest} />
       </div>
+      {tabs && <div className="topbar-sub"><TaskFilters tabs={tabs} onTab={onTab} /></div>}
     </header>
   );
 }

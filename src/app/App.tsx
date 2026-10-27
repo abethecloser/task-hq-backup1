@@ -310,6 +310,12 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
   const selected = taskId ? taskById(state, taskId) : undefined;
   const contextAllowed = selected && (!focused || selected.id === state.focus?.taskId || !!grant);
+  // The everyday sections sit in the top navigation on wide screens; the rail keeps the rest.
+  // Phones keep the full list in the menu (the top navigation is hidden there).
+  const topSections = (['home', 'all-tasks', 'company-work', 'calendar', 'inbox'] as View[])
+    .map(id => navigation.find(item => item.id === id)).filter(item => !!item)
+    .map(item => ({ id: item.id, label: item.id === 'all-tasks' ? 'Tasks' : item.label, count: item.id === 'inbox' ? item.count : undefined, hot: item.hot, active: view === item.id && !(selected && contextAllowed) }));
+  const railItems = sidebar.isMobile ? navigation : navigation.filter(item => !topSections.some(top => top.id === item.id));
 
   // Left and right panels keep independent open state (core/layout.ts): opening one never closes the other.
   // Short on room, the left panel narrows first; a right panel that still can't dock becomes a drawer.
@@ -417,7 +423,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           ? <CalendarPullout quest={quest} company={company} onOpenTask={openTask} onExpandCalendar={() => go('calendar')} onCreate={canCreate ? due => createOn(due) : undefined} />
           : <p className="muted pullout-note">The calendar is unavailable during Critical Focus.</p>}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
-        items={navigation.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: view === item.id || (item.id === 'calendar' && pullouts.calendar), info: info[item.id] }))}
+        items={railItems.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: view === item.id || (item.id === 'calendar' && pullouts.calendar), info: info[item.id] }))}
         onSelect={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
@@ -431,6 +437,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         </aside>}
         <TopBar calendarAccess={sidebar.isMobile ? calendarAccess : undefined} quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen} notifOpen={notifOpen}
           title={(VIEW_LABELS[view] ?? '').replace(' · Preview', '')}
+          sections={topSections} onSection={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
+          onCreate={canCreate && !focused ? () => setCreating(true) : undefined}
           tabs={view === 'all-tasks' && !(selected && contextAllowed) ? taskTabs : undefined}
           onTab={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={toggleAsk} onBell={toggleNotifications}
           onMenu={() => { restoreCalendar.current = false; setNotifOpen(false); setAskOpen(false); setMobileCalendarOpen(false); sidebar.openMobile(); }} menuOpen={sidebar.mobileOpen} />
@@ -507,6 +515,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />
         <AskTasks key={`ask:${state.workspace.tenantId}:${actor}`} quest={quest} company={company} open={askOpen && !focused} onClose={closeRightPanel} />
       </div>
+      {canCreate && !focused && !creating && <button type="button" className="fab-create" aria-label="New task" title="New task" onClick={() => setCreating(true)}><Icon d="M12 5v14M5 12h14" /></button>}
       {creating && canCreate && <CreateTask quest={quest} due={createDue} onClose={() => { setCreating(false); setCreateDue(undefined); }} onCreated={id => { setCreating(false); setCreateDue(undefined); openTask(id); }} />}
       {feedbackOn && <ReviewLayer quest={quest} openRequest={reviewRequest}
         screen={{ view: VIEW_LABELS[view], route: `#/${view}${view === 'leads' && leadId ? `/${leadId}` : ''}`, taskId: selected?.id ?? '', leadId: view === 'leads' && leadId ? leadId : '', deck: view === 'leads' && leadId ? 'lead' : selected ? 'task' : '' }}
