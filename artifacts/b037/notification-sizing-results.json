@@ -1,0 +1,339 @@
+{
+  "tabs": [
+    {
+      "viewport": 1440,
+      "width": 288,
+      "count": 4,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":288,\"tabs\":[{\"text\":\"Inbox4\",\"lines\":1,\"badgeLines\":1,\"width\":89,\"height\":44,\"fits\":true},{\"text\":\"Attention4\",\"lines\":1,\"badgeLines\":1,\"width\":89,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":89,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1440,
+      "width": 288,
+      "count": 11,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":288,\"tabs\":[{\"text\":\"Inbox11\",\"lines\":1,\"badgeLines\":1,\"width\":89,\"height\":44,\"fits\":true},{\"text\":\"Attention11\",\"lines\":1,\"badgeLines\":1,\"width\":89,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":89,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1440,
+      "width": 288,
+      "count": 101,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":288,\"tabs\":[{\"text\":\"Inbox99+\",\"lines\":1,\"badgeLines\":1,\"width\":88.546875,\"height\":44,\"fits\":true},{\"text\":\"Attention99+\",\"lines\":1,\"badgeLines\":1,\"width\":89.90625,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":88.546875,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1440,
+      "width": 304,
+      "count": 4,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":304,\"tabs\":[{\"text\":\"Inbox4\",\"lines\":1,\"badgeLines\":1,\"width\":94.328125,\"height\":44,\"fits\":true},{\"text\":\"Attention4\",\"lines\":1,\"badgeLines\":1,\"width\":94.3359375,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":94.3359375,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1440,
+      "width": 304,
+      "count": 11,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":304,\"tabs\":[{\"text\":\"Inbox11\",\"lines\":1,\"badgeLines\":1,\"width\":94.328125,\"height\":44,\"fits\":true},{\"text\":\"Attention11\",\"lines\":1,\"badgeLines\":1,\"width\":94.3359375,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":94.3359375,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1440,
+      "width": 304,
+      "count": 101,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":304,\"tabs\":[{\"text\":\"Inbox99+\",\"lines\":1,\"badgeLines\":1,\"width\":94.328125,\"height\":44,\"fits\":true},{\"text\":\"Attention99+\",\"lines\":1,\"badgeLines\":1,\"width\":94.3359375,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":94.3359375,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1440,
+      "width": 232,
+      "count": 4,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":232,\"tabs\":[{\"text\":\"Inbox4\",\"lines\":1,\"badgeLines\":1,\"width\":64.3671875,\"height\":44,\"fits\":true},{\"text\":\"Attention4\",\"lines\":1,\"badgeLines\":1,\"width\":82.2578125,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":64.375,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1440,
+      "width": 232,
+      "count": 11,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":232,\"tabs\":[{\"text\":\"Inbox11\",\"lines\":1,\"badgeLines\":1,\"width\":64.15625,\"height\":44,\"fits\":true},{\"text\":\"Attention11\",\"lines\":1,\"badgeLines\":1,\"width\":82.6875,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":64.15625,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1440,
+      "width": 232,
+      "count": 101,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":232,\"tabs\":[{\"text\":\"Inbox99+\",\"lines\":1,\"badgeLines\":1,\"width\":66.2890625,\"height\":44,\"fits\":true},{\"text\":\"Attention99+\",\"lines\":1,\"badgeLines\":1,\"width\":89.90625,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":54.8046875,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1024,
+      "width": 288,
+      "count": 4,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":288,\"tabs\":[{\"text\":\"Inbox4\",\"lines\":1,\"badgeLines\":1,\"width\":89,\"height\":44,\"fits\":true},{\"text\":\"Attention4\",\"lines\":1,\"badgeLines\":1,\"width\":89,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":89,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1024,
+      "width": 288,
+      "count": 11,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":288,\"tabs\":[{\"text\":\"Inbox11\",\"lines\":1,\"badgeLines\":1,\"width\":89,\"height\":44,\"fits\":true},{\"text\":\"Attention11\",\"lines\":1,\"badgeLines\":1,\"width\":89,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":89,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1024,
+      "width": 288,
+      "count": 101,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":288,\"tabs\":[{\"text\":\"Inbox99+\",\"lines\":1,\"badgeLines\":1,\"width\":88.546875,\"height\":44,\"fits\":true},{\"text\":\"Attention99+\",\"lines\":1,\"badgeLines\":1,\"width\":89.90625,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":88.546875,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1024,
+      "width": 304,
+      "count": 4,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":304,\"tabs\":[{\"text\":\"Inbox4\",\"lines\":1,\"badgeLines\":1,\"width\":94.328125,\"height\":44,\"fits\":true},{\"text\":\"Attention4\",\"lines\":1,\"badgeLines\":1,\"width\":94.3359375,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":94.3359375,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1024,
+      "width": 304,
+      "count": 11,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":304,\"tabs\":[{\"text\":\"Inbox11\",\"lines\":1,\"badgeLines\":1,\"width\":94.328125,\"height\":44,\"fits\":true},{\"text\":\"Attention11\",\"lines\":1,\"badgeLines\":1,\"width\":94.3359375,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":94.3359375,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1024,
+      "width": 304,
+      "count": 101,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":304,\"tabs\":[{\"text\":\"Inbox99+\",\"lines\":1,\"badgeLines\":1,\"width\":94.328125,\"height\":44,\"fits\":true},{\"text\":\"Attention99+\",\"lines\":1,\"badgeLines\":1,\"width\":94.3359375,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":94.3359375,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1024,
+      "width": 232,
+      "count": 4,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":232,\"tabs\":[{\"text\":\"Inbox4\",\"lines\":1,\"badgeLines\":1,\"width\":64.3671875,\"height\":44,\"fits\":true},{\"text\":\"Attention4\",\"lines\":1,\"badgeLines\":1,\"width\":82.2578125,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":64.375,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1024,
+      "width": 232,
+      "count": 11,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":232,\"tabs\":[{\"text\":\"Inbox11\",\"lines\":1,\"badgeLines\":1,\"width\":64.15625,\"height\":44,\"fits\":true},{\"text\":\"Attention11\",\"lines\":1,\"badgeLines\":1,\"width\":82.6875,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":64.15625,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1024,
+      "width": 232,
+      "count": 101,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":232,\"tabs\":[{\"text\":\"Inbox99+\",\"lines\":1,\"badgeLines\":1,\"width\":66.2890625,\"height\":44,\"fits\":true},{\"text\":\"Attention99+\",\"lines\":1,\"badgeLines\":1,\"width\":89.90625,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":54.8046875,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 375,
+      "width": 288,
+      "count": 4,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":375,\"tabs\":[{\"text\":\"Inbox4\",\"lines\":1,\"badgeLines\":1,\"width\":118,\"height\":44,\"fits\":true},{\"text\":\"Attention4\",\"lines\":1,\"badgeLines\":1,\"width\":118,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":118,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 375,
+      "width": 288,
+      "count": 11,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":375,\"tabs\":[{\"text\":\"Inbox11\",\"lines\":1,\"badgeLines\":1,\"width\":118,\"height\":44,\"fits\":true},{\"text\":\"Attention11\",\"lines\":1,\"badgeLines\":1,\"width\":118,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":118,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 375,
+      "width": 288,
+      "count": 101,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"panel\":375,\"tabs\":[{\"text\":\"Inbox99+\",\"lines\":1,\"badgeLines\":1,\"width\":118,\"height\":44,\"fits\":true},{\"text\":\"Attention99+\",\"lines\":1,\"badgeLines\":1,\"width\":118,\"height\":44,\"fits\":true},{\"text\":\"Activity\",\"lines\":1,\"badgeLines\":0,\"width\":118,\"height\":44,\"fits\":true}],\"pass\":true}\n```"
+          }
+        ]
+      }
+    }
+  ],
+  "sharedWidths": [
+    {
+      "viewport": 1440,
+      "desired": 288,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"widths\":{\"calendar\":288,\"notifications-edge-drawer\":288,\"ask-edge-drawer\":288},\"routePreserved\":true,\"scrollPreserved\":true,\"workspace\":1081,\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1440,
+      "desired": 304,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"widths\":{\"calendar\":304,\"notifications-edge-drawer\":304,\"ask-edge-drawer\":304},\"routePreserved\":true,\"scrollPreserved\":true,\"workspace\":1065,\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1024,
+      "desired": 288,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"widths\":{\"calendar\":288,\"notifications-edge-drawer\":288,\"ask-edge-drawer\":288},\"routePreserved\":true,\"scrollPreserved\":true,\"workspace\":665,\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 1024,
+      "desired": 304,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"widths\":{\"calendar\":304,\"notifications-edge-drawer\":304,\"ask-edge-drawer\":304},\"routePreserved\":true,\"scrollPreserved\":true,\"workspace\":649,\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "viewport": 375,
+      "desired": 375,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"widths\":{\"calendar\":375,\"notifications-edge-drawer\":375,\"ask-edge-drawer\":375},\"routePreserved\":true,\"scrollPreserved\":true,\"workspace\":375,\"pass\":true}\n```"
+          }
+        ]
+      }
+    }
+  ]
+}

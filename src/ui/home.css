@@ -24,7 +24,7 @@
 .momentum-support { max-width: 62ch; color: var(--ink-2); font-size: 14.5px; line-height: 1.45; }
 .momentum-support b { color: var(--accent-ink); font-weight: 700; }
 .hd-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-.hd-hero-actions .btn { min-height: 32px; }
+:root[data-look] .hd-hero-actions .btn { min-height: 44px; }
 .hd-hero-art { position: relative; min-width: 0; -webkit-mask-image: linear-gradient(90deg, transparent, #000 28%); mask-image: linear-gradient(90deg, transparent, #000 28%); }
 .hd-hero-art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hd-hero-tag { position: absolute; top: 16px; right: 20px; max-width: 12ch; padding-bottom: 8px; border-bottom: 2px solid var(--accent); color: var(--ink-2); font-size: 10.5px; font-weight: 800; letter-spacing: .2em; line-height: 1.6; text-align: right; text-transform: uppercase; }
@@ -226,17 +226,18 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
   background-image: linear-gradient(color-mix(in srgb, var(--bar, transparent) 45%, transparent), color-mix(in srgb, var(--bar, transparent) 45%, transparent));
   background-repeat: no-repeat; background-position: left center; background-size: 3px calc(100% - 16px);
 }
-/* Wide fields are open lines: no box, a rule that fades out to the right over a faint shade,
-   and the caret in the accent. Pills and small inline controls keep their own look. */
-:root:root:root :is(.field > :is(input, textarea, select), .task-comment-form textarea, .tp-people select, .tp-card > select, .search-field input, .composer-box):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not(.pill-select) {
-  --field-rule: rgb(0 0 0 / 20%);
-  border: 0; border-radius: 0; box-shadow: none; outline: none; caret-color: var(--accent);
-  background:
-    linear-gradient(to right, var(--field-rule), transparent) left bottom / 100% 1px no-repeat,
-    radial-gradient(70% 10px at 0 100%, rgb(0 0 0 / 4%), transparent) left bottom / 100% 10px no-repeat;
+/* Shared minimal form appearance. Labels and spacing identify fields; keyboard
+   focus supplies the only outline. Binary, file and pill controls keep their structure. */
+:root:root:root :is(input, textarea, select):not(:is([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"], [type="reset"], [type="image"], .pill-select)),
+:root:root:root :is(.field, .auth-input, .search-field, .composer-box, .thread-post, .msg-composer, .task-comment-form) {
+  border: 0; border-radius: 0; box-shadow: none; background: transparent; caret-color: var(--accent);
 }
-:root:root:root :is(.field > :is(input, textarea, select), .task-comment-form textarea, .tp-people select, .tp-card > select, .search-field input, .composer-box):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not(.pill-select):hover { --field-rule: rgb(0 0 0 / 32%); }
-:root:root:root :is(.field > :is(input, textarea, select), .task-comment-form textarea, .tp-people select, .tp-card > select, .search-field input, .composer-box):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not(.pill-select):focus, :root:root:root .composer-box:focus-within { --field-rule: rgb(0 0 0 / 60%); box-shadow: none; outline: none; }
+:root:root:root :is(input, textarea, select):not(:is([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"], [type="reset"], [type="image"], .pill-select)):focus {
+  box-shadow: none;
+}
+:root:root:root :is(input, textarea, select):not(:is([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"], [type="submit"], [type="reset"], [type="image"], .pill-select)):focus-visible {
+  outline: 2px solid var(--accent, #b84300); outline-offset: 2px;
+}
 :root:root:root .field > :is(input, textarea):not([type="checkbox"]):not([type="radio"]) { padding-inline: 2px; }
 /* No side edges: containers are sections divided by hairlines above and below, with square
    corners and no side shade. Only actionable controls (buttons, links) keep a full outline;
@@ -286,11 +287,11 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .sig-item:disabled:hover { box-shadow: none; transform: none; }
 
 /* ── Ask your tasks ────────────────────────────────────────────────────── */
-.ask-panel { position: fixed; right: 24px; bottom: 24px; z-index: 60; display: flex; flex-direction: column; width: min(400px, calc(100vw - 32px)); height: min(640px, calc(100vh - 96px)); overflow: hidden; border: 1px solid rgb(17 18 20 / 7%); border-radius: 22px; background: #f9f8f7; box-shadow: 0 24px 64px rgb(17 18 20 / 18%), 0 2px 6px rgb(17 18 20 / 8%); color: var(--ink); animation: ask-in .22s var(--ease-out); }
-.ask-head { display: flex; align-items: center; gap: 10px; padding: 16px 16px 16px 20px; border-bottom: 1px solid rgb(17 18 20 / 8%); }
+.ask-panel { color: var(--ink); overflow: hidden; }
+.ask-head { display: flex; align-items: center; gap: 10px; padding: 16px 16px 16px 20px; }
 .ask-head h2 { flex: 1; margin: 0; font: 700 17px var(--display); letter-spacing: -.01em; }
 .ask-spark { color: var(--accent); }
-.ask-icon-btn { display: grid; place-items: center; width: 38px; height: 38px; flex: none; padding: 0; border: 1px solid var(--hair-2); border-radius: 10px; background: #fff; color: var(--ink); }
+.ask-icon-btn { display: grid; place-items: center; width: 44px; height: 44px; flex: none; padding: 0; border: 1px solid var(--hair-2); border-radius: 10px; background: #fff; color: var(--ink); }
 .ask-icon-btn:hover:not(:disabled) { border-color: var(--ink-2); }
 .ask-log { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 20px; overflow-y: auto; }
 .ask-empty { display: grid; justify-items: center; gap: 8px; margin: auto 0; text-align: center; }
@@ -302,13 +303,10 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .ask-msg { max-width: 86%; margin: 0; padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .ask-msg.from-you { align-self: flex-end; background: var(--ink); color: #fff; }
 .ask-msg.from-tasks { align-self: flex-start; border: 1px solid rgb(17 18 20 / 8%); background: #fff; color: var(--ink); }
-.ask-foot { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-top: 1px solid rgb(17 18 20 / 8%); }
+.ask-foot { display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
 .ask-foot input { flex: 1; min-width: 0; min-height: 48px; padding: 0 18px; border: 1px solid rgb(17 18 20 / 8%); border-radius: 14px; background: #f7f6f4; font-size: 15px; }
 .ask-send { width: 48px; height: 48px; border-radius: 12px; color: var(--accent); }
 .ask-send:disabled { opacity: .5; }
-@keyframes ask-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
-@media (max-width: 760px) { .ask-panel { right: 12px; bottom: 76px; height: min(560px, calc(100dvh - 110px)); } }
-
 /* ── Top bar ───────────────────────────────────────────────────────────── */
 .topbar > * { flex-shrink: 0; }
 .topbar > .topbar-title { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -338,7 +336,7 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .page-preview b { color: var(--accent-ink); }
 .page-preview-view { padding: clamp(18px, 4vw, 40px); }
 .icon.icon-sm { width: 14px; height: 14px; }
-.topbar .topbar-right { flex: none; margin-left: 0; gap: 10px; }
+.topbar .topbar-right { flex: none; margin-left: auto; gap: 10px; }
 /* Search lives in the top bar: an open line like every wide field, results drop down beneath it. */
 .top-search { flex: 0 1 300px; min-width: 200px; transition: flex-basis .2s var(--ease-out), min-width .2s var(--ease-out); }
 .top-search.has-reference input { padding-left: 8px; }
@@ -353,7 +351,7 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 /* Placeholder until time tracking exists: looks like the design, but can't be pressed. */
 :root .btn.top-clock:disabled { opacity: 1; border-color: var(--hair-2); background: var(--card); color: var(--ink-2); box-shadow: none; }
 .top-clock-play { color: #16a34a; font-size: 11px; }
-.top-icon { position: relative; display: grid; place-items: center; width: 38px; height: 38px; flex: none; padding: 0; border: 1px solid var(--hair-2); border-radius: 10px; background: var(--card); color: var(--ink); }
+.top-icon { position: relative; display: grid; place-items: center; width: 44px; height: 44px; flex: none; padding: 0; border: 1px solid var(--hair-2); border-radius: 10px; background: var(--card); color: var(--ink); }
 .top-icon:hover:not(:disabled) { border-color: var(--ink-2); }
 .top-icon:disabled { color: var(--faint); cursor: not-allowed; }
 .top-icon.is-on { border-color: var(--accent); background: var(--accent-pale); color: var(--accent-ink); }
@@ -461,3 +459,18 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .filter-select select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @container topbar (max-width: 860px) { .task-filters { display: none; } .filter-select { display: inline-flex; } }
 @media (max-width: 1000px) { .topbar > .task-filters, .topbar > .filter-select { order: 3; } .topbar > .filter-select { flex: 1 0 100%; } .topbar > .filter-select select { flex: 1 1 auto; } }
+
+/* Keep global controls together on the existing header row. */
+@media (max-width: 760px) {
+  .topbar { padding-inline: 12px; }
+  .topbar:not(:has(.task-filters)) { flex-wrap: nowrap; }
+  .topbar .menu-btn { min-width: 44px; min-height: 44px; }
+  .topbar .topbar-right { gap: 4px; }
+  .topbar .top-icon { min-width: 44px; min-height: 44px; }
+  .topbar .top-search { flex-basis: 44px; min-width: 44px; }
+  .topbar:has(.top-search:focus-within) > .topbar-title,
+  .topbar:has(.top-search:focus-within) .account-pop { display: none; }
+  .topbar .top-search:focus-within { min-width: min(180px, calc(100vw - 172px)); flex-basis: 180px; }
+  .topbar .top-search input { min-height: 44px; }
+  .topbar .user-chip-text { display: none; }
+}

@@ -206,12 +206,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 .mode-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-pale); }
 .main { min-height: 100vh; margin-left: calc(var(--rail) + var(--panel-offset, 0px)); transition: margin-left var(--sidebar-speed) var(--sidebar-ease); }
 .shell[data-resizing] .main { transition: none; }
-.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 14px; height: 60px; padding: 0 36px; border-bottom: 1px solid transparent; background: rgb(255 255 255 / 88%); backdrop-filter: blur(14px); }
-/* No divider at rest; a faint hairline fades in only once content scrolls beneath the bar. */
-@supports (animation-timeline: scroll()) {
-  .topbar { animation: topbar-hairline linear both; animation-timeline: scroll(root); animation-range: 0 24px; }
-  @keyframes topbar-hairline { to { border-bottom-color: rgb(17 18 20 / 5%); } }
-}
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 14px; height: 60px; padding: 0 36px; border-bottom: 0; background: rgb(255 255 255 / 88%); backdrop-filter: blur(14px); }
+/* The workspace header stays continuous with the page, including while scrolling. */
 .topbar-title { font-weight: 750; white-space: nowrap; }
 .working-as > span, .focus-chip { white-space: nowrap; }
 .topbar-right { display: flex; align-items: center; gap: 12px; min-width: 0; margin-left: auto; }
@@ -385,7 +381,7 @@ span.attn-title { color: var(--ink); font-weight: 800; }
 .modal-head h2 { margin-top: 4px; font: 800 24px var(--display); letter-spacing: -.03em; }
 .form { display: grid; gap: 14px; padding: 18px 22px 22px; }
 .form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.form-actions { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 8px; margin: 0 -2px; padding: 12px 2px; border-top: 1px solid var(--line); background: rgb(255 255 255 / 96%); }
+.form-actions { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 8px; margin: 0 -2px; padding: 12px 2px; background: rgb(255 255 255 / 96%); }
 
 /* Ultra Priority */
 .shell.is-focus .main { background: radial-gradient(circle at 50% 0, #fff 0, var(--bg) 60%); }

@@ -164,8 +164,8 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             {editable && <>
                 <div className="roles">
                   {quest.backend.supports?.taskTaxonomy !== false && <>
-                    <label className="field"><span>Time</span><input type="time" value={task.dueTime ?? ''} disabled={!task.due || locked} onChange={event => void update({ dueTime: event.target.value || undefined })} /></label>
-                    {(state.taxonomy?.types.length ?? 0) > 0 && <label className="field"><span>Type</span><Select value={task.type ?? ''} onChange={event => void update({ type: event.target.value || undefined })}><option value="">No type</option>{state.taxonomy!.types.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</Select></label>}
+                    <label className="field"><span>Time</span><input type="time" value={task.dueTime ?? ''} disabled={!task.due || locked} onChange={event => void update({ dueTime: event.target.value })} /></label>
+                    {(state.taxonomy?.types.length ?? 0) > 0 && <label className="field"><span>Type</span><Select value={task.type ?? ''} onChange={event => void update({ type: event.target.value })}><option value="">No type</option>{state.taxonomy!.types.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</Select></label>}
                     <label className="field"><span>Tags</span><input defaultValue={(task.tags ?? []).join(' ')} placeholder="permits safety" onBlur={event => { const tags = event.target.value.split(/[\s,]+/).map(tag => tag.replace(/^#/, '').toLowerCase()).filter(Boolean); if (tags.join(' ') !== (task.tags ?? []).join(' ')) void update({ tags }); }} /></label>
                   </>}
                 </div>

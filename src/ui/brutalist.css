@@ -127,7 +127,7 @@
 :root[data-look="brutalist"] .rail { border-right: 1px solid var(--ink-rule); }
 :root[data-look="brutalist"] .workspace-panel { border-right: 1px solid var(--ink-rule); }
 :root[data-look="brutalist"] .panel-head { border-bottom: 1px solid var(--ink-rule); }
-:root[data-look="brutalist"] .topbar { border-bottom: 1px solid var(--ink-rule); background: rgb(243 244 245 / 92%); }
+:root[data-look="brutalist"] .topbar { border-bottom: 0; background: rgb(243 244 245 / 92%); }
 :root[data-look="brutalist"] .context { border-left: 1px solid var(--ink-rule); }
 :root[data-look="brutalist"] .context-head { border-bottom: 1px solid var(--ink-rule); }
 :root[data-look="brutalist"] .registry-table,

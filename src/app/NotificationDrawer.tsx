@@ -2,7 +2,13 @@
 // and Activity lists as before. Selecting a task notification from the Inbox opens that task's
 // existing conversation here (context, comments with @mentions, and an inline reply) without
 // leaving the page underneath, so scroll position and everything else stay put.
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import { EdgeDrawer } from '../ui/EdgeDrawer.tsx';
+import { ChannelThread } from './Inbox.tsx';
+import type { InboxData } from './Inbox.tsx';
+import { channelsFor } from '../core/inbox.ts';
+import type { InboxItem } from '../core/inbox.ts';
+import { LeadCard } from './SpeedToLead.tsx';
 import type { Attention } from '../core/awareness.ts';
 import type { UniversalInbox } from '../core/inbox.ts';
 import { responsibility } from '../core/responsibility.ts';
@@ -12,64 +18,45 @@ import { Awareness } from './Awareness.tsx';
 import type { SidebarControl } from './Sidebar.tsx';
 import { CommentReply, EventFeed, canReply, isComment, taskEvents } from './TaskComments.tsx';
 
-const FOCUSABLE = 'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]';
-
-export function NotificationDrawer({ quest, control, inbox, attention, docked, threadAllowed, onClose, onOpenTask, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity }: {
-  quest: Quest; control: SidebarControl; inbox: UniversalInbox; attention: Attention; docked: boolean;
+export function NotificationDrawer({ quest, control, inbox, attention, data, detailsAllowed = true, open: visible, threadAllowed, onClose, onOpenTask, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity }: {
+  quest: Quest; control: SidebarControl; inbox: UniversalInbox; attention: Attention; data?: InboxData; detailsAllowed?: boolean; open: boolean;
   /** False for a task outside the person's Critical Focus: its thread is not shown. */
   threadAllowed: (taskId: string) => boolean;
   onClose: () => void; onOpenTask: (id: string) => void; onOpenLead: (id: string) => void; onOpenInbox: () => void; onOpenAttention: () => void; onOpenActivity: () => void;
 }) {
   const [thread, setThread] = useState<string | null>(null);
-  const panel = useRef<HTMLElement>(null);
-  const returnFocus = useRef<HTMLElement | null>(null);
-
-  // As an overlay: take focus, keep it inside, hand it back on close.
-  useEffect(() => {
-    if (docked) return;
-    returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    panel.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
-    return () => { returnFocus.current?.focus(); };
-  }, [docked]);
-
-  // On a phone the drawer fills the screen; follow the visible area so the reply box stays above the keyboard.
-  useEffect(() => {
-    const viewport = window.visualViewport;
-    const node = panel.current;
-    if (!viewport || !node) return;
-    const fit = () => node.style.setProperty('--vvh', `${Math.round(viewport.height)}px`);
-    fit();
-    viewport.addEventListener('resize', fit);
-    viewport.addEventListener('scroll', fit);
-    return () => { viewport.removeEventListener('resize', fit); viewport.removeEventListener('scroll', fit); };
-  }, []);
-
-  // The drawer stays open for navigation on desktop; on a phone it gets out of the way.
-  const sheet = { ...control, afterNavigate: () => { if (control.isMobile || !docked) onClose(); } } as SidebarControl;
-  const open = (fn: (id: string) => void) => (id: string) => { fn(id); sheet.afterNavigate(); };
+  const [item, setItem] = useState<InboxItem | null>(null);
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const sheet = { ...control, afterNavigate: () => {} } as SidebarControl;
+  const back = () => { setThread(null); setItem(null); setLeadId(null); };
+  const selectTask = (id: string) => { back(); setThread(id); };
+  const selectLead = (id: string) => { back(); setLeadId(id); };
+  const lead = quest.state.leads.find(entry => entry.id === leadId);
+  const channel = item?.channelId && data?.messaging
+    ? channelsFor(data.messaging, quest.actor).find(entry => entry.id === item.channelId) : null;
 
   return (
-    <aside ref={panel} className={`context context-signals notify-drawer ${docked ? 'is-docked' : 'is-drawer'}`} role={docked ? 'complementary' : 'dialog'} aria-modal={docked ? undefined : true} aria-label="Notifications"
-      onKeyDown={event => {
-        if (event.key === 'Escape') { event.stopPropagation(); if (thread) setThread(null); else onClose(); }
-        if (!docked && event.key === 'Tab') {
-          const controls = [...(panel.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? [])].filter(el => el.getClientRects().length > 0);
-          const first = controls[0], last = controls[controls.length - 1];
-          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-        }
-      }}>
-      {thread
-        ? <Thread quest={quest} taskId={thread} allowed={threadAllowed(thread)} onBack={() => setThread(null)} onClose={onClose} onOpenTask={id => { open(onOpenTask)(id); setThread(null); }} />
+    <EdgeDrawer id="notifications-edge-drawer" open={visible} label="Notifications" className="context context-signals notify-drawer is-drawer" onClose={onClose}>
+      {(item || leadId) ? <>
+        <header className="context-head"><button type="button" className="btn btn-ghost" onClick={back}>Back to notifications</button><button type="button" className="icon-btn" aria-label="Close notifications" onClick={onClose}>×</button></header>
+        <div className="context-body">
+          {!detailsAllowed ? <p role="alert">This detail is outside your Critical Focus. Request access first.</p> : leadId ? lead ? <LeadCard quest={quest} lead={lead} onOpen={selectTask} /> : <p>This lead no longer exists.</p>
+            : channel && data?.messaging && data.store ? <ChannelThread quest={quest} messaging={data.messaging} store={data.store} channelId={channel.id} current={data.current} onOpenTask={selectTask} />
+            : <><h2>{item?.title}</h2><p>{item?.detail}</p><p className="muted">Conversation unavailable in this workspace.</p></>}
+        </div>
+      </> :
+      thread
+        ? <Thread quest={quest} taskId={thread} allowed={threadAllowed(thread)} onBack={() => setThread(null)} onClose={onClose} onOpenTask={id => { onOpenTask(id); onClose(); }} />
         : <>
             <header className="context-head"><span className="context-label">Notifications</span><button type="button" className="icon-btn" aria-label="Close notifications" onClick={onClose}>×</button></header>
             <div className="context-body notify-body">
               <Awareness quest={quest} control={sheet} inbox={inbox} attention={attention}
-                onOpenTask={open(onOpenTask)} onOpenThread={setThread} onOpenLead={open(onOpenLead)}
-                onOpenInbox={() => { onOpenInbox(); sheet.afterNavigate(); }} onOpenAttention={() => { onOpenAttention(); sheet.afterNavigate(); }} onOpenActivity={() => { onOpenActivity(); sheet.afterNavigate(); }} />
+                onOpenTask={selectTask} onOpenThread={selectTask} onOpenLead={selectLead}
+                onOpenItem={entry => { if (entry.channelId) { back(); setItem(entry); } else if (entry.taskId) selectTask(entry.taskId); else if (entry.leadId) selectLead(entry.leadId); else { back(); setItem(entry); } }}
+                onOpenInbox={() => { onOpenInbox(); onClose(); }} onOpenAttention={() => { onOpenAttention(); onClose(); }} onOpenActivity={() => { onOpenActivity(); onClose(); }} />
             </div>
           </>}
-    </aside>
+    </EdgeDrawer>
   );
 }
 

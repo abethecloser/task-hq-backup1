@@ -319,8 +319,9 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       }
       if (task.ultra && !isManager && (changes.owner !== undefined || changes.due !== undefined || changes.priority !== undefined)) return fail(input, 'Only an owner or admin can change owner, due date or priority on an Ultra Priority task.');
       if (![changes.owner, changes.nextOwner, changes.decisionOwner, changes.approver].every(id => validPerson(state, id))) return fail(input, 'That person is not in this workspace.');
+      if (changes.due === '' && task.dueTime && !('dueTime' in changes)) changes.dueTime = undefined;
       if ('type' in changes || 'tags' in changes || 'dueTime' in changes) {
-        const shape = classify(state, { type: changes.type ?? task.type, tags: changes.tags ?? task.tags, dueTime: changes.dueTime ?? task.dueTime, due: changes.due ?? task.due });
+        const shape = classify(state, { ...task, ...changes });
         if (typeof shape === 'string') return fail(input, shape);
         Object.assign(changes, { type: shape.type, tags: shape.tags, dueTime: shape.dueTime });
       }

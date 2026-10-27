@@ -1,7 +1,7 @@
 // Persistent workspace sidebar: a 56px Instrument Rail that is always visible, plus
 // a resizable pullout beside it. On desktop the pullout reflows the main content (the
 // shell reserves its width) and never covers it. On mobile it is a dismissible drawer.
-// The rail navigates; the left pullout is the calendar quick view, opened by the Calendar icon.
+// The rail navigates; the attached Calendar tab opens the left quick view.
 // Notifications live in a drawer on the right (NotificationDrawer.tsx). On mobile the rail is
 // hidden, so this drawer carries navigation instead.
 // Open state, width, tab, read items and snoozes are saved per person in localStorage;
@@ -135,7 +135,8 @@ function unreadIn(notes: Notification[], read: Set<string>, section?: string) {
   return notes.filter(note => (!section || note.section === section) && !read.has(note.id)).length;
 }
 
-export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, pullout, pulloutTitle, settings, account }: {
+export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, pullout, pulloutTitle, settings, account, calendarAccess }: {
+  calendarAccess?: ReactNode;
   control: SidebarControl;
   items: SidebarItem[];
   brand: ReactNode;
@@ -208,6 +209,12 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
     if (isMobile && control.mobileOpen) panel.current?.querySelector<HTMLElement>('.panel-close')?.focus();
   }, [isMobile, control.mobileOpen]);
 
+  useEffect(() => {
+    if (!isMobile && control.open && document.activeElement?.id === 'calendar-edge-launcher') {
+      panel.current?.querySelector<HTMLElement>('.panel-close')?.focus({ preventScroll: true });
+    }
+  }, [isMobile, control.open]);
+
   function onResizeKey(event: KeyboardEvent) {
     const step = event.shiftKey ? 48 : 16;
     let next: number | null = null;
@@ -252,7 +259,11 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
       <aside className="rail" aria-label="Instrument Rail">
         <div className="sidebar-brand">{brand}</div>
         <nav className="nav" aria-label="Task-HQ sections">
-          {everyday.map(railItem)}
+          <div className="nav-primary">
+            {everyday.filter(item => item.id === 'home' || item.id === 'calendar').map(item => item.id === 'calendar' && calendarAccess ? <div key={item.id} className="rail-calendar-access">{calendarAccess}</div> : railItem(item))}
+          </div>
+          <div className="nav-secondary">
+          {everyday.filter(item => item.id !== 'home' && item.id !== 'calendar').map(railItem)}
           {previews.length > 0 && (
             <>
               <button type="button" className={`nav-item nav-group-toggle ${showPreviews ? 'is-open' : ''}`} aria-expanded={showPreviews} aria-controls="nav-previews"
@@ -264,6 +275,7 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
               {showPreviews && <div id="nav-previews" className="nav-previews" role="group" aria-label="Previews">{previews.map(railItem)}</div>}
             </>
           )}
+          </div>
         </nav>
         <div className="sidebar-foot">
           <RailMenu label="Settings" className="rail-settings" hint={hintFor('Settings', 'Look and workspace')} icon={<svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>}>{settings}</RailMenu>
@@ -278,10 +290,19 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
       <aside id="quest-sidebar" ref={panel} className="workspace-panel" aria-label="Workspace sidebar" aria-hidden={panelHidden || undefined}
         data-state={panelHidden ? 'collapsed' : 'expanded'} data-resizing={control.resizing || undefined}
         style={isMobile ? undefined : { width: control.width }}
-        onKeyDown={event => { if (isMobile && event.key === 'Escape') { event.stopPropagation(); control.closeMobile(); } }}>
+        onKeyDown={event => {
+          if (event.key === 'Escape') {
+            event.stopPropagation();
+            if (isMobile) control.closeMobile();
+            else { control.toggle(); document.getElementById('calendar-edge-launcher')?.focus({ preventScroll: true }); }
+          }
+        }}>
         <div className="panel-head">
           <span className="panel-title">{isMobile ? <>Task-<b>HQ</b></> : pulloutTitle}</span>
-          <button type="button" className="icon-btn panel-close" aria-label={isMobile ? 'Close navigation' : `Close ${pulloutTitle.toLowerCase()}`} onClick={isMobile ? control.closeMobile : control.toggle}>
+          <button type="button" className="icon-btn panel-close" aria-label={isMobile ? 'Close navigation' : `Close ${pulloutTitle.toLowerCase()}`} onClick={() => {
+            if (isMobile) control.closeMobile();
+            else { control.toggle(); document.getElementById('calendar-edge-launcher')?.focus({ preventScroll: true }); }
+          }}>
             <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={isMobile ? 'M6 6l12 12M18 6 6 18' : 'M15 6l-6 6 6 6'} /></svg>
           </button>
         </div>
