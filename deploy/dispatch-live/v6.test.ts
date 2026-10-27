@@ -57,3 +57,31 @@ test('v6 core is the current engine, byte for byte', async () => {
   const dir = new URL('./v6/core/', import.meta.url);
   for (const file of readdirSync(dir)) assert.equal(readFileSync(new URL(file, dir), 'utf8'), readFileSync(new URL(`../../src/core/${file}`, import.meta.url), 'utf8'), `${file} drifted; run npm run sync:functions`);
 });
+
+test('v6 clears due fields across JSON reload without leaving an orphaned time', () => {
+  let s = v6.emptyState(ORG, members, T0);
+  s = ok(v6.runAction(s, ORG, members, OWNER, { type: 'task/create', task: { title: 'Inspect flashing', owner: MEMBER, due: '2026-10-28', dueTime: '09:00' } }, T0));
+  const taskId = s.tasks.find(t => t.title === 'Inspect flashing')!.id;
+  const clearTime = JSON.parse(JSON.stringify({ type: 'task/update', id: taskId, changes: { dueTime: '' } })) as Action;
+  s = ok(v6.runAction(s, ORG, members, MEMBER, clearTime, T0 + 1000));
+  s = JSON.parse(JSON.stringify(s));
+  assert.equal(s.tasks.find(t => t.id === taskId)?.dueTime, undefined);
+  assert.equal(s.tasks.find(t => t.id === taskId)?.due, '2026-10-28');
+  s = ok(v6.runAction(s, ORG, members, MEMBER, { type: 'task/update', id: taskId, changes: { dueTime: '10:30' } }, T0 + 2000));
+  s = ok(v6.runAction(s, ORG, members, MEMBER, { type: 'task/update', id: taskId, changes: { due: '' } }, T0 + 3000));
+  s = JSON.parse(JSON.stringify(s));
+  assert.equal(s.tasks.find(t => t.id === taskId)?.due, '');
+  assert.equal(s.tasks.find(t => t.id === taskId)?.dueTime, undefined);
+});
+
+test('JSON-safe clearing payloads work against frozen v5 without widening its capabilities', () => {
+  let s = v5.emptyState(ORG, members, T0);
+  s = ok(v5.runAction(s, ORG, members, OWNER, { type: 'task/create', task: { title: 'Inspect flashing', owner: MEMBER, due: '2026-10-28', dueTime: '09:00' } }, T0));
+  const taskId = s.tasks.find(t => t.title === 'Inspect flashing')!.id;
+  for (const changes of [{ dueTime: '' }, { due: '', dueTime: '' }]) {
+    const action = JSON.parse(JSON.stringify({ type: 'task/update', id: taskId, changes })) as Action;
+    s = ok(v5.runAction(s, ORG, members, MEMBER, action, T0 + 1000));
+    assert.equal(s.tasks.find(t => t.id === taskId)?.dueTime, undefined);
+  }
+  assert.equal(s.tasks.find(t => t.id === taskId)?.due, '');
+});

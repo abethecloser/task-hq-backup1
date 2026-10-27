@@ -4,7 +4,7 @@
 //   RIGHT   Context & execution for the selected task, or operational signals
 //           (ContextPanel.tsx). Docked beside the canvas when there is room, so
 //           nothing ever covers the work; a drawer on smaller screens.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { SECTION_LABELS } from '../core/contract.ts';
 import { decisionDesk } from '../core/executive.ts';
@@ -41,6 +41,7 @@ import { CriticalFocus, GrantBar } from './UltraFocus.tsx';
 import { FeedbackInbox, ReviewLayer, ReviewerWelcome } from './Review.tsx';
 import { ROLE_LABELS, useLive } from './LiveContext.tsx';
 import type { QuestBackend } from '../adapter/store.ts';
+import { EdgeDrawer } from '../ui/EdgeDrawer.tsx';
 import { Sidebar, useSidebar } from './Sidebar.tsx';
 import { NotificationDrawer } from './NotificationDrawer.tsx';
 import { attentionFor } from '../core/awareness.ts';
@@ -56,7 +57,7 @@ import { notificationsFor } from './notifications.ts';
 import { PREVIEW_VIEWS, PreviewNotice } from './PreviewNotice.tsx';
 import { canonicalPage, pageStatus } from '../core/navigation.ts';
 import type { AppPageId } from '../core/navigation.ts';
-import { openPullout, pulloutMode, togglePullout } from '../core/layout.ts';
+import { closeTemporaryRight, openTemporaryRight, togglePullout } from '../core/layout.ts';
 import type { PulloutRoom, Pullouts } from '../core/layout.ts';
 import { splitFilters } from '../core/task-filters.ts';
 import type { Notification } from './notifications.ts';
@@ -73,8 +74,6 @@ const VIEW_LABELS: Record<View, string> = {
 
 /** Views where the Instrument Deck (signals, calendar, insights) is useful beside the canvas. */
 const SIGNAL_VIEWS: View[] = ['home', 'all-tasks', 'company-work', 'needs-attention'];
-/** Width of the notifications drawer when docked beside the page. */
-const NOTIFY_PANEL = 360;
 /** The canvas never gets narrower than this because of a docked panel. */
 const MIN_CANVAS = 600;
 /** With the left panel open too, the canvas may narrow further before the right panel overlays. */
@@ -123,6 +122,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const [createDue, setCreateDue] = useState<string | undefined>();
   const createOn = (due: string) => { setCreateDue(due); setCreating(true); };
   const [askOpen, setAskOpen] = useState(false);
+  const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
   // Which task view and scope All Tasks is showing, for the top-bar tabs.
   const registry = useRegistryPrefs(state.workspace.tenantId, actor);
   const registryView = registry.prefs.query;
@@ -288,8 +288,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const navigation: { id: View; label: string; count?: number; countLabel?: string; hot?: boolean; preview?: boolean; icon: ReactNode }[] = [
     // Everyday work. Reports and Executive Desk were the same page; they are one "Owner overview".
     { id: 'home', label: 'Home', icon: <Icon d="M3 11l9-8 9 8M5 10v11h14V10M10 21v-7h4v7" /> },
-    { id: 'all-tasks', label: 'Tasks', count: counts.all, countLabel: 'open tasks', icon: <Icon d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v2H4z" /> },
     { id: 'calendar', label: 'Calendar', icon: <Icon d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4" /> },
+    { id: 'all-tasks', label: 'Tasks', count: counts.all, countLabel: 'open tasks', icon: <Icon d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v2H4z" /> },
     { id: 'inbox', label: 'Inbox', count: inboxUnread, countLabel: 'unread updates', hot: inboxUnread > 0, icon: <Icon d="M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z" /> },
     { id: 'needs-attention', label: 'Needs Attention', count: attention.length, countLabel: 'conditions', hot: myAttention > 0, icon: <Icon d="M12 4 21 20H3zM12 10v4M12 17v.5" /> },
     { id: 'company-work', label: 'Projects', count: openCompany.length, countLabel: 'open tasks', icon: <Icon d="M3 8h18v12H3zM8 8V5h8v3M3 13h18" /> },
@@ -316,19 +316,54 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const deckAllowed = SIGNAL_VIEWS.includes(view) && !focused;
 
   // Two pullouts. Left: the calendar quick view, opened by the rail's Calendar icon (not in Critical Focus).
-  // Right: notifications, opened by the bell. Both start closed. Both may be open on a wide desktop only while
-  // the center stays usable; otherwise opening one closes the other. On a phone only one panel shows at a time.
+  // Right: Notifications and Ask share an in-flow desktop pane; phones use a full-width panel.
+  // Both start closed. On a phone opening notifications closes the navigation menu.
   const calendarAllowed = !focused;
-  const room: PulloutRoom = { viewport: width, mobile: sidebar.isMobile, calendarWidth: sidebar.width, notificationsWidth: NOTIFY_PANEL, minCanvasBoth: MIN_CANVAS_BOTH, minCanvas: MIN_CANVAS };
-  const pullouts: Pullouts = { calendar: !sidebar.isMobile && calendarAllowed && sidebar.open, notifications: notifOpen };
-  const notifyDocked = pulloutMode('notifications', pullouts, room) === 'docked';
+  const rightPanelOpen = notifOpen || (askOpen && !focused);
+  const restoreCalendar = useRef(false);
+  useEffect(() => { restoreCalendar.current = false; }, [actor, state.workspace.tenantId]);
+  const edgePanelOpen = rightPanelOpen || (sidebar.isMobile && mobileCalendarOpen);
+  const panelScroll = useRef<{ x: number; y: number; route: string } | null>(null);
+  useLayoutEffect(() => {
+    if (edgePanelOpen) {
+      panelScroll.current = { x: window.scrollX, y: window.scrollY, route: location.hash };
+      return;
+    }
+    const saved = panelScroll.current;
+    panelScroll.current = null;
+    if (!saved || saved.route !== location.hash) return;
+    const frame = requestAnimationFrame(() => {
+      if (saved.route === location.hash) window.scrollTo({ left: saved.x, top: saved.y, behavior: 'instant' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [edgePanelOpen]);
+  // Calendar owns the persisted, clamped panel width; both right panes reuse it.
+  const rightPanelWidth = sidebar.width;
+  const room: PulloutRoom = { viewport: width, mobile: sidebar.isMobile, calendarWidth: sidebar.width, notificationsWidth: rightPanelWidth, minCanvasBoth: MIN_CANVAS_BOTH, minCanvas: MIN_CANVAS };
+  const pullouts: Pullouts = { calendar: !sidebar.isMobile && calendarAllowed && sidebar.open, notifications: rightPanelOpen };
   function showPullouts(next: Pullouts) {
-    if (next.notifications !== notifOpen) setNotifOpen(next.notifications);
+    if (!next.notifications) { setNotifOpen(false); setAskOpen(false); }
     if (!sidebar.isMobile && next.calendar !== sidebar.open) sidebar.toggle();
   }
-  /** The Calendar icon: a quick view beside the page on desktop; the full calendar page on a phone or in Critical Focus. */
+  function prepareRightPanel() {
+    if (sidebar.isMobile) { setMobileCalendarOpen(false); sidebar.closeMobile(); return; }
+    const opened = openTemporaryRight(pullouts, room);
+    restoreCalendar.current ||= opened.restoreCalendar;
+    showPullouts(opened.next);
+  }
+  function closeRightPanel() {
+    const next = closeTemporaryRight(pullouts, restoreCalendar.current && calendarAllowed, room);
+    restoreCalendar.current = false;
+    showPullouts(next);
+  }
+  /** The attached Calendar tab toggles the existing adaptive quick view. */
   function toggleCalendar() {
-    if (sidebar.isMobile || !calendarAllowed) { go('calendar'); return; }
+    if (!calendarAllowed) { go('calendar'); return; }
+    if (sidebar.isMobile) {
+      restoreCalendar.current = false; setNotifOpen(false); setAskOpen(false); sidebar.closeMobile();
+      setMobileCalendarOpen(value => !value); return;
+    }
+    restoreCalendar.current = false; // An explicit Calendar choice supersedes temporary restoration.
     showPullouts(togglePullout(pullouts, 'calendar', room));
   }
   /** Home's Calendar and Insights buttons open the same quick view. */
@@ -337,13 +372,28 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   }
   /** The bell: Inbox in the right drawer. Pressing it again closes it. */
   function toggleNotifications() {
-    if (notifOpen) { setNotifOpen(false); return; }
-    sidebar.setTab('inbox');
-    if (sidebar.isMobile) { sidebar.closeMobile(); setNotifOpen(true); return; }
-    showPullouts(openPullout(pullouts, 'notifications', room));
+    if (notifOpen) { closeRightPanel(); return; }
+    setAskOpen(false);
+    prepareRightPanel();
+    setNotifOpen(true);
   }
-  const contextOffset = notifOpen && notifyDocked ? NOTIFY_PANEL : 0;
+  function toggleAsk() {
+    if (askOpen) { closeRightPanel(); return; }
+    prepareRightPanel();
+    setNotifOpen(false);
+    setAskOpen(true);
+  }
+  const contextOffset = !sidebar.isMobile && rightPanelOpen ? rightPanelWidth : 0;
   const leftReserved = pullouts.calendar ? sidebar.width : 0;
+  const calendarAccess = calendarAllowed ? <div className="calendar-quick-access" role="group" aria-label="Calendar navigation">
+    <button type="button" className="calendar-shortcut" aria-current={view === 'calendar' ? 'page' : undefined} aria-label="Open full Calendar" title="Open full Calendar" onClick={() => { setMobileCalendarOpen(false); go('calendar'); }}><Icon d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4" /></button>
+    <button type="button" id="calendar-edge-launcher" className="calendar-edge-tab" aria-label="Toggle Calendar quick view" aria-controls={sidebar.isMobile ? 'calendar-quick-drawer' : 'quest-sidebar'}
+      aria-expanded={sidebar.isMobile ? mobileCalendarOpen : pullouts.calendar} onClick={toggleCalendar}
+      onKeyDown={event => { if (event.key === 'Escape' && (sidebar.isMobile ? mobileCalendarOpen : pullouts.calendar)) { event.stopPropagation(); toggleCalendar(); } }} title="Toggle Calendar quick view">
+      <Icon d={(sidebar.isMobile ? mobileCalendarOpen : pullouts.calendar) ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} />
+    </button>
+  </div> : null;
+
 
   return (
     <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'}`}
@@ -360,28 +410,31 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           {!live && onExitDemo && <button type="button" role="menuitem" onClick={() => { close(); onExitDemo(); }}>Sign in to Task HQ</button>}
         </>}
         account={{ label: me.name && !me.name.includes('@') ? me.name : live?.email ?? me.name, detail: live ? ROLE_LABELS[live.role] : me.title, mark: <AccountMark quest={quest} />, menu: close => <AccountMenu quest={quest} close={close} /> }}
+        calendarAccess={!sidebar.isMobile ? calendarAccess : undefined}
         pulloutTitle="Calendar"
         pullout={calendarAllowed
           ? <CalendarPullout quest={quest} company={company} onOpenTask={openTask} onExpandCalendar={() => go('calendar')} onCreate={canCreate ? due => createOn(due) : undefined} />
           : <p className="muted pullout-note">The calendar is unavailable during Critical Focus.</p>}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
         items={navigation.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: view === item.id || (item.id === 'calendar' && pullouts.calendar), info: info[item.id] }))}
-        onSelect={id => id === 'all-tasks' ? openLens(registryView.lens) : id === 'calendar' ? toggleCalendar() : go(id as View)}
+        onSelect={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
           ? <><LookSwitch compact /><ModeChip quest={quest} /><p>Signed in as {me.name && !me.name.includes('@') ? me.name : live.email} · {ROLE_LABELS[live.role]}{live.isPlatformAdmin ? ' · platform admin (separate)' : ''}</p><button type="button" className="link exit-demo" onClick={live.onSignOut}>Sign out</button></>
           : <><LookSwitch compact /><ModeChip quest={quest} /><p><b>Task-HQ Demo</b> · synthetic people and data. Changes stay on this device; teammates are not notified.</p>{onExitDemo && <button type="button" className="link exit-demo" onClick={onExitDemo}>Sign in to Task HQ</button>}</>}
       />
-      <main className="main">
+      <main className="main" inert={sidebar.isMobile && edgePanelOpen}>
         {!live && onExitDemo && <aside className="demo-access" aria-label="Task HQ demo">
           <div><strong>Task HQ Demo</strong><span>Sample data · changes stay on this device</span></div>
           <button type="button" className="btn btn-primary" onClick={onExitDemo}>Sign in to Task HQ</button>
         </aside>}
-        <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen} notifOpen={notifOpen}
+        <TopBar calendarAccess={sidebar.isMobile ? calendarAccess : undefined} quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen} notifOpen={notifOpen}
           title={(VIEW_LABELS[view] ?? '').replace(' · Preview', '')}
           tabs={view === 'all-tasks' && !(selected && contextAllowed) ? taskTabs : undefined}
-          onTab={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={() => setAskOpen(value => !value)} onBell={toggleNotifications}
-          onMenu={() => { setNotifOpen(false); sidebar.openMobile(); }} menuOpen={sidebar.mobileOpen} />
+          onTab={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={toggleAsk} onBell={toggleNotifications}
+          onMenu={() => { restoreCalendar.current = false; setNotifOpen(false); setAskOpen(false); setMobileCalendarOpen(false); sidebar.openMobile(); }} menuOpen={sidebar.mobileOpen} />
+
+
 
         {quest.feedback.cue && <FeedbackBar quest={quest} preferences={feedbackOn} onViewCompleted={() => { const task = state.tasks.find(task => task.id === quest.feedback.cue?.taskId); openCompleted(task?.owner === actor ? 'mine' : 'company'); }} />}
         {focused && grant && <GrantBar quest={quest} grant={grant} onReturn={() => { closeTask(); go('home'); }} />}
@@ -398,7 +451,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
-                unseen={{ count: inboxUnread, latest: inbox.items.find(item => !sidebar.read.has(item.id))?.title }} onUnseen={() => sidebar.showTab('inbox')}
+                unseen={{ count: inboxUnread, latest: inbox.items.find(item => !sidebar.read.has(item.id))?.title }} onUnseen={() => { sidebar.setTab('inbox'); if (!notifOpen) toggleNotifications(); }}
                 mentions={mentions} read={sidebar.read}
                 onOpen={openTask} onOpenLead={openLead} onCreate={() => setCreating(true)}
                 onOpenMention={item => { sidebar.markRead([item.id]); location.hash = `#/inbox/${encodeURIComponent(item.channelId ?? '')}/${encodeURIComponent(item.messageId ?? '')}`; }}
@@ -440,15 +493,19 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       {selected && !contextAllowed && (
         <div className="locked-note" role="alert">“{selected.title}” is outside your Critical Focus. Request access to {SECTION_LABELS['company-work']} first. <button className="btn btn-ghost btn-sm" onClick={closeTask}>Close</button></div>
       )}
-      {notifOpen && <>
-        {!notifyDocked && <button type="button" className="scrim" aria-label="Close notifications" onClick={() => setNotifOpen(false)} />}
-        <NotificationDrawer quest={quest} control={sidebar} inbox={inbox} attention={awareAttention} docked={notifyDocked}
+      <div className="notification-edge">
+        <EdgeDrawer id="calendar-quick-drawer" label="Calendar quick view" className="calendar-mobile-drawer" open={sidebar.isMobile && mobileCalendarOpen && calendarAllowed} onClose={() => setMobileCalendarOpen(false)}>
+          <header className="context-head"><span className="context-label">Calendar</span><button type="button" className="icon-btn" aria-label="Close Calendar quick view" onClick={() => setMobileCalendarOpen(false)}>×</button></header>
+          <div className="context-body"><CalendarPullout quest={quest} company={company} onOpenTask={id => { setMobileCalendarOpen(false); openTask(id); }}
+            onExpandCalendar={() => { setMobileCalendarOpen(false); go('calendar'); }} onCreate={canCreate ? due => { setMobileCalendarOpen(false); createOn(due); } : undefined} /></div>
+        </EdgeDrawer>
+        <NotificationDrawer key={`${state.workspace.tenantId}:${actor}`} quest={quest} control={sidebar} inbox={inbox} attention={awareAttention} data={inboxData} detailsAllowed={!focused || !!grant} open={notifOpen}
           threadAllowed={id => !focused || id === state.focus?.taskId || !!grant}
-          onClose={() => setNotifOpen(false)}
+          onClose={closeRightPanel}
           onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
           onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />
-      </>}
-      {askOpen && !focused && <AskTasks quest={quest} company={company} onClose={() => setAskOpen(false)} />}
+        <AskTasks key={`ask:${state.workspace.tenantId}:${actor}`} quest={quest} company={company} open={askOpen && !focused} onClose={closeRightPanel} />
+      </div>
       {creating && canCreate && <CreateTask quest={quest} due={createDue} onClose={() => { setCreating(false); setCreateDue(undefined); }} onCreated={id => { setCreating(false); setCreateDue(undefined); openTask(id); }} />}
       {feedbackOn && <ReviewLayer quest={quest} openRequest={reviewRequest}
         screen={{ view: VIEW_LABELS[view], route: `#/${view}${view === 'leads' && leadId ? `/${leadId}` : ''}`, taskId: selected?.id ?? '', leadId: view === 'leads' && leadId ? leadId : '', deck: view === 'leads' && leadId ? 'lead' : selected ? 'task' : '' }}

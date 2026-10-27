@@ -88,6 +88,11 @@ export function DueInput({ quest, task, overdue = false }: { quest: Quest; task:
   if (!editable) return <span className={`due-text ${overdue ? 'text-danger' : ''}`}>{task.due ? shortDate(task.due, localDate(quest.now)) : '—'}</span>;
   return (
     <input type="date" className={`inline-date ${overdue ? 'is-overdue' : ''}`} value={task.due} aria-label="Due date" {...stop}
-      onChange={event => void dispatch({ type: 'task/update', id: task.id, changes: { due: event.target.value } })} />
+      onChange={event => {
+        const due = event.target.value;
+        void dispatch({ type: 'task/update', id: task.id, changes: { due,
+          ...(!due && task.dueTime && quest.backend.supports?.taskTaxonomy !== false ? { dueTime: '' } : {}),
+        } });
+      }} />
   );
 }

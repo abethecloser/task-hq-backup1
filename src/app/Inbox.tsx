@@ -101,7 +101,7 @@ export function Inbox({ quest, data, notes, read, markRead, onOpenTask, onOpenLe
 
         <section className="inbox-main" aria-live="polite">
           {channel && data.messaging && data.store
-            ? <Thread key={channel.id} quest={quest} messaging={data.messaging} store={data.store} channelId={channel.id} current={data.current} onOpenTask={onOpenTask} />
+            ? <ChannelThread key={channel.id} quest={quest} messaging={data.messaging} store={data.store} channelId={channel.id} current={data.current} onOpenTask={onOpenTask} />
             : (
               <>
                 <div className="inbox-filters" role="group" aria-label="Filter">
@@ -145,7 +145,7 @@ export function Inbox({ quest, data, notes, read, markRead, onOpenTask, onOpenLe
   );
 }
 
-function Thread({ quest, messaging, store, channelId, current, onOpenTask }: {
+export function ChannelThread({ quest, messaging, store, channelId, current, onOpenTask }: {
   quest: Quest; messaging: MessagingState; store: MessagingStore; channelId: string; current: WorkspaceRef; onOpenTask: (id: string) => void;
 }) {
   const { state, actor, now } = quest;

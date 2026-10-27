@@ -1,0 +1,96 @@
+{
+  "layout": [
+    {
+      "width": 1440,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"viewport\":1440,\"closedTab\":{\"x\":56,\"right\":92,\"width\":36,\"y\":112,\"height\":48},\"calendar\":{\"x\":56,\"right\":344,\"width\":288,\"y\":0,\"height\":900},\"adjacentTab\":{\"x\":344,\"right\":380,\"width\":36,\"y\":112,\"height\":48},\"notifications\":{\"x\":1137,\"right\":1425,\"width\":288,\"y\":0,\"height\":900},\"routePreserved\":true,\"restoration\":true,\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "width": 1024,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"viewport\":1024,\"closedTab\":{\"x\":56,\"right\":92,\"width\":36,\"y\":112,\"height\":48},\"calendar\":{\"x\":56,\"right\":344,\"width\":288,\"y\":0,\"height\":900},\"adjacentTab\":{\"x\":344,\"right\":380,\"width\":36,\"y\":112,\"height\":48},\"notifications\":{\"x\":721,\"right\":1009,\"width\":288,\"y\":0,\"height\":900},\"routePreserved\":true,\"restoration\":true,\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "width": 375,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"viewport\":375,\"closedTab\":{\"x\":108,\"right\":152,\"width\":44,\"y\":112,\"height\":44},\"calendar\":{\"x\":0,\"right\":375,\"width\":375,\"y\":0,\"height\":900},\"adjacentTab\":{\"x\":108,\"right\":152,\"width\":44,\"y\":112,\"height\":44},\"notifications\":{\"x\":0,\"right\":375,\"width\":375,\"y\":0,\"height\":900},\"routePreserved\":true,\"restoration\":true,\"pass\":true}\n```"
+          }
+        ]
+      }
+    }
+  ],
+  "keyboard": [
+    {
+      "width": 1440,
+      "visible": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"outline\":\"rgb(167, 56, 5) solid 2px\",\"tab\":{\"x\":56,\"y\":112,\"width\":36,\"height\":48,\"top\":112,\"right\":92,\"bottom\":160,\"left\":56}}\n```"
+          }
+        ]
+      },
+      "closed": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"closed\":true,\"focusRestored\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "width": 1024,
+      "visible": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"outline\":\"rgb(167, 56, 5) solid 2px\",\"tab\":{\"x\":56,\"y\":112,\"width\":36,\"height\":48,\"top\":112,\"right\":92,\"bottom\":160,\"left\":56}}\n```"
+          }
+        ]
+      },
+      "closed": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"closed\":true,\"focusRestored\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "width": 375,
+      "visible": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"outline\":\"rgb(167, 56, 5) solid 2px\",\"tab\":{\"x\":108,\"y\":112,\"width\":44,\"height\":44,\"top\":112,\"right\":152,\"bottom\":156,\"left\":108}}\n```"
+          }
+        ]
+      },
+      "closed": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"closed\":true,\"focusRestored\":true}\n```"
+          }
+        ]
+      }
+    }
+  ]
+}

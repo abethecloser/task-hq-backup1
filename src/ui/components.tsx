@@ -96,7 +96,7 @@ export function MoveForward({ quest, task, compact = false, onDone }: { quest: Q
   );
 }
 
-export function TaskRow({ quest, task, onOpen, index, locked = false }: { quest: Quest; task: Task; onOpen: (id: string) => void; index?: number; locked?: boolean }) {
+export function TaskRow({ quest, task, onOpen, index, locked = false, priority = false }: { quest: Quest; task: Task; onOpen: (id: string) => void; index?: number; locked?: boolean; priority?: boolean }) {
   const { state, now } = quest;
   const feedback = useFeedbackRecord(task.id);
   const today = localDate(now);
@@ -106,7 +106,7 @@ export function TaskRow({ quest, task, onOpen, index, locked = false }: { quest:
       {index !== undefined && <span className="row-index">{String(index + 1).padStart(2, '0')}</span>}
       <span className={`state-dot dot-${task.status}`} aria-hidden="true" />
       <span className="row-main">
-        <span className="row-title"><button type="button" className="row-open" aria-label={`Open task: ${task.title}`} onClick={event => { event.stopPropagation(); onOpen(task.id); }}><strong>{task.title}</strong></button><TaskTags state={state} task={task} now={now} /></span>
+        <span className="row-title"><button type="button" className="row-open" aria-label={`Open task: ${task.title}`} onClick={event => { event.stopPropagation(); onOpen(task.id); }}><strong>{task.title}</strong></button><TaskTags state={state} task={task} now={now} />{priority && <span className="muted">First by urgency</span>}</span>
         <span className="row-next">{task.status === 'blocked' ? `Blocked: ${task.blocker?.note ?? ''}` : task.nextAction ? `Next: ${task.nextAction}` : <em>No next action yet</em>}</span>
         <span className="row-meta">
           <Avatar state={state} id={task.owner} size="sm" /><span>{firstName(state, task.owner)}</span>

@@ -75,6 +75,17 @@ export function togglePullout(current: Pullouts, which: Pullout, room: PulloutRo
   return current[which] ? { ...current, [which]: false } : openPullout(current, which, room);
 }
 
+/** A right panel may temporarily displace Calendar; keep its restoration intent
+ * separate from the actual open panels so mutual exclusion remains authoritative. */
+export function openTemporaryRight(current: Pullouts, room: PulloutRoom) {
+  const next = openPullout(current, 'notifications', room);
+  return { next, restoreCalendar: !room.mobile && current.calendar && !next.calendar };
+}
+
+export function closeTemporaryRight(current: Pullouts, restoreCalendar: boolean, room: PulloutRoom): Pullouts {
+  return { calendar: current.calendar || (!room.mobile && restoreCalendar), notifications: false };
+}
+
 /** How an open pullout is shown: docked beside the center when it fits, otherwise over it. */
 export function pulloutMode(which: Pullout, current: Pullouts, room: PulloutRoom): 'closed' | 'docked' | 'drawer' {
   if (!current[which]) return 'closed';

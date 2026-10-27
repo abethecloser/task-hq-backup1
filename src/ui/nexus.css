@@ -42,7 +42,7 @@ body { background: var(--canvas); }
 .panel-head { border-bottom-color: var(--hair); }
 .panel-foot { background: var(--sidebar-bg); border-top-color: var(--hair); }
 .panel-section, .panel-notes { border-bottom-color: var(--hair); }
-.main { margin-right: var(--context-offset, 0px); transition: margin-left var(--sidebar-speed) var(--sidebar-ease), margin-right var(--sidebar-speed) var(--sidebar-ease); }
+.main { margin-right: 0; transition: margin-left var(--sidebar-speed) var(--sidebar-ease); }
 .topbar { background: rgb(255 255 255 / 96%); }
 /* Pages use the width they're given; the cap only keeps lines readable on very large monitors. */
 .content { max-width: 1600px; transition: max-width var(--sidebar-speed) var(--sidebar-ease); }
@@ -797,7 +797,7 @@ i.sev.sev-high { background: var(--accent); }
 .home-stat small { color: var(--muted); font-size: 11.5px; }
 .home-stat.is-hot b { color: var(--accent-ink); }
 .home-section { display: grid; gap: 8px; }
-.home-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 6px; border-bottom: 2px solid var(--ink); }
+.home-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 6px; }
 .home-section-head h2 { margin: 0; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .home-empty { margin: 0; padding: 10px 0; color: var(--muted); font-size: 13px; }
 .queue { display: grid; margin: 0; padding: 0; list-style: none; border: 1px solid var(--hair); border-radius: 12px; background: var(--card); box-shadow: var(--shadow); overflow: hidden; }
@@ -925,7 +925,7 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .situation.v-drawer::before { display: none; }
 .situation.v-drawer .situation-headline, .situation.v-drawer .situation-detail { display: none; }
 .situation-label { display: flex; align-items: center; gap: 10px; margin: 4px 0 0; }
-.situation-label::after { content: ""; flex: 1; height: 1px; background: var(--hair-2); }
+
 .situation.v-drawer .situation-kicker { font-size: 10.5px; }
 .situation.v-drawer .latch-lg { --thumb: 28px; }
 .situation.v-drawer .latch-lg .latch-track { height: var(--ctl-m); padding: 0 14px 0 40px; font-size: 13px; }
@@ -1020,12 +1020,12 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .tp-facts dd small { color: var(--muted); font-size: 12px; }
 .tp-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); align-items: start; gap: 32px; }
 .tp-col { display: grid; gap: 18px; min-width: 0; }
-.tp-card { display: grid; gap: 12px; min-width: 0; padding: 18px 0 0; border-top: 1px solid var(--hair-2); }
+.tp-card { display: grid; gap: 12px; min-width: 0; padding: 18px 0 0; }
 .tp-conversation { padding-left: 0; }
 .tp-card > .ctx-label { margin: 0; font-size: 11px; }
 .tp-card .field > input, .tp-card .field > textarea { width: 100%; }
 .tp-card textarea { min-height: 0; padding: 9px 10px; field-sizing: content; resize: vertical; }
-.tp-card textarea[readonly], .tp-card input[readonly] { border-color: transparent; background: var(--surface-2); }
+.tp-card textarea[readonly], .tp-card input[readonly] { color: var(--ink-2); }
 .tp-tabs { display: flex; gap: 4px; }
 .tp-tabs button { margin-bottom: -1px; padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font-size: 13px; font-weight: 750; }
 .tp-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); }
@@ -1040,7 +1040,7 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .tp-people select { width: 100%; min-height: 34px; font-size: 13px; }
 .tp-sub { margin: 4px 0 0; font-size: 11px; }
 .tp-watchers { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.tp-watchers li { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 4px; border: 1px solid var(--hair-2); border-radius: 999px; font-size: 12.5px; font-weight: 650; }
+.tp-watchers li { display: inline-flex; align-items: center; gap: 6px; padding: 3px 4px 3px 4px; font-size: 12.5px; font-weight: 650; }
 .tp-watchers li.muted { padding: 0; border: 0; font-weight: 500; }
 .tp-watchers .icon-btn { width: 22px; height: 22px; min-height: 0; font-size: 14px; }
 .tp-details .ctx-deps ul { margin: 0; padding: 0; list-style: none; }
@@ -1110,7 +1110,7 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 }
 
 /* The web demo's account exit stays visible with either sidebar state. */
-.demo-access { position: sticky; top: 0; z-index: 12; min-height: 64px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 24px; background: var(--bg, #fff); border-bottom: 1px solid var(--accent-line, #e4cbb9); }
+.demo-access { position: sticky; top: 0; z-index: 12; min-height: 64px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 24px; background: var(--bg, #fff); border-bottom: 0; }
 .demo-access > div { display: grid; gap: 3px; min-width: 0; }
 .demo-access strong { font-size: 13px; }
 .demo-access span { font-size: 12px; color: var(--muted, #666); }
@@ -1123,7 +1123,7 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
   .demo-access + .topbar { top: 104px; }
 }
 
-.demo-attendance { margin-bottom: 16px; border-bottom: 1px solid var(--line, #ddd); }
+.demo-attendance { margin-bottom: 16px; }
 .demo-attendance summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; font-size: 13px; font-weight: 600; }
 .demo-attendance > p { font-size: 13px; color: var(--muted, #666); }
 
@@ -1240,19 +1240,65 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .pullout-calendar { display: grid; gap: 12px; padding: 4px 4px 24px; }
 .pullout-full { width: 100%; justify-content: center; }
 .pullout-note { padding: 16px; }
-.context.context-signals.notify-drawer { width: 360px; background: var(--card); background-image: none; animation: none; }
-.context.context-signals.notify-drawer.is-drawer { width: min(420px, 100%); box-shadow: var(--shadow-lg); animation: slide .26s var(--ease-out); }
-.notify-body { padding: 10px 14px 32px; }
+/* The right pane is a real grid column, not an overlay with a compensating margin. */
+.shell { display: grid; grid-template-columns: minmax(0, 1fr) var(--context-offset, 0px); align-items: start; }
+.shell > .main { grid-column: 1; grid-row: 1; min-width: 0; }
+.notification-edge { position: sticky; top: 0; grid-column: 2; grid-row: 1; width: 100%; height: 100dvh; z-index: 35; pointer-events: none; overflow: clip; contain: paint; }
+.shell[data-context="open"] { overflow-anchor: none; }
+/* Shared edge shell fills its desktop column; mobile fills the viewport. */
+.edge-drawer { position: absolute; inset: 0 0 0 auto; display: flex; flex-direction: column; width: 100%; max-width: 100%; height: 100dvh; border: 0; border-left: 1px solid var(--hair); border-radius: 0; background: var(--card); background-image: none; box-shadow: none; pointer-events: auto; transform: translateX(100%); visibility: hidden; transition: transform 180ms ease-out, visibility 180ms; }
+.edge-drawer.is-open { transform: translateX(0); visibility: visible; }
+.edge-drawer.is-closed { pointer-events: none; }
+.context.context-signals.notify-drawer.is-drawer { width: 100%; background-image: none; box-shadow: none; animation: none; }
+@media (prefers-reduced-motion: reduce) { .edge-drawer { transition: none; } }
+.notify-drawer .context-head { flex-wrap: wrap; padding-block: 8px; }
+.notify-drawer .context-head .icon-btn { flex-shrink: 0; }
+.notify-drawer .icon-btn, .notify-drawer .aware-tabs button { min-width: 44px; min-height: 44px; }
+.notify-drawer .context-body { min-height: 0; overflow-wrap: anywhere; }
+.notify-body { padding: 10px 4px 32px; }
+.notify-body > .aware { padding-inline: 0; }
+.notify-drawer .aware-tabs { grid-template-columns: repeat(3, minmax(max-content, 1fr)); overflow-wrap: normal; word-break: normal; }
+.notify-drawer .aware-tabs button { gap: 3px; padding-inline: 2px; white-space: nowrap; flex-wrap: nowrap; }
+.notify-drawer .aware-count { flex: none; padding-inline: 2px; white-space: nowrap; }
 .thread-head { gap: 8px; padding: 0 8px 0 10px; }
 .thread-head .icon-btn { margin-left: auto; }
 .thread-body { gap: 14px; padding-top: 14px; }
 .thread-context h2 { margin: 0 0 4px; font-size: 16px; font-weight: 800; line-height: 1.25; letter-spacing: -.01em; }
 .thread-context p { margin: 3px 0; font-size: 13px; line-height: 1.4; }
-.thread-reply { flex: none; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--hair); background: var(--card); }
+.thread-reply { flex: none; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: var(--card); }
 .thread-reply .task-comment-form { display: grid; gap: 8px; }
 .thread-reply .task-comment-form .btn { justify-self: end; }
 .field-error { margin: 0; color: var(--stop); font-size: 12.5px; font-weight: 650; }
 /* A phone shows one full-width panel; it follows the visible area so the reply box stays above the keyboard. */
 @media (max-width: 760px) {
-  .context.context-signals.notify-drawer, .context.context-signals.notify-drawer.is-drawer { inset: 0; width: 100%; max-width: 100%; height: var(--vvh, 100dvh); }
+  .shell { display: block; }
+  .notification-edge { position: fixed; inset: 0; width: 100%; }
+  .edge-drawer, .context.context-signals.notify-drawer.is-drawer { inset: 0; width: 100%; max-width: 100%; height: var(--vvh, 100dvh); }
 }
+
+/* The attached tab lives outside the scrolling secondary navigation. Its open
+   position follows Calendar's existing persisted width, never a second width. */
+.rail { overflow: visible; }
+.rail .nav { display: flex; flex-direction: column; overflow: visible; }
+.nav-primary { display: grid; gap: 2px; flex: none; }
+.nav-secondary { display: grid; align-content: start; gap: 2px; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.rail-calendar-access, .calendar-quick-access { position: relative; width: 100%; }
+.calendar-quick-access { display: flex; align-items: center; }
+.calendar-shortcut, .calendar-edge-tab { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0; color: var(--ink); }
+.calendar-shortcut { width: 100%; border: 0; border-radius: 9px; background: transparent; }
+.calendar-shortcut:hover { background: var(--surface-2); }
+.calendar-shortcut[aria-current="page"] { background: var(--ink); color: #fff; }
+.rail .calendar-edge-tab { position: absolute; left: calc(100% + 8px + var(--panel-offset, 0px)); top: -2px; width: 36px; height: 48px; border: 2px solid var(--accent); border-left: 0; border-radius: 0 14px 14px 0; background: var(--accent-pale); color: var(--accent-ink); transition: left var(--sidebar-speed) var(--sidebar-ease), background .15s; }
+.calendar-edge-tab .icon { width: 20px; height: 20px; stroke-width: 2.5; }
+.calendar-edge-tab:hover, .calendar-edge-tab[aria-expanded="true"] { background: var(--accent); color: #fff; }
+.calendar-shortcut:focus-visible, .calendar-edge-tab:focus-visible { outline: 2px solid var(--ink); outline-offset: -4px; }
+.shell[data-resizing] .calendar-edge-tab { transition: none; }
+@media (prefers-reduced-motion: reduce) { .rail .calendar-edge-tab { transition: none; } }
+@media (max-width: 760px) {
+  .topbar > .calendar-quick-access { width: auto; flex: none; }
+  .calendar-shortcut, .calendar-edge-tab { width: 44px; min-width: 44px; }
+  .calendar-edge-tab { min-height: 44px; border: 2px solid var(--accent); border-radius: 0 12px 12px 0; background: var(--accent-pale); color: var(--accent-ink); }
+}
+.calendar-mobile-drawer { left: 0; right: auto; transform: translateX(-100%); }
+.calendar-mobile-drawer button { min-height: 44px; }
+.calendar-mobile-drawer .icon-btn { min-width: 44px; }

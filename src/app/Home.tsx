@@ -47,12 +47,21 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
   const activity = teamActivity(state, actor, company, 5);
   const greeting = useMomentum(quest, company);
   const today = localDate(minute);
-  const scope = company ? 'company' : 'mine';
+  const next = queue[0];
+  const [allRisks, setAllRisks] = useState(false);
+  const nextTask = next?.taskId ? taskById(state, next.taskId) : undefined;
+  // These labels describe opening the situation, never performing its mutation.
+  const nextLabel = next?.leadId ? 'Review next lead'
+    : next?.kind === 'approval' ? 'Review approval'
+    : next?.kind === 'help-request' ? 'Review help request'
+    : nextTask?.status === 'blocked' ? 'Review blocker'
+    : 'Open next task';
 
   return (
     <div className="view home-dash">
       <Hero eyebrow={greeting.eyebrow} primary={greeting.primary} support={greeting.support}>
-        <button type="button" className="btn btn-primary btn-sm" disabled={!canCreate} onClick={onCreate}>+ New task</button>
+        {next && <button type="button" className="btn btn-primary btn-sm" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}>{nextLabel}</button>}
+        {canCreate && <button type="button" className={`btn ${next ? '' : 'btn-primary'} btn-sm`} onClick={onCreate}>+ New task</button>}
         {canDeck && <button type="button" className="btn btn-sm" onClick={() => onDeck('calendar')}>Calendar</button>}
       </Hero>
 
@@ -121,11 +130,11 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
 
         <section className="hd-panel" aria-labelledby="hd-risk">
           <PanelHead id="hd-risk" title="At risk" sub="Needs attention" tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />}
-            more={risks.length > 0 ? { label: `View all (${risks.length})`, onClick: () => onRegistry('overdue', { scope }) } : undefined} />
+            more={risks.length > 4 ? { label: allRisks ? 'Show fewer' : `View all (${risks.length})`, onClick: () => setAllRisks(value => !value) } : undefined} />
           {risks.length === 0
             ? <p className="hd-quiet">Nothing is at risk{company ? '' : ' on your work'}.</p>
             : <ul className="hd-list">
-                {risks.slice(0, 4).map(({ task, reasons }) => (
+                {(allRisks ? risks : risks.slice(0, 4)).map(({ task, reasons }) => (
                   <li key={task.id} className="hd-row is-risk">
                     <button type="button" className="hd-row-main" onClick={() => onOpen(task.id)}>
                       <strong>{task.title}</strong><small>{firstName(state, task.owner)} · {reasons.join(' · ')}</small>

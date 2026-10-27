@@ -70,8 +70,8 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
     label: `Shared · ${org.name}`,
     detail: `Saved to Task-HQ. Everyone in ${org.name} sees changes as they happen. Permissions are checked on the server.`,
     async load() {
-      const { reply } = await call({ op: 'load' });
-      if (!reply.ok || !reply.state) throw new Error(reply.error ?? 'Could not load the workspace.');
+      const { status, reply } = await call({ op: 'load' });
+      if (status < 200 || status >= 300 || !reply.ok || !reply.state) throw new Error(reply.error ?? 'Could not load the workspace.');
       return remember(reply.state, reply.rev);
     },
     async dispatch(action: Action): Promise<DispatchResult> {
@@ -93,8 +93,8 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
       // Temporary access expires on the server; ask at most every 5 seconds.
       if (Date.now() - lastTick < 5000) return;
       lastTick = Date.now();
-      const { reply } = await call({ op: 'tick' });
-      if (reply.ok && reply.state) remember(reply.state, reply.rev);
+      const { status, reply } = await call({ op: 'tick' });
+      if (status >= 200 && status < 300 && reply.ok && reply.state) remember(reply.state, reply.rev);
     },
     subscribe(listener) {
       const channel = client.channel(`workspace-${org.id}`)

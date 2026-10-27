@@ -1,24 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { answer, ASK_SUGGESTIONS } from '../core/ask.ts';
+import { EdgeDrawer } from '../ui/EdgeDrawer.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 
 interface Message { id: number; from: 'you' | 'tasks'; text: string }
 
-/** Floating "Ask your tasks" panel. Read-only answers from ask.ts; nothing it says changes data. */
-export function AskTasks({ quest, company, onClose }: { quest: Quest; company: boolean; onClose: () => void }) {
+/** Right-edge "Ask your tasks" panel. Read-only answers from ask.ts; nothing it says changes data. */
+export function AskTasks({ quest, company, open = true, onClose }: { quest: Quest; company: boolean; open?: boolean; onClose: () => void }) {
   const [draft, setDraft] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const input = useRef<HTMLInputElement>(null);
   const log = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { input.current?.focus(); }, []);
   useEffect(() => { log.current?.scrollTo({ top: log.current.scrollHeight }); }, [messages]);
-  useEffect(() => {
-    // Capture phase, so Escape closes only this panel and not the open task or sidebar.
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [onClose]);
 
   function ask(question: string) {
     const text = question.trim();
@@ -29,7 +23,7 @@ export function AskTasks({ quest, company, onClose }: { quest: Quest; company: b
   }
 
   return (
-    <section className="ask-panel" role="dialog" aria-label="Ask your tasks">
+    <EdgeDrawer id="ask-edge-drawer" open={open} label="Ask your tasks" className="ask-panel" onClose={onClose}>
       <header className="ask-head">
         <svg className="icon ask-spark" viewBox="0 0 24 24" aria-hidden="true"><path d={SPARK} /></svg>
         <h2>Ask your tasks</h2>
@@ -46,10 +40,10 @@ export function AskTasks({ quest, company, onClose }: { quest: Quest; company: b
         {messages.map(message => <p key={message.id} className={`ask-msg from-${message.from}`}>{message.text}</p>)}
       </div>
       <form className="ask-foot" onSubmit={event => { event.preventDefault(); ask(draft); }}>
-        <input ref={input} value={draft} onChange={event => setDraft(event.target.value)} placeholder="Ask a question…" aria-label="Ask a question" maxLength={300} />
+        <input ref={input} data-drawer-autofocus value={draft} onChange={event => setDraft(event.target.value)} placeholder="Ask a question…" aria-label="Ask a question" maxLength={300} />
         <button type="submit" className="ask-icon-btn ask-send" aria-label="Send" disabled={!draft.trim()}><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg></button>
       </form>
-    </section>
+    </EdgeDrawer>
   );
 }
 

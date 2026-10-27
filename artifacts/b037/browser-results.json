@@ -1,0 +1,459 @@
+{
+  "keyboard": [
+    {
+      "width": 1440,
+      "kind": "ask",
+      "initial": {
+        "inside": true,
+        "panel": 288,
+        "workspace": 1081
+      },
+      "reverse": {
+        "inside": true,
+        "last": true,
+        "visible": true
+      },
+      "forward": {
+        "first": true
+      },
+      "closed": {
+        "closed": true,
+        "launcher": "ask-edge-drawer",
+        "route": true,
+        "scroll": 80,
+        "mainReleased": true,
+        "overflow": false
+      },
+      "pass": true
+    },
+    {
+      "width": 1440,
+      "kind": "notifications",
+      "initial": {
+        "inside": true,
+        "panel": 288,
+        "workspace": 1081
+      },
+      "reverse": {
+        "inside": true,
+        "last": true,
+        "visible": true
+      },
+      "forward": {
+        "first": true
+      },
+      "closed": {
+        "closed": true,
+        "launcher": "notifications-edge-drawer",
+        "route": true,
+        "scroll": 80,
+        "mainReleased": true,
+        "overflow": false
+      },
+      "pass": true
+    },
+    {
+      "width": 1024,
+      "kind": "ask",
+      "initial": {
+        "inside": true,
+        "panel": 288,
+        "workspace": 665
+      },
+      "reverse": {
+        "inside": true,
+        "last": true,
+        "visible": true
+      },
+      "forward": {
+        "first": true
+      },
+      "closed": {
+        "closed": true,
+        "launcher": "ask-edge-drawer",
+        "route": true,
+        "scroll": 80,
+        "mainReleased": true,
+        "overflow": false
+      },
+      "pass": true
+    },
+    {
+      "width": 1024,
+      "kind": "notifications",
+      "initial": {
+        "inside": true,
+        "panel": 288,
+        "workspace": 665
+      },
+      "reverse": {
+        "inside": true,
+        "last": true,
+        "visible": true
+      },
+      "forward": {
+        "first": true
+      },
+      "closed": {
+        "closed": true,
+        "launcher": "notifications-edge-drawer",
+        "route": true,
+        "scroll": 80,
+        "mainReleased": true,
+        "overflow": false
+      },
+      "pass": true
+    },
+    {
+      "width": 375,
+      "kind": "ask",
+      "initial": {
+        "inside": true,
+        "panel": 375,
+        "workspace": 375
+      },
+      "reverse": {
+        "inside": true,
+        "last": true,
+        "visible": true
+      },
+      "forward": {
+        "first": true
+      },
+      "closed": {
+        "closed": true,
+        "launcher": "ask-edge-drawer",
+        "route": true,
+        "scroll": 80,
+        "mainReleased": true,
+        "overflow": false
+      },
+      "pass": true
+    },
+    {
+      "width": 375,
+      "kind": "notifications",
+      "initial": {
+        "inside": true,
+        "panel": 375,
+        "workspace": 375
+      },
+      "reverse": {
+        "inside": true,
+        "last": true,
+        "visible": true
+      },
+      "forward": {
+        "first": true
+      },
+      "closed": {
+        "closed": true,
+        "launcher": "notifications-edge-drawer",
+        "route": true,
+        "scroll": 80,
+        "mainReleased": true,
+        "overflow": false
+      },
+      "pass": true
+    }
+  ],
+  "counts": [
+    {
+      "count": 4,
+      "viewport": 1440,
+      "panel": 288,
+      "tabs": [
+        {
+          "label": "Inbox",
+          "badge": "4",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Attention",
+          "badge": "4",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Activity",
+          "badge": null,
+          "lines": 1,
+          "badgeLines": 0,
+          "aligned": true,
+          "inside": true
+        }
+      ],
+      "overflow": false,
+      "pass": true
+    },
+    {
+      "count": 11,
+      "viewport": 1440,
+      "panel": 288,
+      "tabs": [
+        {
+          "label": "Inbox",
+          "badge": "11",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Attention",
+          "badge": "11",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Activity",
+          "badge": null,
+          "lines": 1,
+          "badgeLines": 0,
+          "aligned": true,
+          "inside": true
+        }
+      ],
+      "overflow": false,
+      "pass": true
+    },
+    {
+      "count": 101,
+      "viewport": 1440,
+      "panel": 288,
+      "tabs": [
+        {
+          "label": "Inbox",
+          "badge": "99+",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Attention",
+          "badge": "99+",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Activity",
+          "badge": null,
+          "lines": 1,
+          "badgeLines": 0,
+          "aligned": true,
+          "inside": true
+        }
+      ],
+      "overflow": false,
+      "pass": true
+    },
+    {
+      "count": 4,
+      "viewport": 1024,
+      "panel": 288,
+      "tabs": [
+        {
+          "label": "Inbox",
+          "badge": "4",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Attention",
+          "badge": "4",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Activity",
+          "badge": null,
+          "lines": 1,
+          "badgeLines": 0,
+          "aligned": true,
+          "inside": true
+        }
+      ],
+      "overflow": false,
+      "pass": true
+    },
+    {
+      "count": 11,
+      "viewport": 1024,
+      "panel": 288,
+      "tabs": [
+        {
+          "label": "Inbox",
+          "badge": "11",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Attention",
+          "badge": "11",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Activity",
+          "badge": null,
+          "lines": 1,
+          "badgeLines": 0,
+          "aligned": true,
+          "inside": true
+        }
+      ],
+      "overflow": false,
+      "pass": true
+    },
+    {
+      "count": 101,
+      "viewport": 1024,
+      "panel": 288,
+      "tabs": [
+        {
+          "label": "Inbox",
+          "badge": "99+",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Attention",
+          "badge": "99+",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Activity",
+          "badge": null,
+          "lines": 1,
+          "badgeLines": 0,
+          "aligned": true,
+          "inside": true
+        }
+      ],
+      "overflow": false,
+      "pass": true
+    },
+    {
+      "count": 4,
+      "viewport": 375,
+      "panel": 375,
+      "tabs": [
+        {
+          "label": "Inbox",
+          "badge": "4",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Attention",
+          "badge": "4",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Activity",
+          "badge": null,
+          "lines": 1,
+          "badgeLines": 0,
+          "aligned": true,
+          "inside": true
+        }
+      ],
+      "overflow": false,
+      "pass": true
+    },
+    {
+      "count": 11,
+      "viewport": 375,
+      "panel": 375,
+      "tabs": [
+        {
+          "label": "Inbox",
+          "badge": "11",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Attention",
+          "badge": "11",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Activity",
+          "badge": null,
+          "lines": 1,
+          "badgeLines": 0,
+          "aligned": true,
+          "inside": true
+        }
+      ],
+      "overflow": false,
+      "pass": true
+    },
+    {
+      "count": 101,
+      "viewport": 375,
+      "panel": 375,
+      "tabs": [
+        {
+          "label": "Inbox",
+          "badge": "99+",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Attention",
+          "badge": "99+",
+          "lines": 1,
+          "badgeLines": 1,
+          "aligned": true,
+          "inside": true
+        },
+        {
+          "label": "Activity",
+          "badge": null,
+          "lines": 1,
+          "badgeLines": 0,
+          "aligned": true,
+          "inside": true
+        }
+      ],
+      "overflow": false,
+      "pass": true
+    }
+  ]
+}

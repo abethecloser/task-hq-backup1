@@ -54,6 +54,66 @@ test('an HTTP failure cannot be reported as a saved task even with a success-sha
  assert.equal(result.ok,false);assert.equal(result.state.rev,1);
 });
 
+for (const status of [401, 500]) {
+ test(`a failed HTTP ${status} load cannot replace confirmed task state or capabilities`, async t => {
+  const f = fixture();
+  let loads = 0;
+  let expectedRev: unknown;
+  t.mock.method(globalThis, 'fetch', async (_url: unknown, init: { body: string }) => {
+   const body = JSON.parse(init.body);
+   if (body.op === 'load') {
+    loads += 1;
+    if (loads === 2) return new Response(JSON.stringify({ ok: true, state, rev: 99, contract: 6 }), { status });
+    return new Response(JSON.stringify({ ok: true, state, rev: loads === 1 ? 1 : 2, contract: 5 }));
+   }
+   expectedRev = body.expectedRev;
+   return new Response(JSON.stringify({ ok: false, error: 'Synthetic refusal' }), { status: 403 });
+  });
+  await f.backend.load();
+  await assert.rejects(f.backend.load(), /Could not load the workspace/);
+  const refused = await f.backend.dispatch({ type: 'task/comment', id: 't', note: 'Keep confirmed work' }, 'actor');
+  assert.equal(refused.ok, false);
+  assert.equal(refused.state.rev, 1, 'failed load did not poison the cached revision');
+  assert.equal(expectedRev, 1, 'later task writes retain the last confirmed revision');
+  assert.equal(f.backend.supports?.taskArchive, false, 'failed reply cannot advertise new capabilities');
+  assert.equal((await f.backend.load()).rev, 2, 'a subsequent valid load still recovers');
+ });
+}
+
+test('a failed tick cannot replace confirmed task state used by the next write', async t => {
+ const f = fixture();
+ let expectedRev: unknown;
+ t.mock.method(globalThis, 'fetch', async (_url: unknown, init: { body: string }) => {
+  const body = JSON.parse(init.body);
+  if (body.op === 'load') return new Response(JSON.stringify({ ok: true, state, rev: 1, contract: 5 }));
+  if (body.op === 'tick') return new Response(JSON.stringify({ ok: true, state, rev: 99, contract: 6 }), { status: 500 });
+  expectedRev = body.expectedRev;
+  return new Response(JSON.stringify({ ok: false, error: 'Synthetic refusal' }), { status: 403 });
+ });
+ await f.backend.load();
+ await f.backend.tick();
+ const refused = await f.backend.dispatch({ type: 'task/comment', id: 't', note: 'Keep confirmed work' }, 'actor');
+ assert.equal(refused.state.rev, 1);
+ assert.equal(expectedRev, 1);
+ assert.equal(f.backend.supports?.taskArchive, false);
+});
+
+test('a successful tick still advances the confirmed state for later task writes', async t => {
+ const f = fixture();
+ let expectedRev: unknown;
+ t.mock.method(globalThis, 'fetch', async (_url: unknown, init: { body: string }) => {
+  const body = JSON.parse(init.body);
+  if (body.op === 'load' || body.op === 'tick') return new Response(JSON.stringify({ ok: true, state, rev: body.op === 'load' ? 1 : 2, contract: 5 }));
+  expectedRev = body.expectedRev;
+  return new Response(JSON.stringify({ ok: false, error: 'Synthetic refusal' }), { status: 403 });
+ });
+ await f.backend.load();
+ await f.backend.tick();
+ const refused = await f.backend.dispatch({ type: 'task/comment', id: 't', note: 'Use confirmed update' }, 'actor');
+ assert.equal(refused.state.rev, 2);
+ assert.equal(expectedRev, 2);
+});
+
 test('a v5 server opens the gated features; a later reply without a contract closes them again',async t=>{
  const f=fixture();const bodies:Record<string,unknown>[]=[];let contract:number|undefined=5;
  t.mock.method(globalThis,'fetch',async(_url:unknown,init:{body:string})=>{bodies.push(JSON.parse(init.body));return new Response(JSON.stringify({ok:true,state,rev:bodies.length,...(contract?{contract}:{})}));});
