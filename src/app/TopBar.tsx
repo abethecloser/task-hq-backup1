@@ -59,13 +59,14 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title
       <div className="topbar-right">
         {focused && <span className="focus-chip">Critical Focus</span>}
         {search}
-        {onCreate && <button type="button" className="btn btn-primary top-create" onClick={onCreate} title="New task (N)" aria-label="New task"><TopIcon d="M12 5v14M5 12h14" /><span>New task</span></button>}
         {!focused && <button type="button" className={`top-icon ${askOpen ? 'is-on' : ''}`} aria-label="Ask your tasks" title={askOpen ? 'Close Ask your tasks drawer' : 'Open Ask your tasks drawer'} aria-controls="right-edge-drawer" data-edge="ask" aria-expanded={askOpen} onClick={onAsk}><TopIcon d={SPARK} /></button>}
         <button type="button" className={`top-icon ${notifOpen ? 'is-on' : ''}`} title={notifOpen ? 'Close notifications drawer' : 'Open notifications drawer'} aria-controls="right-edge-drawer" data-edge="updates" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'} aria-expanded={notifOpen} onClick={onBell}>
           <TopIcon d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0" />
           {unread > 0 && <span className="rail-unread" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>}
         </button>
         <UserChip quest={quest} />
+        {/* New task closes the row: the primary action sits at the far right. */}
+        {onCreate && <button type="button" className="btn btn-primary top-create" onClick={onCreate} title="New task (N)" aria-label="New task"><TopIcon d="M12 5v14M5 12h14" /><span>New task</span></button>}
       </div>
       {tabs && <div className="topbar-sub"><TaskFilters tabs={tabs} onTab={onTab} /></div>}
     </header>
