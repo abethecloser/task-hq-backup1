@@ -13,7 +13,7 @@ import { firstName, projectName, taskById } from '../core/selectors.ts';
 import { localDate, shortDate } from '../core/time.ts';
 import { PRODUCT } from '../core/workspace.ts';
 import { MoveForward } from '../ui/components.tsx';
-import { BannerEditor, bannerLook, useBanner } from './HeroBanner.tsx';
+import { BannerAdjust, BannerEditor, bannerLook, useBanner } from './HeroBanner.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import type { DeckSection } from './ContextPanel.tsx';
 
@@ -249,7 +249,7 @@ function Hero({ eyebrow, primary, support, banner, children }: { eyebrow: string
         </svg>
         <p className="hd-hero-tag">{PRODUCT.tagline}</p>
       </div>
-      <BannerEditor {...banner} />
+      {banner.adjusting ? <BannerAdjust {...banner} /> : <BannerEditor {...banner} />}
     </header>
   );
 }

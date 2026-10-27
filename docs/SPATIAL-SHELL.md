@@ -15,8 +15,8 @@ no code copied:
 
 | Edge | Holds | Opened by | Shown as |
 | --- | --- | --- | --- |
-| Top bar | Sections (Home · Tasks · Projects · Calendar · Inbox), search, **New task**, Ask, bell, account | — | Fixed. It never moves when a panel opens. |
-| Left | *Your work* (views with counts, projects) **or** *Calendar quick view* | Menu button (Your work) · rail Calendar icon (Calendar) · left edge toggle | Column beside the page, below the top bar |
+| Top bar | Sections, centered when the bar has room (Home · Tasks · Projects · Calendar · Inbox), search, **New task**, Ask, bell, account | — | Fixed. It never moves when a panel opens. |
+| Left | *Calendar quick view* on top, *Your work* (views with counts, projects) below | Menu button · rail Calendar icon · left edge toggle | Column beside the page, below the top bar (320px default) |
 | Center | The page | Top bar sections | The largest region; keeps its scroll position while panels open |
 | Right | *Notifications* (Inbox · Attention · Activity, threads) **or** *Ask* | Bell (Notifications) · ✦ (Ask) · right edge toggle | Column beside the page, directly under the bell and ✦ |
 | Bottom | — (deferred; see Open) | | |
@@ -29,8 +29,8 @@ bar's **Calendar** opens the full page.
 - Right panel: `notifOpen` / `askOpen` (at most one true) in `App.tsx`, rendered by **one**
   `EdgeDrawer` (`#right-edge-drawer`). Both modes stay mounted; the inactive one is `hidden`, so an open
   thread or an Ask conversation survives a switch. `askOpenLast` lets the edge toggle reopen the last mode.
-- Left panel: `pullouts.calendar` (open) + `leftTab` (`work` | `calendar`), rendered by the existing
-  workspace panel in `Sidebar.tsx`.
+- Left panel: `pullouts.calendar` (open), rendered by the existing workspace panel in `Sidebar.tsx`.
+  One content: the calendar quick view, then the work views.
 - Phones: one full-width panel at a time (`mobileCalendarOpen`, the right panel, or the menu).
 
 ## Transitions
@@ -38,7 +38,7 @@ bar's **Calendar** opens the full page.
 | # | Case | Behavior |
 | --- | --- | --- |
 | 1 | Collapsed → open | The trigger opens its panel beside the page; the top bar stays put. |
-| 2 | Open → switch content | The other trigger on the same edge swaps content in place. The panel never closes in between. |
+| 2 | Open → switch content | Right: the other trigger (bell / ✦) swaps content in place; the panel never closes in between. Left has one content. |
 | 3 | Open → close | The active trigger, the edge toggle, the panel's × or Escape. |
 | 4 | Change page while open | Panels stay open. |
 | 5 | Notification → task | The task opens in the center; on wide screens the panel stays open. On phones the panel closes. |

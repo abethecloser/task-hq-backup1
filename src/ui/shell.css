@@ -121,3 +121,32 @@
 @media (prefers-reduced-motion: reduce) { .right-mode, .seam, .shell { animation: none; transition: none; } }
 /* The left edge toggle closes the panel on wide screens; one control, not two side by side. */
 @media (min-width: 761px) { .workspace-panel .panel-close { display: none; } }
+
+/* ── Edge toggles sit at mid-height on each panel's inner border ───────────────────────── */
+.seam { top: 50%; transform: translateY(-50%); height: 52px; }
+
+/* ── Left panel: calendar on top, your work below ──────────────────────────────────────── */
+.left-stack { display: grid; gap: 4px; }
+.left-stack > .work-nav { padding-top: 0; border-top: 1px solid var(--hair); }
+
+/* ── Banner tones: every tone carries its own text and highlight color ──────────────────── */
+.hd-hero.has-tone .hd-hero-copy, .hd-hero.has-tone .hd-hero-eyebrow, .hd-hero.has-tone .momentum-support, .hd-hero.has-tone h1 { color: var(--banner-ink); }
+.hd-hero.has-tone h1 b, .hd-hero.has-tone .hd-greet, .hd-hero.has-tone .momentum-support b { color: var(--banner-accent); }
+.hd-hero.has-tone.is-dark .hd-hero-actions .btn-primary { border-color: #fff; background: #fff; color: #16171a; }
+.hd-hero.has-tone.is-dark .hd-hero-actions .btn-primary:hover { background: rgb(255 255 255 / 88%); }
+.hd-banner-swatches.is-grid { display: grid; grid-template-columns: repeat(5, 30px); gap: 8px; }
+.hd-banner-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.hd-banner-panel { width: 236px; }
+
+/* ── Photo positioning ─────────────────────────────────────────────────────────────────── */
+.hd-adjust { position: absolute; inset: 0; z-index: 3; background-size: cover; cursor: grab; touch-action: none; outline: none; }
+.hd-adjust:active { cursor: grabbing; }
+.hd-adjust:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.hd-adjust-hint { position: absolute; top: 12px; left: 50%; padding: 5px 12px; border-radius: 999px; background: rgb(17 18 20 / 72%); color: #fff; font-size: 12px; font-weight: 700; transform: translateX(-50%); pointer-events: none; }
+.hd-adjust-actions { position: absolute; right: 14px; bottom: 12px; display: flex; gap: 6px; }
+.hd-adjust-actions .btn:not(.btn-primary) { background: #fff; }
+
+/* ── Top nav centered on the bar when there's room; inline when narrow ─────────────────── */
+@container topbar (min-width: 1080px) {
+  .topbar.has-sections > .top-nav { position: absolute; top: 0; left: 50%; height: 60px; transform: translateX(-50%); }
+}
