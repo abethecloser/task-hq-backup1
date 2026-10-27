@@ -20,7 +20,7 @@
 
 /* Phones: menu · title · search · bell · you. Ask lives inside the right panel's switch. */
 @media (max-width: 760px) {
-  :root .topbar .top-icon[aria-controls="ask-edge-drawer"] { display: none; }
+  :root .topbar .top-icon[data-edge="ask"] { display: none; }
   :root .topbar .user-chip { padding: 2px; border-radius: 50%; }
   :root .topbar .user-chip .user-chip-text, :root .topbar .user-chip > .icon { display: none; }
   :root .topbar .topbar-right { gap: 2px; }
@@ -68,7 +68,6 @@
   .notification-edge .edge-drawer { height: 100%; border-top: 1px solid var(--hair); }
   .shell[data-resizing] .topbar { transition: none; }
 }
-.panel-head .panel-switch { margin-right: auto; }
 
 /* ── Fields: a quiet hairline you can see, never a heavy box ───────────────────────────── */
 :root:root:root:root :is(.auth-input input, .field > input, .field > textarea, .field > select, .ask-foot input) {
@@ -101,3 +100,24 @@
   .home-dash .hd-top, .home-dash .hd-row3.is-pair { grid-template-columns: 1fr; }
   .home-dash .hd-top .hd-metric { min-height: 96px; }
 }
+
+/* ── Right panel: one surface, two modes that swap in place ─────────────────────────────── */
+.right-slot:not([hidden]) { display: contents; }
+:root:root .right-mode { position: static; inset: auto; z-index: auto; display: flex; flex: 1 1 auto; flex-direction: column; width: 100%; min-height: 0; border: 0; animation: mode-in .16s var(--ease-spring); }
+@keyframes mode-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* ── The shell reflows as one grid: the right column eases open like the left one ───────── */
+@media (min-width: 761px) { .shell { transition: grid-template-columns var(--sidebar-speed) var(--sidebar-ease); } .shell[data-resizing] { transition: none; } }
+
+/* ── Edge toggles: on each panel's inner border, visible when collapsed ──────────────────── */
+.seam { position: fixed; top: calc(var(--topbar-h, 60px) + 14px); z-index: 36; display: grid; place-items: center; width: 22px; height: 44px; padding: 0; border: 1px solid var(--hair-2); background: var(--card, #fff); color: var(--ink-2); cursor: pointer; box-shadow: 0 2px 8px rgb(17 18 20 / 6%); transition: left var(--sidebar-speed) var(--sidebar-ease), right var(--sidebar-speed) var(--sidebar-ease), color .15s, background .15s; }
+.seam:hover { background: var(--sunk); color: var(--ink); }
+.seam:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seam .icon { width: 16px; height: 16px; }
+.seam-left { left: calc(var(--rail) + var(--panel-offset, 0px)); border-left: 0; border-radius: 0 10px 10px 0; }
+.seam-right { right: var(--context-offset, 0px); border-right: 0; border-radius: 10px 0 0 10px; }
+.seam[aria-expanded="true"] { color: var(--accent-ink); }
+.shell[data-resizing] ~ .seam, .shell[data-resizing] .seam { transition: none; }
+@media (prefers-reduced-motion: reduce) { .right-mode, .seam, .shell { animation: none; transition: none; } }
+/* The left edge toggle closes the panel on wide screens; one control, not two side by side. */
+@media (min-width: 761px) { .workspace-panel .panel-close { display: none; } }
