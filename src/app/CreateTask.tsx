@@ -1,6 +1,6 @@
 import { Select } from '../ui/Select.tsx';
 import { ReferenceInput, ReferenceTextarea, ReferencedText } from '../ui/ReferenceEditor.tsx';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { NewTask, QuestState } from '../core/contract.ts';
 import { apply } from '../core/engine.ts';
@@ -14,6 +14,19 @@ import type { Quest } from '../ui/useQuest.ts';
 import type { Draft } from '../core/command.ts';
 import { Composer } from './Composer.tsx';
 
+// An unfinished task survives a reload in this tab (sessionStorage), exactly as left,
+// including a cleared due date. Closing or creating discards it.
+interface SavedDraft { draft: NewTask; entryText: string; manual: (keyof NewTask)[] }
+const draftKey = (tenant: string, actor: string) => `quest.createDraft.${tenant}.${actor}`;
+const FULL_KEY = 'quest.createFull';
+function readDraft(key: string): SavedDraft | null {
+  try { const raw = sessionStorage.getItem(key); return raw ? JSON.parse(raw) as SavedDraft : null; } catch { return null; }
+}
+function forgetDraft(key: string) { try { sessionStorage.removeItem(key); } catch { /* storage unavailable */ } }
+/** True when a create dialog was open with a draft before the page reloaded. */
+export function hasCreateDraft(tenant: string, actor: string) { return !!readDraft(draftKey(tenant, actor)); }
+export function discardCreateDraft(tenant: string, actor: string) { forgetDraft(draftKey(tenant, actor)); }
+
 export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; due?: string; onClose: () => void; onCreated: (id: string) => void }) {
   const { state, actor, now, dispatch } = quest;
   // Managers delegate: creating work doesn't make them its owner by default.
@@ -21,13 +34,23 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
   // Live members create work for themselves or leave it unassigned; assigning others needs a supervisor, admin or owner.
   const assigns = canAssignOthers(state, actor);
   const owners = assigns ? state : { ...state, people: state.people.filter(item => item.id === actor) };
-  const [draft, setDraft] = useState<NewTask>({ title: '', owner: delegates ? '' : actor, due: due ?? localDate(now), priority: 'normal', nextAction: '', approver: '', nextOwner: '', projectId: '', dependsOn: [] });
-  const manual = useRef(new Set<keyof NewTask>());
+  const storageKey = draftKey(state.workspace.tenantId, actor);
+  const [saved] = useState(() => readDraft(storageKey));
+  const [draft, setDraft] = useState<NewTask>(() => saved ? { ...saved.draft, ...(due ? { due } : {}) }
+    : { title: '', owner: delegates ? '' : actor, due: due ?? localDate(now), priority: 'normal', nextAction: '', approver: '', nextOwner: '', projectId: '', dependsOn: [] });
+  const manual = useRef(new Set<keyof NewTask>(saved?.manual ?? []));
   const set = (changes: Partial<NewTask>) => {
     for (const key of Object.keys(changes) as (keyof NewTask)[]) manual.current.add(key);
     setDraft(current => ({ ...current, ...changes }));
   };
-  const [entryText, setEntryText] = useState('');
+  const [entryText, setEntryText] = useState(saved?.entryText ?? '');
+  useEffect(() => {
+    try { sessionStorage.setItem(storageKey, JSON.stringify({ draft, entryText, manual: [...manual.current] } satisfies SavedDraft)); } catch { /* storage unavailable */ }
+  }, [storageKey, draft, entryText]);
+  const close = () => { forgetDraft(storageKey); onClose(); };
+  // Full-page view is a per-device preference.
+  const [full, setFull] = useState(() => { try { return localStorage.getItem(FULL_KEY) === '1'; } catch { return false; } });
+  const toggleFull = () => setFull(value => { try { localStorage.setItem(FULL_KEY, value ? '0' : '1'); } catch { /* storage unavailable */ } return !value; });
   const taxonomyOk = quest.backend.supports?.taskTaxonomy !== false;
   const types = state.taxonomy?.types ?? [];
   // Live inference updates untouched fields only. A manual choice (including
@@ -61,7 +84,7 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
     try {
       const watchers = [...new Set([...(draft.watchers ?? []), ...(delegated && watch ? [actor] : [])])];
       const result = await dispatch({ type: 'task/create', task: { ...draft, watchers } });
-      if (result.ok) onCreated(result.state.tasks[0]!.id);
+      if (result.ok) { forgetDraft(storageKey); onCreated(result.state.tasks[0]!.id); }
     } finally { saving.current = false; setBusy(false); }
   }
 
@@ -100,9 +123,16 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
 
   return (
     <>
-      <button className="scrim scrim-modal" aria-label="Close" onClick={onClose} />
-      <section className="modal create-wide" role="dialog" aria-modal="true" aria-labelledby="create-title">
-        <header className="modal-head"><div><span className="kicker">NEW TASK</span><h2 id="create-title">Create a task</h2></div><button type="button" className="icon-btn" aria-label="Close" onClick={onClose}>×</button></header>
+      {!full && <button className="scrim scrim-modal" aria-label="Close" onClick={close} />}
+      <section className={`modal create-wide ${full ? 'is-full' : ''}`} role="dialog" aria-modal="true" aria-labelledby="create-title">
+        <header className="modal-head"><div><span className="kicker">NEW TASK</span><h2 id="create-title">Create a task</h2></div>
+          <div className="modal-head-actions">
+            <button type="button" className="icon-btn" aria-pressed={full} aria-label={full ? 'Exit full page' : 'Expand to full page'} title={full ? 'Exit full page' : 'Expand to full page'} onClick={toggleFull}>
+              <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">{full ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}</svg>
+            </button>
+            <button type="button" className="icon-btn" aria-label="Close" onClick={close}>×</button>
+          </div>
+        </header>
         <div className="cx">
           <div className="cx-form">
             <section className="cx-card cx-hero" aria-label="Describe it for me (optional)">
@@ -160,7 +190,7 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
                 {delegated && <label className="check-row watch-check"><input type="checkbox" checked={watch} onChange={event => setWatch(event.target.checked)} />Watch this task: follow its comments and changes</label>}
               </section>
 
-              <footer className="form-actions"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={busy || !ready} aria-busy={busy}>{busy ? 'Creating…' : 'Create task →'}</button></footer>
+              <footer className="form-actions"><button type="button" className="btn btn-ghost" onClick={close}>Cancel</button><button className="btn btn-primary" disabled={busy || !ready} aria-busy={busy}>{busy ? 'Creating…' : 'Create task →'}</button></footer>
             </form>
           </div>
 
