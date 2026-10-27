@@ -46,40 +46,9 @@
 .work-nav-item.is-active { background: var(--accent-pale); color: var(--accent-ink); }
 .work-nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
-/* ── Bottom sheet: the calendar ─────────────────────────────────────────────────────────── */
-.sheet-handle {
-  position: fixed; left: 50%; bottom: 0; z-index: 25; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 10px 18px 8px;
-  border: 1px solid var(--hair-2); border-bottom: 0; border-radius: 14px 14px 0 0; background: rgb(255 255 255 / 94%); color: var(--ink-2);
-  font: inherit; font-size: 13px; font-weight: 700; box-shadow: 0 -6px 24px rgb(17 18 20 / 8%); backdrop-filter: blur(10px); cursor: pointer;
-  transform: translateX(-50%); transition: padding .2s var(--ease-spring), color .2s;
-}
-.sheet-handle:hover { padding-top: 14px; color: var(--ink); }
-.sheet-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.sheet-handle .icon { width: 16px; height: 16px; }
-.sheet-handle b { padding: 1px 8px; border-radius: 999px; background: var(--accent-pale); color: var(--accent-ink); font-size: 11.5px; }
-.sheet-handle .sheet-grip { position: absolute; top: 4px; left: 50%; margin-left: -14px; }
-.sheet-grip { display: block; width: 28px; height: 4px; border-radius: 4px; background: rgb(17 18 20 / 16%); }
-.sheet-scrim { position: fixed; inset: 0; z-index: 80; background: rgb(17 18 20 / 28%); backdrop-filter: blur(2px); }
-.sheet {
-  position: fixed; right: 0; bottom: 0; left: 0; z-index: 81; display: flex; flex-direction: column; width: min(1040px, 100%); max-height: min(80dvh, 720px); margin: 0 auto;
-  border-radius: 22px 22px 0 0; background: var(--card, #fff); box-shadow: 0 -18px 60px rgb(17 18 20 / 18%); outline: none;
-}
-.sheet-head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 16px 10px 24px; cursor: grab; touch-action: none; user-select: none; }
-.sheet-head:active { cursor: grabbing; }
-.sheet-head .sheet-grip { position: absolute; top: 8px; left: 50%; margin-left: -14px; }
-.sheet-title { margin: 0; font: 800 20px var(--display); letter-spacing: -.02em; }
-.sheet-body { min-height: 0; padding: 0 24px calc(20px + env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; }
-.sheet .pullout-calendar { display: grid; grid-template-columns: minmax(300px, 420px) minmax(0, 1fr); align-items: start; gap: 8px 28px; }
-.sheet .pullout-calendar > .pullout-full { grid-column: 1 / -1; justify-self: start; }
-.content { padding-bottom: 64px; }
-@media (max-width: 760px) {
-  .sheet-handle { display: none; }
-  .sheet { max-height: 88dvh; border-radius: 20px 20px 0 0; }
-  .sheet-body { padding: 0 16px calc(16px + env(safe-area-inset-bottom)); }
-  .sheet .pullout-calendar { grid-template-columns: 1fr; }
-  .tabbar { grid-template-columns: repeat(5, 1fr); }
-}
-@media (prefers-reduced-motion: reduce) { .sheet-handle, .ctl, .panel-switch button { transition: none; } }
+/* ── Phones: five tab bar items (Calendar joins) ───────────────────────────────────────── */
+@media (max-width: 760px) { .tabbar { grid-template-columns: repeat(5, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .ctl, .panel-switch button { transition: none; } }
 
 /* Radix popovers share one entrance. */
 .hd-banner-panel { z-index: 90; transform-origin: var(--radix-popover-content-transform-origin); animation: pop-in .16s var(--ease-spring); }
@@ -89,3 +58,46 @@
 :root .topbar .menu-btn[aria-expanded="true"] { background: var(--accent-pale); color: var(--accent-ink); }
 :root .ask-head .ask-icon-btn, :root .context-head .icon-btn { width: var(--ctl); height: var(--ctl); border: 0; border-radius: var(--ctl-r); background: transparent; color: var(--ink-2); }
 :root .ask-head .ask-icon-btn:hover, :root .context-head .icon-btn:hover { background: var(--sunk); color: var(--ink); }
+
+/* ── Spatial side panels: they open beside the page, below the top bar, which never moves ── */
+@media (min-width: 761px) {
+  .topbar { margin-left: calc(-1 * var(--panel-offset, 0px)); margin-right: calc(-1 * var(--context-offset, 0px)); transition: margin var(--sidebar-speed) var(--sidebar-ease); }
+  :root .shell[data-sidebar="open"] .topbar { padding-inline: 36px; }
+  .workspace-panel { top: var(--topbar-h, 60px); border-top: 1px solid var(--hair); }
+  .notification-edge { top: var(--topbar-h, 60px); height: calc(100dvh - var(--topbar-h, 60px)); margin-top: var(--topbar-h, 60px); }
+  .notification-edge .edge-drawer { height: 100%; border-top: 1px solid var(--hair); }
+  .shell[data-resizing] .topbar { transition: none; }
+}
+.panel-head .panel-switch { margin-right: auto; }
+
+/* ── Fields: a quiet hairline you can see, never a heavy box ───────────────────────────── */
+:root:root:root:root :is(.auth-input input, .field > input, .field > textarea, .field > select, .ask-foot input) {
+  border: 1px solid rgb(17 18 20 / 12%); border-radius: 10px; background: #fff; padding-inline: 12px; transition: border-color .15s, box-shadow .15s;
+}
+:root:root:root:root :is(.auth-input input, .field > input, .field > textarea, .field > select, .ask-foot input):hover:not(:disabled) { border-color: rgb(17 18 20 / 22%); }
+:root:root:root:root :is(.auth-input input, .field > input, .field > textarea, .field > select, .ask-foot input):focus-visible { border-color: var(--accent); outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
+:root:root:root:root .auth-input input { padding-inline: 16px; }
+:root:root:root:root .auth-input:has(.auth-eye) input { padding-right: 48px; }
+.field > textarea { padding-block: 10px; }
+
+/* ── Home: plate tiles (2 × 2) · Up next · Comments & mentions ─────────────────────────── */
+.home-dash .hd-top { grid-template-columns: minmax(250px, .8fr) minmax(0, 1.2fr) minmax(0, 1.2fr); align-items: stretch; }
+.home-dash .hd-top .hd-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 10px; align-content: start; }
+.home-dash .hd-top .hd-metric { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto 1fr auto; align-content: stretch; min-height: 118px; padding: 14px; border: 1px solid var(--hair); border-radius: 14px; background: linear-gradient(160deg, var(--card) 50%, var(--tint)); box-shadow: 0 1px 2px rgb(17 18 20 / 5%); will-change: transform; }
+.home-dash .hd-top .hd-metric:hover { transform: none; box-shadow: 0 8px 24px rgb(17 18 20 / 9%); }
+.home-dash .hd-top .hd-metric b { grid-column: 1; grid-row: 1; font-size: 34px; }
+.home-dash .hd-top .hd-metric .icon { grid-column: 2; grid-row: 1; align-self: start; }
+.home-dash .hd-top .hd-metric .lbl { grid-column: 1 / -1; grid-row: 3; align-self: end; }
+.home-dash .hd-top .hd-metric .sub { grid-column: 1 / -1; grid-row: 4; }
+.home-dash .hd-top .hd-metric:not(:has(.sub)) .lbl { grid-row: 3; align-self: end; }
+.home-dash .hd-row3.is-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* The Home grid answers to its own width, so opening a side panel reflows it gracefully. */
+.home-dash { container: home / inline-size; }
+@container home (max-width: 1080px) {
+  .home-dash .hd-top { grid-template-columns: minmax(230px, .9fr) minmax(0, 1.4fr); }
+  .home-dash .hd-top .hd-collab { grid-column: 1 / -1; }
+}
+@container home (max-width: 640px) {
+  .home-dash .hd-top, .home-dash .hd-row3.is-pair { grid-template-columns: 1fr; }
+  .home-dash .hd-top .hd-metric { min-height: 96px; }
+}

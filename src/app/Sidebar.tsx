@@ -135,7 +135,7 @@ function unreadIn(notes: Notification[], read: Set<string>, section?: string) {
   return notes.filter(note => (!section || note.section === section) && !read.has(note.id)).length;
 }
 
-export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, pullout, pulloutTitle, settings, account, calendarAccess }: {
+export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, pullout, pulloutTitle, pulloutHead, settings, account, calendarAccess }: {
   calendarAccess?: ReactNode;
   control: SidebarControl;
   items: SidebarItem[];
@@ -148,6 +148,8 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
   /** The left pullout's body (the calendar quick view), shown on desktop only. */
   pullout: ReactNode;
   pulloutTitle: string;
+  /** Wide screens: replaces the title with a control (the panel's tab switch); the title stays as its label. */
+  pulloutHead?: ReactNode;
   /** The settings menu at the foot of the rail; `close` dismisses it after a choice. */
   settings: (close: () => void) => ReactNode;
   /** Who is signed in: their mark on the rail, and the account menu. */
@@ -298,7 +300,7 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
           }
         }}>
         <div className="panel-head">
-          <span className="panel-title">{isMobile ? <>Task-<b>HQ</b></> : pulloutTitle}</span>
+          {isMobile || !pulloutHead ? <span className="panel-title">{isMobile ? <>Task-<b>HQ</b></> : pulloutTitle}</span> : pulloutHead}
           <button type="button" className="icon-btn panel-close" aria-label={isMobile ? 'Close navigation' : `Close ${pulloutTitle.toLowerCase()}`} onClick={() => {
             if (isMobile) control.closeMobile();
             else { control.toggle(); document.getElementById('calendar-edge-launcher')?.focus({ preventScroll: true }); }

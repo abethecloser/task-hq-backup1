@@ -23,7 +23,7 @@ import { CalendarPage, CalendarPullout } from './ContextPanel.tsx';
 import { TaskPage } from './TaskPage.tsx';
 import type { DeckSection } from './ContextPanel.tsx';
 import { localDate } from '../core/time.ts';
-import { CalendarSheet } from './CalendarSheet.tsx';
+import { EdgeDrawer } from '../ui/EdgeDrawer.tsx';
 import { WorkNavigator } from './WorkNavigator.tsx';
 import { CreateTask, discardCreateDraft, hasCreateDraft } from './CreateTask.tsx';
 import { ExecutiveDesk } from './ExecutiveDesk.tsx';
@@ -125,8 +125,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const [createDue, setCreateDue] = useState<string | undefined>();
   const createOn = (due: string) => { setCreateDue(due); setCreating(true); };
   const [askOpen, setAskOpen] = useState(false);
-  // The calendar quick view is a bottom sheet on every screen size.
-  const [calendarSheet, setCalendarSheet] = useState(false);
+  // The left panel holds "where" and "when": the work views or the calendar quick view.
+  const [leftTab, setLeftTab] = useState<'work' | 'calendar'>('work');
+  const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false);
   // Which task view and scope All Tasks is showing, for the top-bar tabs.
   const registry = useRegistryPrefs(state.workspace.tenantId, actor);
   const registryView = registry.prefs.query;
@@ -332,7 +333,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const rightPanelOpen = notifOpen || (askOpen && !focused);
   const restoreCalendar = useRef(false);
   useEffect(() => { restoreCalendar.current = false; }, [actor, state.workspace.tenantId]);
-  const edgePanelOpen = rightPanelOpen;
+  const edgePanelOpen = rightPanelOpen || (sidebar.isMobile && mobileCalendarOpen);
   const panelScroll = useRef<{ x: number; y: number; route: string } | null>(null);
   useLayoutEffect(() => {
     if (edgePanelOpen) {
@@ -367,8 +368,13 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     showPullouts(next);
   }
   /** Home's Calendar and Insights entries open the calendar sheet. */
-  function openDeck(_section: DeckSection) {
-    if (calendarAllowed) setCalendarSheet(true); else go('calendar');
+  function openDeck(_section: DeckSection) { openCalendar(); }
+  /** Calendar quick view: the left panel's Calendar tab on wide screens, a full-width panel on phones. */
+  function openCalendar() {
+    if (!calendarAllowed) { go('calendar'); return; }
+    if (sidebar.isMobile) { setNotifOpen(false); setAskOpen(false); sidebar.closeMobile(); setMobileCalendarOpen(true); return; }
+    setLeftTab('calendar');
+    if (!pullouts.calendar) { restoreCalendar.current = false; showPullouts(togglePullout(pullouts, 'calendar', room)); }
   }
   /** The bell: Inbox in the right drawer. Pressing it again closes it. */
   function toggleNotifications() {
@@ -404,8 +410,14 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           {!live && onExitDemo && <button type="button" role="menuitem" onClick={() => { close(); onExitDemo(); }}>Sign in to Task HQ</button>}
         </>}
         account={{ label: me.name && !me.name.includes('@') ? me.name : live?.email ?? me.name, detail: live ? ROLE_LABELS[live.role] : me.title, mark: <AccountMark quest={quest} />, menu: close => <AccountMenu quest={quest} close={close} /> }}
-        pulloutTitle="Your work"
-        pullout={<WorkNavigator lenses={taskTabs} projects={state.projects} onLens={id => { if (id === 'completed') openCompleted(); else openLens(id as Lens); }} onProjects={() => go('company-work')} />}
+        pulloutTitle={leftTab === 'calendar' ? 'Calendar' : 'Your work'}
+        pulloutHead={<div className="panel-switch" role="group" aria-label="Left panel">
+          <button type="button" aria-pressed={leftTab === 'work'} onClick={() => setLeftTab('work')}>Your work</button>
+          {calendarAllowed && <button type="button" aria-pressed={leftTab === 'calendar'} onClick={() => setLeftTab('calendar')}>Calendar</button>}
+        </div>}
+        pullout={leftTab === 'calendar' && calendarAllowed
+          ? <CalendarPullout quest={quest} company={company} onOpenTask={openTask} onExpandCalendar={() => go('calendar')} onCreate={canCreate ? due => createOn(due) : undefined} />
+          : <WorkNavigator lenses={taskTabs} projects={state.projects} onLens={id => { if (id === 'completed') openCompleted(); else openLens(id as Lens); }} onProjects={() => go('company-work')} />}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
         items={railItems.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: view === item.id || (item.id === 'calendar' && pullouts.calendar), info: info[item.id] }))}
         onSelect={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
@@ -426,7 +438,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           tabs={view === 'all-tasks' && !(selected && contextAllowed) ? taskTabs : undefined}
           onTab={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={toggleAsk} onBell={toggleNotifications}
           onMenu={() => {
-            restoreCalendar.current = false; setCalendarSheet(false);
+            restoreCalendar.current = false; setMobileCalendarOpen(false);
             // Wide screens: the menu button opens and closes the left "Your work" panel.
             if (!sidebar.isMobile) { showPullouts(togglePullout(pullouts, 'calendar', room)); return; }
             setNotifOpen(false); setAskOpen(false); sidebar.openMobile();
@@ -479,8 +491,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             ...(['inbox', 'needs-attention'] as View[]).map(id => navigation.find(item => item.id === id)).filter(item => !!item),
           ].map(item => {
             return (
-              <button key={item.id} type="button" className={`${view === item.id || (item.id === 'calendar' && calendarSheet) ? 'is-active' : ''}`}
-                onClick={() => (item.id === 'all-tasks' ? openLens(registryView.lens) : item.id === 'calendar' ? setCalendarSheet(true) : go(item.id))}>
+              <button key={item.id} type="button" className={`${view === item.id || (item.id === 'calendar' && mobileCalendarOpen) ? 'is-active' : ''}`}
+                onClick={() => (item.id === 'all-tasks' ? openLens(registryView.lens) : item.id === 'calendar' ? openCalendar() : go(item.id))}>
                 {item.icon}<span>{item.label.replace('Owner overview', 'Overview')}</span>
                 {item.hot && <i className="tab-dot" />}
               </button>
@@ -501,10 +513,13 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           onAsk={focused ? undefined : toggleAsk} />
         <AskTasks key={`ask:${state.workspace.tenantId}:${actor}`} quest={quest} company={company} open={askOpen && !focused} onClose={closeRightPanel} onUpdates={toggleNotifications} />
       </div>
-      {calendarAllowed && <CalendarSheet open={calendarSheet} onOpenChange={setCalendarSheet} dueToday={dueToday}>
-        <CalendarPullout quest={quest} company={company} onOpenTask={id => { setCalendarSheet(false); openTask(id); }}
-          onExpandCalendar={() => { setCalendarSheet(false); go('calendar'); }} onCreate={canCreate ? due => { setCalendarSheet(false); createOn(due); } : undefined} />
-      </CalendarSheet>}
+      {sidebar.isMobile && <div className="notification-edge calendar-edge">
+        <EdgeDrawer id="calendar-quick-drawer" label="Calendar quick view" className="calendar-mobile-drawer" open={mobileCalendarOpen && calendarAllowed} onClose={() => setMobileCalendarOpen(false)}>
+          <header className="context-head"><span className="context-label">Calendar</span><button type="button" className="icon-btn" aria-label="Close Calendar quick view" onClick={() => setMobileCalendarOpen(false)}>×</button></header>
+          <div className="context-body"><CalendarPullout quest={quest} company={company} onOpenTask={id => { setMobileCalendarOpen(false); openTask(id); }}
+            onExpandCalendar={() => { setMobileCalendarOpen(false); go('calendar'); }} onCreate={canCreate ? due => { setMobileCalendarOpen(false); createOn(due); } : undefined} /></div>
+        </EdgeDrawer>
+      </div>}
       {canCreate && !focused && !creating && <button type="button" className="fab-create" aria-label="New task" title="New task" onClick={() => setCreating(true)}><Icon d="M12 5v14M5 12h14" /></button>}
       {creating && canCreate && <CreateTask quest={quest} due={createDue} onClose={() => { setCreating(false); setCreateDue(undefined); }} onCreated={id => { setCreating(false); setCreateDue(undefined); openTask(id); }} />}
       {feedbackOn && <ReviewLayer quest={quest} openRequest={reviewRequest}

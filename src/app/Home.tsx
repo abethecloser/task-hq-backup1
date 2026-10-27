@@ -1,6 +1,7 @@
 import { useMomentum } from '../ui/useMomentum.ts';
 import { useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { PointerEvent, ReactNode } from 'react';
+import { motion, useReducedMotion, useSpring } from 'motion/react';
 import type { QuestEvent, QuestState } from '../core/contract.ts';
 import { compose } from '../core/compose.ts';
 import { ago, atRisk, collaboration, homeMetrics, statusMix, teamActivity, teamWorkload, todayProgress } from '../core/dashboard.ts';
@@ -66,32 +67,8 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
         {next && <button type="button" className="btn btn-primary btn-sm" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}>{nextLabel}</button>}
       </Hero>
 
+      {/* Your plate (four tiles) · what to do next · who is talking to you. */}
       <div className="hd-top">
-        <section className="hd-panel hd-collab" aria-labelledby="hd-comments">
-          <div className="hd-head">
-            <Tile tone="accent"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z" /></Tile>
-            <div><h2 id="hd-comments">Comments &amp; mentions</h2><small>On your work</small></div>
-            <button type="button" className={`hd-unread ${unseen.count ? 'has-unseen' : ''}`} onClick={onUnseen}
-              aria-label={unseen.count ? `Inbox: ${unseen.count} unread across all updates — open inbox` : 'Inbox: all caught up — open inbox'} title={unseen.latest ? `Latest in your inbox: ${unseen.latest}` : 'Open inbox'}>
-              {unseen.count ? <>Inbox · <b>{unseen.count > 99 ? '99+' : unseen.count}</b> unread</> : 'Inbox · caught up'}
-              <Chevron />
-            </button>
-          </div>
-          {collab.length === 0
-            ? <p className="hd-quiet">No comments or mentions on your work yet. Comments on tasks you’re part of and @mentions of you land here.</p>
-            : <ul className="hd-list hd-feed">
-                {collab.map(item => (
-                  <li key={item.id}>
-                    <button type="button" className={`hd-act ${item.unread ? 'is-unread' : ''}`} onClick={() => (item.channelId ? onOpenMention(item) : item.taskId && onOpen(item.taskId))}>
-                      <Initial state={state} id={item.from} />
-                      <span className="t"><b>{firstName(state, item.from, 'Someone')}</b> {COLLAB_VERB[item.kind]} <span className="q">{item.context.replace(/^Mentioned you in /, '')}</span><small>{item.text}</small></span>
-                      <time dateTime={new Date(item.at).toISOString()}>{ago(item.at, now)}</time>
-                    </button>
-                  </li>
-                ))}
-              </ul>}
-        </section>
-
         <div className="hd-metrics" role="group" aria-label="Your plate">
           <Metric value={metrics.active} label="Active items" tone="accent" icon={<path d="M5 20v-6M10 20V9M15 20v-9M20 20V5" />} onClick={() => onRegistry('all', { scope: 'mine' })} />
           <Metric value={metrics.completedToday} label="Completed today" tone="ok" sub={progress.total ? `${progress.done} of ${progress.total} on today’s plate` : undefined}
@@ -99,9 +76,6 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
           <Metric value={metrics.overdue} label="Overdue" tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />} onClick={() => onRegistry('overdue', { scope: 'mine' })} />
           <Metric value={metrics.blocked} label="Blocked" tone="warn" sub="marked blocked" icon={<path d="M5 12h14" />} onClick={() => onRegistry('all', { scope: 'mine', status: 'blocked' })} />
         </div>
-      </div>
-
-      <div className="hd-row3">
         <section className="hd-panel" aria-labelledby="hd-next">
           <PanelHead id="hd-next" title="Up next" sub="Your queue · by priority & due date" tone="accent" icon={<path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5" />}
             more={queue.length > 0 ? { label: `View all (${metrics.active})`, onClick: () => onRegistry('all', { scope: 'mine' }) } : undefined} />
@@ -128,6 +102,33 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
                 })}
               </ul>}
         </section>
+        <section className="hd-panel hd-collab" aria-labelledby="hd-comments">
+          <div className="hd-head">
+            <Tile tone="accent"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z" /></Tile>
+            <div><h2 id="hd-comments">Comments &amp; mentions</h2><small>On your work</small></div>
+            <button type="button" className={`hd-unread ${unseen.count ? 'has-unseen' : ''}`} onClick={onUnseen}
+              aria-label={unseen.count ? `Inbox: ${unseen.count} unread across all updates — open inbox` : 'Inbox: all caught up — open inbox'} title={unseen.latest ? `Latest in your inbox: ${unseen.latest}` : 'Open inbox'}>
+              {unseen.count ? <>Inbox · <b>{unseen.count > 99 ? '99+' : unseen.count}</b> unread</> : 'Inbox · caught up'}
+              <Chevron />
+            </button>
+          </div>
+          {collab.length === 0
+            ? <p className="hd-quiet">No comments or mentions on your work yet. Comments on tasks you’re part of and @mentions of you land here.</p>
+            : <ul className="hd-list hd-feed">
+                {collab.map(item => (
+                  <li key={item.id}>
+                    <button type="button" className={`hd-act ${item.unread ? 'is-unread' : ''}`} onClick={() => (item.channelId ? onOpenMention(item) : item.taskId && onOpen(item.taskId))}>
+                      <Initial state={state} id={item.from} />
+                      <span className="t"><b>{firstName(state, item.from, 'Someone')}</b> {COLLAB_VERB[item.kind]} <span className="q">{item.context.replace(/^Mentioned you in /, '')}</span><small>{item.text}</small></span>
+                      <time dateTime={new Date(item.at).toISOString()}>{ago(item.at, now)}</time>
+                    </button>
+                  </li>
+                ))}
+              </ul>}
+        </section>
+      </div>
+
+      <div className="hd-row3 is-pair">
 
         <section className="hd-panel" aria-labelledby="hd-risk">
           <PanelHead id="hd-risk" title="At risk" sub="Needs attention" tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />}
@@ -263,13 +264,22 @@ function PanelHead({ id, title, sub, tone, icon, more }: { id: string; title: st
   );
 }
 
+/** A plate tile. It leans a few pixels toward the pointer and springs back (off with reduced motion). */
 function Metric({ value, label, sub, tone, icon, onClick }: { value: number; label: string; sub?: string; tone: 'accent' | 'ok' | 'stop' | 'warn'; icon: ReactNode; onClick: () => void }) {
+  const reduce = useReducedMotion();
+  const x = useSpring(0, { stiffness: 300, damping: 20 }), y = useSpring(0, { stiffness: 300, damping: 20 });
+  const lean = (event: PointerEvent<HTMLButtonElement>) => {
+    if (reduce || event.pointerType !== 'mouse') return;
+    const r = event.currentTarget.getBoundingClientRect();
+    x.set((event.clientX - r.left - r.width / 2) * 0.08); y.set((event.clientY - r.top - r.height / 2) * 0.08);
+  };
   return (
-    <button type="button" className={`hd-metric tone-${tone} ${value ? 'has-value' : ''}`} onClick={onClick}>
+    <motion.button type="button" className={`hd-metric tone-${tone} ${value ? 'has-value' : ''}`} onClick={onClick} style={{ x, y }}
+      onPointerMove={lean} onPointerLeave={() => { x.set(0); y.set(0); }} whileTap={reduce ? undefined : { scale: 0.97 }}>
       <span className="hd-metric-top"><b>{value}</b><svg className="icon" viewBox="0 0 24 24" aria-hidden="true">{icon}</svg></span>
       <span className="lbl">{label}</span>
       {sub && <span className="sub">{sub}</span>}
-    </button>
+    </motion.button>
   );
 }
 

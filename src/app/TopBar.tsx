@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useDropdown } from '../ui/useDropdown.tsx';
 import { firstName, person } from '../core/selectors.ts';
@@ -28,8 +28,19 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title
   mode?: { current: 'work' | 'manage'; onChange: (next: 'work' | 'manage') => void };
   onTab: (id: string) => void; /** The app-wide search field (TopSearch). */ search: ReactNode; onAsk: () => void; onBell: () => void; onMenu: () => void; menuOpen: boolean;
 }) {
+  // Side panels open below the bar, so it never moves: publish where the bar ends.
+  const bar = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const node = bar.current;
+    if (!node) return;
+    const publish = () => document.documentElement.style.setProperty('--topbar-h', `${node.offsetTop + node.offsetHeight}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
   return (
-    <header className={`topbar ${sections ? 'has-sections' : ''} ${tabs ? 'has-sub' : ''}`}>
+    <header ref={bar} className={`topbar ${sections ? 'has-sections' : ''} ${tabs ? 'has-sub' : ''}`}>
       <button type="button" className="icon-btn menu-btn" aria-label="Open navigation" aria-controls="quest-sidebar" aria-expanded={menuOpen} onClick={onMenu}><TopIcon d="M4 6h16M4 12h16M4 18h16" /></button>
       {calendarAccess}
       {demo && <span className="demo-flag" title="Synthetic people and data on this device. Not company work.">Demo · synthetic</span>}
