@@ -4,7 +4,7 @@ import type { PointerEvent, ReactNode } from 'react';
 import { motion, useReducedMotion, useSpring } from 'motion/react';
 import type { QuestEvent, QuestState } from '../core/contract.ts';
 import { compose } from '../core/compose.ts';
-import { ago, atRisk, collaboration, homeMetrics, statusMix, teamActivity, teamWorkload, todayProgress } from '../core/dashboard.ts';
+import { ago, atRisk, collaboration, homeMetrics, teamActivity, todayProgress } from '../core/dashboard.ts';
 import type { CollabItem, MentionSource } from '../core/dashboard.ts';
 import { CULTURE_CONTENT, CULTURE_SLOTS } from '../core/culture.ts';
 import type { CultureItem, CultureSlot } from '../core/culture.ts';
@@ -13,13 +13,13 @@ import { firstName, projectName, taskById } from '../core/selectors.ts';
 import { localDate, shortDate } from '../core/time.ts';
 import { PRODUCT } from '../core/workspace.ts';
 import { MoveForward } from '../ui/components.tsx';
+import { ProjectTeam } from './ProjectTeam.tsx';
 import { BannerAdjust, BannerEditor, bannerLook, useBanner } from './HeroBanner.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import type { DeckSection } from './ContextPanel.tsx';
 
-// Home: the day at a glance. Momentum greeting; Comments & mentions beside the four plate
-// metrics; Up next · At risk · Team workload; Projects overview · Team activity · Culture.
-// Calendar, signals and insights live in the Instrument Deck on the right.
+// Home: the day at a glance. Momentum greeting; plate tiles · Up next · Comments & mentions;
+// At risk · Team activity; Projects & team · Culture. The calendar lives in the left panel.
 // Everything is read from records; team-wide panels need the same access as Company Work.
 export function Home({ quest, company, canCreate, canDeck, unseen, mentions, read, onUnseen, onOpen, onOpenLead, onOpenMention, onCreate, onRegistry, onDeck, onTeam, onActivity, culture = CULTURE_CONTENT }: {
   quest: Quest; company: boolean; canCreate: boolean;
@@ -44,9 +44,7 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
   const metrics = homeMetrics(state, actor, minute);
   const progress = todayProgress(state, actor, minute);
   const risks = atRisk(state, actor, minute, company);
-  const mix = statusMix(state, actor);
   const collab = collaboration(state, actor, company, mentions, read, 4);
-  const workload = company ? teamWorkload(state, minute) : [];
   const activity = teamActivity(state, actor, company, 5);
   const greeting = useMomentum(quest, company);
   const today = localDate(minute);
@@ -147,58 +145,6 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
               </ul>}
         </section>
 
-        <section className="hd-panel" aria-labelledby="hd-team">
-          <PanelHead id="hd-team" title="Team workload" sub="Assigned work distribution" tone="act"
-            icon={<path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" />}
-            more={company ? { label: 'View team', onClick: onTeam } : undefined} />
-          {!company
-            ? <p className="hd-quiet">Team workload is hidden while your access is limited to your own work.</p>
-            : workload.length === 0
-              ? <p className="hd-quiet">Nobody has open work right now.</p>
-              : <>
-                  <ul className="hd-list">
-                    {workload.slice(0, 5).map(item => {
-                      const max = workload[0]!.open;
-                      return (
-                        <li key={item.person}>
-                          <button type="button" className="hd-person" onClick={() => onRegistry('all', { scope: 'company', owner: item.person })}
-                            aria-label={`${item.name}: ${item.open} open — ${item.byStatus.working} in progress, ${item.byStatus.review} in review, ${item.byStatus.ready} not started, ${item.byStatus.blocked} blocked${item.attention ? `; ${item.attention} need attention` : ''}`}>
-                            <Initial state={state} id={item.person} /><b className="n">{item.name}</b>
-                            <b className="cnt">{item.open}</b>
-                            <span className="hd-dist" aria-hidden="true"><span style={{ width: `${Math.max(8, Math.round((item.open / max) * 100))}%` }}>
-                              {(['working', 'review', 'ready', 'blocked'] as const).map(key => item.byStatus[key] > 0 && <i key={key} className={`s-${key}`} style={{ flexGrow: item.byStatus[key] }} />)}
-                            </span></span>
-                            {item.attention > 0 ? <span className="late" title="Overdue, blocked or waiting">{item.attention}!</span> : <span className="late" />}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <p className="hd-legend" aria-hidden="true"><span><i className="s-working" />In progress</span><span><i className="s-review" />Review</span><span><i className="s-ready" />Not started</span><span><i className="s-blocked" />Blocked</span></p>
-                  <p className="hd-fine">Open tasks per person. Task counts aren’t hours or capacity.</p>
-                </>}
-        </section>
-      </div>
-
-      <div className="hd-row3 is-bottom">
-        <section className="hd-panel" aria-labelledby="hd-proj">
-          <PanelHead id="hd-proj" title="Projects overview" sub="Your work" tone="act" icon={<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />} />
-          <div className="hd-proj">
-            <div className="hd-donut" style={{ ['--done' as string]: `${pct(mix.done, mix.total)}%`, ['--working' as string]: `${pct(mix.done + mix.working, mix.total)}%` }} data-empty={mix.total === 0 || undefined}
-              role="img" aria-label={`${mix.percent}% complete: ${mix.done} completed, ${mix.working} in progress, ${mix.notStarted} not started`}>
-              <div><b>{mix.percent}<i>%</i></b><small>COMPLETE</small></div>
-            </div>
-            <div className="hd-proj-legend">
-              {([['In progress', mix.working, 'var(--act)', ['working', 'blocked', 'review']], ['Completed', mix.done, 'var(--accent)', 'done'], ['Not started', mix.notStarted, '#c4c4c8', 'ready']] as const).map(([label, value, color, status]) => (
-                <button key={label} type="button" className="hd-prog" onClick={() => onRegistry('all', { scope: 'mine', status: Array.isArray(status) ? [...status] : status as RegistryQuery['status'] })}>
-                  <div><span><i style={{ background: color }} />{label}</span><b>{value}</b></div>
-                  <div className="track"><span style={{ width: `${pct(value, mix.total)}%`, background: color }} /></div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
         <section className="hd-panel" aria-labelledby="hd-activity">
           <PanelHead id="hd-activity" title="Team activity" sub={company ? 'Recent · all work you can see' : 'Recent · your work'} tone="neutral" icon={<path d="M3 12h4l3-8 4 16 3-8h4" />}
             more={{ label: 'View all', onClick: onActivity }} />
@@ -208,6 +154,11 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
                 {activity.map(event => <li key={event.id}><Recent event={event} quest={quest} onOpen={onOpen} /></li>)}
               </ul>}
         </section>
+      </div>
+
+      <div className="hd-row3 is-bottom is-intel">
+        <ProjectTeam quest={quest} company={company} onOpen={onOpen} />
+
 
         <CultureSpotlight items={culture} />
       </div>
@@ -362,5 +313,3 @@ function Recent({ event, quest, onOpen }: { event: QuestEvent; quest: Quest; onO
   </>;
   return task ? <button type="button" className="hd-act" onClick={() => onOpen(task.id)}>{body}</button> : <div className="hd-act">{body}</div>;
 }
-
-const pct = (part: number, total: number) => (total ? Math.round((part / total) * 100) : 0);
