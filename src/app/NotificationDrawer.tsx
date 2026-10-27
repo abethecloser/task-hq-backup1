@@ -4,6 +4,7 @@
 // leaving the page underneath, so scroll position and everything else stay put.
 import { useState } from 'react';
 import { EdgeDrawer } from '../ui/EdgeDrawer.tsx';
+import { PanelSwitch } from './AskTasks.tsx';
 import { ChannelThread } from './Inbox.tsx';
 import type { InboxData } from './Inbox.tsx';
 import { channelsFor } from '../core/inbox.ts';
@@ -18,11 +19,12 @@ import { Awareness } from './Awareness.tsx';
 import type { SidebarControl } from './Sidebar.tsx';
 import { CommentReply, EventFeed, canReply, isComment, taskEvents } from './TaskComments.tsx';
 
-export function NotificationDrawer({ quest, control, inbox, attention, data, detailsAllowed = true, open: visible, threadAllowed, onClose, onOpenTask, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity }: {
+export function NotificationDrawer({ quest, control, inbox, attention, data, detailsAllowed = true, open: visible, threadAllowed, onClose, onOpenTask, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity, onAsk }: {
   quest: Quest; control: SidebarControl; inbox: UniversalInbox; attention: Attention; data?: InboxData; detailsAllowed?: boolean; open: boolean;
   /** False for a task outside the person's Critical Focus: its thread is not shown. */
   threadAllowed: (taskId: string) => boolean;
   onClose: () => void; onOpenTask: (id: string) => void; onOpenLead: (id: string) => void; onOpenInbox: () => void; onOpenAttention: () => void; onOpenActivity: () => void;
+  /** Switches the right panel to Ask (absent during Critical Focus). */ onAsk?: () => void;
 }) {
   const [thread, setThread] = useState<string | null>(null);
   const [item, setItem] = useState<InboxItem | null>(null);
@@ -48,7 +50,7 @@ export function NotificationDrawer({ quest, control, inbox, attention, data, det
       thread
         ? <Thread quest={quest} taskId={thread} allowed={threadAllowed(thread)} onBack={() => setThread(null)} onClose={onClose} onOpenTask={id => { onOpenTask(id); onClose(); }} />
         : <>
-            <header className="context-head"><span className="context-label">Notifications</span><button type="button" className="icon-btn" aria-label="Close notifications" onClick={onClose}>×</button></header>
+            <header className="context-head">{onAsk ? <PanelSwitch current="updates" onUpdates={() => {}} onAsk={onAsk} /> : <span className="context-label">Notifications</span>}<button type="button" className="icon-btn" aria-label="Close notifications" onClick={onClose}>×</button></header>
             <div className="context-body notify-body">
               <Awareness quest={quest} control={sheet} inbox={inbox} attention={attention}
                 onOpenTask={selectTask} onOpenThread={selectTask} onOpenLead={selectLead}

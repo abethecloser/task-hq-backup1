@@ -506,7 +506,7 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .hd-banner-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid var(--hair-2); border-radius: 999px; background: rgb(255 255 255 / 88%); color: var(--ink-2); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; backdrop-filter: blur(6px); }
 .hd-banner-btn:hover { color: var(--ink); background: #fff; }
 .hd-banner-btn .icon { width: 15px; height: 15px; }
-.hd-banner-panel { position: fixed; z-index: 60; display: grid; gap: 8px; width: 248px; padding: 14px; border: 1px solid var(--hair-2); border-radius: 12px; background: #fff; color: var(--ink); box-shadow: var(--shadow-lift); }
+.hd-banner-panel { display: grid; gap: 8px; width: 248px; padding: 14px; border: 1px solid var(--hair-2); border-radius: 12px; background: #fff; color: var(--ink); box-shadow: var(--shadow-lift); }
 .hd-banner-label { margin: 0; color: var(--muted); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .hd-banner-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 .hd-swatch { position: relative; width: 30px; height: 30px; padding: 0; border: 1px solid rgb(17 18 20 / 16%); border-radius: 50%; cursor: pointer; overflow: hidden; }

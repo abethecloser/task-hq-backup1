@@ -1,0 +1,91 @@
+/* Shell: one control language and the edge drawers (top = navigation, left = where,
+   right = addressed to you, bottom = when). Loaded last so it settles older look rules. */
+:root { --ctl: 40px; --ctl-r: 10px; --ease-spring: cubic-bezier(.2, .9, .25, 1); }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ── One control shape: 40px square, 10px radius, quiet until hovered ───────────────────── */
+.ctl, :root .topbar .top-icon, :root .topbar .menu-btn {
+  position: relative; display: grid; place-items: center; width: var(--ctl); height: var(--ctl); min-width: var(--ctl); min-height: var(--ctl); flex: none;
+  padding: 0; border: 0; border-radius: var(--ctl-r); background: transparent; color: var(--ink-2); cursor: pointer;
+  transition: background .18s var(--ease-spring), color .18s var(--ease-spring), transform .12s var(--ease-spring);
+}
+.ctl:hover, :root .topbar .top-icon:hover:not(:disabled), :root .topbar .menu-btn:hover { background: var(--sunk); color: var(--ink); border-color: transparent; }
+.ctl:active, :root .topbar .top-icon:active, :root .topbar .menu-btn:active { transform: scale(.94); }
+.ctl:focus-visible, :root .topbar .top-icon:focus-visible, :root .topbar .menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:root .topbar .top-icon.is-on { background: var(--accent-pale); color: var(--accent-ink); }
+.ctl .icon, :root .topbar .top-icon .icon, :root .topbar .menu-btn .icon { width: 20px; height: 20px; }
+:root .topbar .top-icon .rail-unread { top: 2px; right: 2px; }
+:root .topbar .user-chip { min-height: var(--ctl); border-color: transparent; background: transparent; transition: background .18s var(--ease-spring); }
+:root .topbar .user-chip:hover { background: var(--sunk); }
+
+/* Phones: menu · title · search · bell · you. Ask lives inside the right panel's switch. */
+@media (max-width: 760px) {
+  :root .topbar .top-icon[aria-controls="ask-edge-drawer"] { display: none; }
+  :root .topbar .user-chip { padding: 2px; border-radius: 50%; }
+  :root .topbar .user-chip .user-chip-text, :root .topbar .user-chip > .icon { display: none; }
+  :root .topbar .topbar-right { gap: 2px; }
+}
+
+/* ── Right panel: Updates | Ask ─────────────────────────────────────────────────────────── */
+.panel-switch { display: inline-flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--sunk); }
+.panel-switch button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: background .18s var(--ease-spring), color .18s var(--ease-spring), box-shadow .18s; }
+.panel-switch button[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgb(17 18 20 / 10%); cursor: default; }
+.panel-switch button:not([aria-pressed="true"]):hover { color: var(--ink); }
+.panel-switch .icon { width: 15px; height: 15px; }
+.edge-drawer { transition-timing-function: var(--ease-spring); }
+
+/* ── Left panel: "Your work" ────────────────────────────────────────────────────────────── */
+.work-nav { display: grid; gap: 4px; padding: 4px 4px 16px; }
+.work-nav ul { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
+.work-nav-label { margin: 12px 10px 4px; color: var(--muted); font-size: 10.5px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.work-nav-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 38px; padding: 0 10px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 650; text-align: left; cursor: pointer; transition: background .15s, color .15s; }
+.work-nav-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-nav-item b { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: rgb(17 18 20 / 6%); color: var(--muted); font-size: 11.5px; font-weight: 750; text-align: center; font-variant-numeric: tabular-nums; }
+.work-nav-item b.is-hot { background: var(--accent-pale); color: var(--accent-ink); }
+.work-nav-item:hover { background: var(--sunk); color: var(--ink); }
+.work-nav-item.is-active { background: var(--accent-pale); color: var(--accent-ink); }
+.work-nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* ── Bottom sheet: the calendar ─────────────────────────────────────────────────────────── */
+.sheet-handle {
+  position: fixed; left: 50%; bottom: 0; z-index: 25; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 10px 18px 8px;
+  border: 1px solid var(--hair-2); border-bottom: 0; border-radius: 14px 14px 0 0; background: rgb(255 255 255 / 94%); color: var(--ink-2);
+  font: inherit; font-size: 13px; font-weight: 700; box-shadow: 0 -6px 24px rgb(17 18 20 / 8%); backdrop-filter: blur(10px); cursor: pointer;
+  transform: translateX(-50%); transition: padding .2s var(--ease-spring), color .2s;
+}
+.sheet-handle:hover { padding-top: 14px; color: var(--ink); }
+.sheet-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sheet-handle .icon { width: 16px; height: 16px; }
+.sheet-handle b { padding: 1px 8px; border-radius: 999px; background: var(--accent-pale); color: var(--accent-ink); font-size: 11.5px; }
+.sheet-handle .sheet-grip { position: absolute; top: 4px; left: 50%; margin-left: -14px; }
+.sheet-grip { display: block; width: 28px; height: 4px; border-radius: 4px; background: rgb(17 18 20 / 16%); }
+.sheet-scrim { position: fixed; inset: 0; z-index: 80; background: rgb(17 18 20 / 28%); backdrop-filter: blur(2px); }
+.sheet {
+  position: fixed; right: 0; bottom: 0; left: 0; z-index: 81; display: flex; flex-direction: column; width: min(1040px, 100%); max-height: min(80dvh, 720px); margin: 0 auto;
+  border-radius: 22px 22px 0 0; background: var(--card, #fff); box-shadow: 0 -18px 60px rgb(17 18 20 / 18%); outline: none;
+}
+.sheet-head { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 16px 10px 24px; cursor: grab; touch-action: none; user-select: none; }
+.sheet-head:active { cursor: grabbing; }
+.sheet-head .sheet-grip { position: absolute; top: 8px; left: 50%; margin-left: -14px; }
+.sheet-title { margin: 0; font: 800 20px var(--display); letter-spacing: -.02em; }
+.sheet-body { min-height: 0; padding: 0 24px calc(20px + env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; }
+.sheet .pullout-calendar { display: grid; grid-template-columns: minmax(300px, 420px) minmax(0, 1fr); align-items: start; gap: 8px 28px; }
+.sheet .pullout-calendar > .pullout-full { grid-column: 1 / -1; justify-self: start; }
+.content { padding-bottom: 64px; }
+@media (max-width: 760px) {
+  .sheet-handle { display: none; }
+  .sheet { max-height: 88dvh; border-radius: 20px 20px 0 0; }
+  .sheet-body { padding: 0 16px calc(16px + env(safe-area-inset-bottom)); }
+  .sheet .pullout-calendar { grid-template-columns: 1fr; }
+  .tabbar { grid-template-columns: repeat(5, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { .sheet-handle, .ctl, .panel-switch button { transition: none; } }
+
+/* Radix popovers share one entrance. */
+.hd-banner-panel { z-index: 90; transform-origin: var(--radix-popover-content-transform-origin); animation: pop-in .16s var(--ease-spring); }
+@keyframes pop-in { from { opacity: 0; transform: scale(.96) translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .hd-banner-panel { animation: none; } }
+:root .topbar .menu-btn { display: grid; }
+:root .topbar .menu-btn[aria-expanded="true"] { background: var(--accent-pale); color: var(--accent-ink); }
+:root .ask-head .ask-icon-btn, :root .context-head .icon-btn { width: var(--ctl); height: var(--ctl); border: 0; border-radius: var(--ctl-r); background: transparent; color: var(--ink-2); }
+:root .ask-head .ask-icon-btn:hover, :root .context-head .icon-btn:hover { background: var(--sunk); color: var(--ink); }
