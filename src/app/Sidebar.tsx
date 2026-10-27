@@ -15,7 +15,9 @@ import { useDropdown } from '../ui/useDropdown.tsx';
 const MOBILE_QUERY = '(max-width: 760px)';
 export const PANEL_MIN = 232;
 export const PANEL_MAX = 420;
-export const PANEL_DEFAULT = 288;
+export const PANEL_DEFAULT = 320;
+/** The earlier default; a width still at it moves to the new default (it was never chosen by hand). */
+const OLD_DEFAULT = 288;
 const READ_LIMIT = 300;
 const storageKey = (actor: string) => `quest.sidebar.v1.${actor}`;
 
@@ -32,7 +34,7 @@ function loadPrefs(actor: string): Prefs {
     return {
       // The calendar pullout always starts closed; width, read items, snoozes and the tab are what persist.
       open: false,
-      width: typeof raw.width === 'number' ? clampWidth(raw.width) : PANEL_DEFAULT,
+      width: typeof raw.width === 'number' && raw.width !== OLD_DEFAULT ? clampWidth(raw.width) : PANEL_DEFAULT,
       read: Array.isArray(raw.read) ? raw.read.filter((id: unknown): id is string => typeof id === 'string') : [],
       tab: TABS.includes(raw.tab) ? raw.tab : 'inbox',
       snoozes: Array.isArray(raw.snoozes) ? raw.snoozes.filter((item: unknown): item is Snooze => !!item && typeof (item as Snooze).id === 'string' && typeof (item as Snooze).until === 'number').slice(-100) : [],
@@ -135,7 +137,7 @@ function unreadIn(notes: Notification[], read: Set<string>, section?: string) {
   return notes.filter(note => (!section || note.section === section) && !read.has(note.id)).length;
 }
 
-export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, pullout, pulloutTitle, settings, account, calendarAccess }: {
+export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, pullout, pulloutTitle, pulloutHead, settings, account, calendarAccess }: {
   calendarAccess?: ReactNode;
   control: SidebarControl;
   items: SidebarItem[];
@@ -148,6 +150,8 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
   /** The left pullout's body (the calendar quick view), shown on desktop only. */
   pullout: ReactNode;
   pulloutTitle: string;
+  /** Wide screens: replaces the title with a control (the panel's tab switch); the title stays as its label. */
+  pulloutHead?: ReactNode;
   /** The settings menu at the foot of the rail; `close` dismisses it after a choice. */
   settings: (close: () => void) => ReactNode;
   /** Who is signed in: their mark on the rail, and the account menu. */
@@ -298,7 +302,7 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
           }
         }}>
         <div className="panel-head">
-          <span className="panel-title">{isMobile ? <>Task-<b>HQ</b></> : pulloutTitle}</span>
+          {isMobile || !pulloutHead ? <span className="panel-title">{isMobile ? <>Task-<b>HQ</b></> : pulloutTitle}</span> : pulloutHead}
           <button type="button" className="icon-btn panel-close" aria-label={isMobile ? 'Close navigation' : `Close ${pulloutTitle.toLowerCase()}`} onClick={() => {
             if (isMobile) control.closeMobile();
             else { control.toggle(); document.getElementById('calendar-edge-launcher')?.focus({ preventScroll: true }); }

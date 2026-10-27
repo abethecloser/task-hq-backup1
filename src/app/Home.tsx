@@ -1,9 +1,10 @@
 import { useMomentum } from '../ui/useMomentum.ts';
 import { useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { PointerEvent, ReactNode } from 'react';
+import { motion, useReducedMotion, useSpring } from 'motion/react';
 import type { QuestEvent, QuestState } from '../core/contract.ts';
 import { compose } from '../core/compose.ts';
-import { ago, atRisk, collaboration, homeMetrics, statusMix, teamActivity, teamWorkload, todayProgress } from '../core/dashboard.ts';
+import { ago, atRisk, collaboration, homeMetrics, teamActivity, todayProgress } from '../core/dashboard.ts';
 import type { CollabItem, MentionSource } from '../core/dashboard.ts';
 import { CULTURE_CONTENT, CULTURE_SLOTS } from '../core/culture.ts';
 import type { CultureItem, CultureSlot } from '../core/culture.ts';
@@ -12,12 +13,13 @@ import { firstName, projectName, taskById } from '../core/selectors.ts';
 import { localDate, shortDate } from '../core/time.ts';
 import { PRODUCT } from '../core/workspace.ts';
 import { MoveForward } from '../ui/components.tsx';
+import { ProjectTeam } from './ProjectTeam.tsx';
+import { BannerAdjust, BannerEditor, bannerLook, useBanner } from './HeroBanner.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import type { DeckSection } from './ContextPanel.tsx';
 
-// Home: the day at a glance. Momentum greeting; Comments & mentions beside the four plate
-// metrics; Up next · At risk · Team workload; Projects overview · Team activity · Culture.
-// Calendar, signals and insights live in the Instrument Deck on the right.
+// Home: the day at a glance. Momentum greeting; plate tiles · Up next · Comments & mentions;
+// At risk · Team activity; Projects & team · Culture. The calendar lives in the left panel.
 // Everything is read from records; team-wide panels need the same access as Company Work.
 export function Home({ quest, company, canCreate, canDeck, unseen, mentions, read, onUnseen, onOpen, onOpenLead, onOpenMention, onCreate, onRegistry, onDeck, onTeam, onActivity, culture = CULTURE_CONTENT }: {
   quest: Quest; company: boolean; canCreate: boolean;
@@ -34,6 +36,7 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
   culture?: CultureItem[];
 }) {
   const { state, actor, now } = quest;
+  const banner = useBanner(state.workspace.tenantId, actor);
   const minute = Math.floor(now / 60000) * 60000;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -41,9 +44,7 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
   const metrics = homeMetrics(state, actor, minute);
   const progress = todayProgress(state, actor, minute);
   const risks = atRisk(state, actor, minute, company);
-  const mix = statusMix(state, actor);
   const collab = collaboration(state, actor, company, mentions, read, 4);
-  const workload = company ? teamWorkload(state, minute) : [];
   const activity = teamActivity(state, actor, company, 5);
   const greeting = useMomentum(quest, company);
   const today = localDate(minute);
@@ -59,38 +60,13 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
 
   return (
     <div className="view home-dash">
-      <Hero eyebrow={greeting.eyebrow} primary={greeting.primary} support={greeting.support}>
+      {/* New task lives in the top bar; the banner keeps only the next step. */}
+      <Hero eyebrow={greeting.eyebrow} primary={greeting.primary} support={greeting.support} banner={banner}>
         {next && <button type="button" className="btn btn-primary btn-sm" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}>{nextLabel}</button>}
-        {canCreate && <button type="button" className={`btn ${next ? '' : 'btn-primary'} btn-sm`} onClick={onCreate}>+ New task</button>}
-        {canDeck && <button type="button" className="btn btn-sm" onClick={() => onDeck('calendar')}>Calendar</button>}
       </Hero>
 
+      {/* Your plate (four tiles) · what to do next · who is talking to you. */}
       <div className="hd-top">
-        <section className="hd-panel hd-collab" aria-labelledby="hd-comments">
-          <div className="hd-head">
-            <Tile tone="accent"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z" /></Tile>
-            <div><h2 id="hd-comments">Comments &amp; mentions</h2><small>On your work</small></div>
-            <button type="button" className={`hd-unread ${unseen.count ? 'has-unseen' : ''}`} onClick={onUnseen}
-              aria-label={unseen.count ? `Inbox: ${unseen.count} unread across all updates — open inbox` : 'Inbox: all caught up — open inbox'} title={unseen.latest ? `Latest in your inbox: ${unseen.latest}` : 'Open inbox'}>
-              {unseen.count ? <>Inbox · <b>{unseen.count > 99 ? '99+' : unseen.count}</b> unread</> : 'Inbox · caught up'}
-              <Chevron />
-            </button>
-          </div>
-          {collab.length === 0
-            ? <p className="hd-quiet">No comments or mentions on your work yet. Comments on tasks you’re part of and @mentions of you land here.</p>
-            : <ul className="hd-list hd-feed">
-                {collab.map(item => (
-                  <li key={item.id}>
-                    <button type="button" className={`hd-act ${item.unread ? 'is-unread' : ''}`} onClick={() => (item.channelId ? onOpenMention(item) : item.taskId && onOpen(item.taskId))}>
-                      <Initial state={state} id={item.from} />
-                      <span className="t"><b>{firstName(state, item.from, 'Someone')}</b> {COLLAB_VERB[item.kind]} <span className="q">{item.context.replace(/^Mentioned you in /, '')}</span><small>{item.text}</small></span>
-                      <time dateTime={new Date(item.at).toISOString()}>{ago(item.at, now)}</time>
-                    </button>
-                  </li>
-                ))}
-              </ul>}
-        </section>
-
         <div className="hd-metrics" role="group" aria-label="Your plate">
           <Metric value={metrics.active} label="Active items" tone="accent" icon={<path d="M5 20v-6M10 20V9M15 20v-9M20 20V5" />} onClick={() => onRegistry('all', { scope: 'mine' })} />
           <Metric value={metrics.completedToday} label="Completed today" tone="ok" sub={progress.total ? `${progress.done} of ${progress.total} on today’s plate` : undefined}
@@ -98,9 +74,6 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
           <Metric value={metrics.overdue} label="Overdue" tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />} onClick={() => onRegistry('overdue', { scope: 'mine' })} />
           <Metric value={metrics.blocked} label="Blocked" tone="warn" sub="marked blocked" icon={<path d="M5 12h14" />} onClick={() => onRegistry('all', { scope: 'mine', status: 'blocked' })} />
         </div>
-      </div>
-
-      <div className="hd-row3">
         <section className="hd-panel" aria-labelledby="hd-next">
           <PanelHead id="hd-next" title="Up next" sub="Your queue · by priority & due date" tone="accent" icon={<path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5" />}
             more={queue.length > 0 ? { label: `View all (${metrics.active})`, onClick: () => onRegistry('all', { scope: 'mine' }) } : undefined} />
@@ -127,6 +100,33 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
                 })}
               </ul>}
         </section>
+        <section className="hd-panel hd-collab" aria-labelledby="hd-comments">
+          <div className="hd-head">
+            <Tile tone="accent"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z" /></Tile>
+            <div><h2 id="hd-comments">Comments &amp; mentions</h2><small>On your work</small></div>
+            <button type="button" className={`hd-unread ${unseen.count ? 'has-unseen' : ''}`} onClick={onUnseen}
+              aria-label={unseen.count ? `Inbox: ${unseen.count} unread across all updates — open inbox` : 'Inbox: all caught up — open inbox'} title={unseen.latest ? `Latest in your inbox: ${unseen.latest}` : 'Open inbox'}>
+              {unseen.count ? <>Inbox · <b>{unseen.count > 99 ? '99+' : unseen.count}</b> unread</> : 'Inbox · caught up'}
+              <Chevron />
+            </button>
+          </div>
+          {collab.length === 0
+            ? <p className="hd-quiet">No comments or mentions on your work yet. Comments on tasks you’re part of and @mentions of you land here.</p>
+            : <ul className="hd-list hd-feed">
+                {collab.map(item => (
+                  <li key={item.id}>
+                    <button type="button" className={`hd-act ${item.unread ? 'is-unread' : ''}`} onClick={() => (item.channelId ? onOpenMention(item) : item.taskId && onOpen(item.taskId))}>
+                      <Initial state={state} id={item.from} />
+                      <span className="t"><b>{firstName(state, item.from, 'Someone')}</b> {COLLAB_VERB[item.kind]} <span className="q">{item.context.replace(/^Mentioned you in /, '')}</span><small>{item.text}</small></span>
+                      <time dateTime={new Date(item.at).toISOString()}>{ago(item.at, now)}</time>
+                    </button>
+                  </li>
+                ))}
+              </ul>}
+        </section>
+      </div>
+
+      <div className="hd-row3 is-pair">
 
         <section className="hd-panel" aria-labelledby="hd-risk">
           <PanelHead id="hd-risk" title="At risk" sub="Needs attention" tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />}
@@ -145,58 +145,6 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
               </ul>}
         </section>
 
-        <section className="hd-panel" aria-labelledby="hd-team">
-          <PanelHead id="hd-team" title="Team workload" sub="Assigned work distribution" tone="act"
-            icon={<path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" />}
-            more={company ? { label: 'View team', onClick: onTeam } : undefined} />
-          {!company
-            ? <p className="hd-quiet">Team workload is hidden while your access is limited to your own work.</p>
-            : workload.length === 0
-              ? <p className="hd-quiet">Nobody has open work right now.</p>
-              : <>
-                  <ul className="hd-list">
-                    {workload.slice(0, 5).map(item => {
-                      const max = workload[0]!.open;
-                      return (
-                        <li key={item.person}>
-                          <button type="button" className="hd-person" onClick={() => onRegistry('all', { scope: 'company', owner: item.person })}
-                            aria-label={`${item.name}: ${item.open} open — ${item.byStatus.working} in progress, ${item.byStatus.review} in review, ${item.byStatus.ready} not started, ${item.byStatus.blocked} blocked${item.attention ? `; ${item.attention} need attention` : ''}`}>
-                            <Initial state={state} id={item.person} /><b className="n">{item.name}</b>
-                            <b className="cnt">{item.open}</b>
-                            <span className="hd-dist" aria-hidden="true"><span style={{ width: `${Math.max(8, Math.round((item.open / max) * 100))}%` }}>
-                              {(['working', 'review', 'ready', 'blocked'] as const).map(key => item.byStatus[key] > 0 && <i key={key} className={`s-${key}`} style={{ flexGrow: item.byStatus[key] }} />)}
-                            </span></span>
-                            {item.attention > 0 ? <span className="late" title="Overdue, blocked or waiting">{item.attention}!</span> : <span className="late" />}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  <p className="hd-legend" aria-hidden="true"><span><i className="s-working" />In progress</span><span><i className="s-review" />Review</span><span><i className="s-ready" />Not started</span><span><i className="s-blocked" />Blocked</span></p>
-                  <p className="hd-fine">Open tasks per person. Task counts aren’t hours or capacity.</p>
-                </>}
-        </section>
-      </div>
-
-      <div className="hd-row3 is-bottom">
-        <section className="hd-panel" aria-labelledby="hd-proj">
-          <PanelHead id="hd-proj" title="Projects overview" sub="Your work" tone="act" icon={<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />} />
-          <div className="hd-proj">
-            <div className="hd-donut" style={{ ['--done' as string]: `${pct(mix.done, mix.total)}%`, ['--working' as string]: `${pct(mix.done + mix.working, mix.total)}%` }} data-empty={mix.total === 0 || undefined}
-              role="img" aria-label={`${mix.percent}% complete: ${mix.done} completed, ${mix.working} in progress, ${mix.notStarted} not started`}>
-              <div><b>{mix.percent}<i>%</i></b><small>COMPLETE</small></div>
-            </div>
-            <div className="hd-proj-legend">
-              {([['In progress', mix.working, 'var(--act)', ['working', 'blocked', 'review']], ['Completed', mix.done, 'var(--accent)', 'done'], ['Not started', mix.notStarted, '#c4c4c8', 'ready']] as const).map(([label, value, color, status]) => (
-                <button key={label} type="button" className="hd-prog" onClick={() => onRegistry('all', { scope: 'mine', status: Array.isArray(status) ? [...status] : status as RegistryQuery['status'] })}>
-                  <div><span><i style={{ background: color }} />{label}</span><b>{value}</b></div>
-                  <div className="track"><span style={{ width: `${pct(value, mix.total)}%`, background: color }} /></div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
         <section className="hd-panel" aria-labelledby="hd-activity">
           <PanelHead id="hd-activity" title="Team activity" sub={company ? 'Recent · all work you can see' : 'Recent · your work'} tone="neutral" icon={<path d="M3 12h4l3-8 4 16 3-8h4" />}
             more={{ label: 'View all', onClick: onActivity }} />
@@ -206,6 +154,11 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
                 {activity.map(event => <li key={event.id}><Recent event={event} quest={quest} onOpen={onOpen} /></li>)}
               </ul>}
         </section>
+      </div>
+
+      <div className="hd-row3 is-bottom is-intel">
+        <ProjectTeam quest={quest} company={company} onOpen={onOpen} />
+
 
         <CultureSpotlight items={culture} />
       </div>
@@ -216,12 +169,13 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
 const COLLAB_VERB: Record<CollabItem['kind'], string> = { comment: 'commented on', mention: 'mentioned you in', reply: 'replied on' };
 
 /** Momentum greeting with the architectural treatment, kept to a compact height. */
-function Hero({ eyebrow, primary, support, children }: { eyebrow: string; primary: string; support: string; children: ReactNode }) {
+function Hero({ eyebrow, primary, support, banner, children }: { eyebrow: string; primary: string; support: string; banner: ReturnType<typeof useBanner>; children: ReactNode }) {
+  const look = bannerLook(banner.banner);
   const [date, time] = eyebrow.split(' · ');
   const words = primary.split(' ');
   const split = words.length >= 4 ? words.length - 2 : words.length;
   return (
-    <header className="hd-hero">
+    <header className={`hd-hero ${look.className}`} style={look.style}>
       <div className="hd-hero-copy">
         <p className="hd-hero-eyebrow"><span>{date}</span>{time && <span className="hd-greet"><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={time === 'Evening' ? 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z' : 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'} /></svg>Good {time.toLowerCase()}</span>}</p>
         <h1>{words.slice(0, split).join(' ')}{split < words.length && <> <b>{words.slice(split).join(' ')}</b></>}</h1>
@@ -246,6 +200,7 @@ function Hero({ eyebrow, primary, support, children }: { eyebrow: string; primar
         </svg>
         <p className="hd-hero-tag">{PRODUCT.tagline}</p>
       </div>
+      {banner.adjusting ? <BannerAdjust {...banner} /> : <BannerEditor {...banner} />}
     </header>
   );
 }
@@ -260,13 +215,22 @@ function PanelHead({ id, title, sub, tone, icon, more }: { id: string; title: st
   );
 }
 
+/** A plate tile. It leans a few pixels toward the pointer and springs back (off with reduced motion). */
 function Metric({ value, label, sub, tone, icon, onClick }: { value: number; label: string; sub?: string; tone: 'accent' | 'ok' | 'stop' | 'warn'; icon: ReactNode; onClick: () => void }) {
+  const reduce = useReducedMotion();
+  const x = useSpring(0, { stiffness: 300, damping: 20 }), y = useSpring(0, { stiffness: 300, damping: 20 });
+  const lean = (event: PointerEvent<HTMLButtonElement>) => {
+    if (reduce || event.pointerType !== 'mouse') return;
+    const r = event.currentTarget.getBoundingClientRect();
+    x.set((event.clientX - r.left - r.width / 2) * 0.08); y.set((event.clientY - r.top - r.height / 2) * 0.08);
+  };
   return (
-    <button type="button" className={`hd-metric tone-${tone} ${value ? 'has-value' : ''}`} onClick={onClick}>
+    <motion.button type="button" className={`hd-metric tone-${tone} ${value ? 'has-value' : ''}`} onClick={onClick} style={{ x, y }}
+      onPointerMove={lean} onPointerLeave={() => { x.set(0); y.set(0); }} whileTap={reduce ? undefined : { scale: 0.97 }}>
       <span className="hd-metric-top"><b>{value}</b><svg className="icon" viewBox="0 0 24 24" aria-hidden="true">{icon}</svg></span>
       <span className="lbl">{label}</span>
       {sub && <span className="sub">{sub}</span>}
-    </button>
+    </motion.button>
   );
 }
 
@@ -349,5 +313,3 @@ function Recent({ event, quest, onOpen }: { event: QuestEvent; quest: Quest; onO
   </>;
   return task ? <button type="button" className="hd-act" onClick={() => onOpen(task.id)}>{body}</button> : <div className="hd-act">{body}</div>;
 }
-
-const pct = (part: number, total: number) => (total ? Math.round((part / total) * 100) : 0);

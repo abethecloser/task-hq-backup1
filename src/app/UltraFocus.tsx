@@ -107,7 +107,7 @@ export function FocusControl({ quest, onOpen }: { quest: Quest; onOpen: (id: str
           )}
         </div>
       ))}
-      <p className="boundary">{quest.backend.kind === 'live' ? LIVE_ENFORCEMENT_NOTE : ENFORCEMENT_NOTE} Policy: {state.policy.ultraScope === 'manager-context' ? 'only the activating manager decides requests' : 'any approver decides requests'} (change in Policy & data).</p>
+      <p className="boundary">{quest.backend.kind === 'live' ? LIVE_ENFORCEMENT_NOTE : ENFORCEMENT_NOTE} Policy: {state.policy.ultraScope === 'manager-context' ? 'only the activating manager decides requests' : 'any approver decides requests'} (change in Settings → Policy & access).</p>
       <FocusHistory quest={quest} />
     </details>
   );

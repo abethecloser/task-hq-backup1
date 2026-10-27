@@ -84,15 +84,18 @@ export function AssigneeSelect({ quest, task, short = false }: { quest: Quest; t
 
 export function DueInput({ quest, task, overdue = false }: { quest: Quest; task: Task; overdue?: boolean }) {
   const { state, actor, dispatch } = quest;
+  // Shows the chosen date at once while the save is in flight; a refused save falls back to the stored date.
+  const [pending, setPending] = useState<string | null>(null);
   const editable = canEditTask(state, task, actor) && !lockedTaskFields(state, task, actor) && task.status !== 'done';
   if (!editable) return <span className={`due-text ${overdue ? 'text-danger' : ''}`}>{task.due ? shortDate(task.due, localDate(quest.now)) : '—'}</span>;
   return (
-    <input type="date" className={`inline-date ${overdue ? 'is-overdue' : ''}`} value={task.due} aria-label="Due date" {...stop}
+    <input type="date" className={`inline-date ${overdue ? 'is-overdue' : ''}`} value={pending ?? task.due} aria-label="Due date" aria-busy={pending !== null} {...stop}
       onChange={event => {
         const due = event.target.value;
+        setPending(due);
         void dispatch({ type: 'task/update', id: task.id, changes: { due,
           ...(!due && task.dueTime && quest.backend.supports?.taskTaxonomy !== false ? { dueTime: '' } : {}),
-        } });
+        } }).finally(() => setPending(current => (current === due ? null : current)));
       }} />
   );
 }

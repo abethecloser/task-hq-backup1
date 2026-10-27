@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 // Notifications, in a drawer on the right (where the bell is). It holds the same Inbox, Attention
 // and Activity lists as before. Selecting a task notification from the Inbox opens that task's
 // existing conversation here (context, comments with @mentions, and an inline reply) without
@@ -18,11 +19,12 @@ import { Awareness } from './Awareness.tsx';
 import type { SidebarControl } from './Sidebar.tsx';
 import { CommentReply, EventFeed, canReply, isComment, taskEvents } from './TaskComments.tsx';
 
-export function NotificationDrawer({ quest, control, inbox, attention, data, detailsAllowed = true, open: visible, threadAllowed, onClose, onOpenTask, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity }: {
+export function NotificationDrawer({ quest, control, inbox, attention, data, detailsAllowed = true, open: visible, threadAllowed, onClose, onOpenTask, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity, embedded = false }: {
   quest: Quest; control: SidebarControl; inbox: UniversalInbox; attention: Attention; data?: InboxData; detailsAllowed?: boolean; open: boolean;
   /** False for a task outside the person's Critical Focus: its thread is not shown. */
   threadAllowed: (taskId: string) => boolean;
   onClose: () => void; onOpenTask: (id: string) => void; onOpenLead: (id: string) => void; onOpenInbox: () => void; onOpenAttention: () => void; onOpenActivity: () => void;
+  /** Rendered inside the shared right panel (App owns the drawer), not as its own drawer. */ embedded?: boolean;
 }) {
   const [thread, setThread] = useState<string | null>(null);
   const [item, setItem] = useState<InboxItem | null>(null);
@@ -36,7 +38,7 @@ export function NotificationDrawer({ quest, control, inbox, attention, data, det
     ? channelsFor(data.messaging, quest.actor).find(entry => entry.id === item.channelId) : null;
 
   return (
-    <EdgeDrawer id="notifications-edge-drawer" open={visible} label="Notifications" className="context context-signals notify-drawer is-drawer" onClose={onClose}>
+    <Shell embedded={embedded} open={visible} onClose={onClose}>
       {(item || leadId) ? <>
         <header className="context-head"><button type="button" className="btn btn-ghost" onClick={back}>Back to notifications</button><button type="button" className="icon-btn" aria-label="Close notifications" onClick={onClose}>×</button></header>
         <div className="context-body">
@@ -46,7 +48,7 @@ export function NotificationDrawer({ quest, control, inbox, attention, data, det
         </div>
       </> :
       thread
-        ? <Thread quest={quest} taskId={thread} allowed={threadAllowed(thread)} onBack={() => setThread(null)} onClose={onClose} onOpenTask={id => { onOpenTask(id); onClose(); }} />
+        ? <Thread quest={quest} taskId={thread} allowed={threadAllowed(thread)} onBack={() => setThread(null)} onClose={onClose} onOpenTask={id => { onOpenTask(id); if (control.isMobile) onClose(); }} />
         : <>
             <header className="context-head"><span className="context-label">Notifications</span><button type="button" className="icon-btn" aria-label="Close notifications" onClick={onClose}>×</button></header>
             <div className="context-body notify-body">
@@ -56,7 +58,7 @@ export function NotificationDrawer({ quest, control, inbox, attention, data, det
                 onOpenInbox={() => { onOpenInbox(); onClose(); }} onOpenAttention={() => { onOpenAttention(); onClose(); }} onOpenActivity={() => { onOpenActivity(); onClose(); }} />
             </div>
           </>}
-    </EdgeDrawer>
+    </Shell>
   );
 }
 
@@ -99,4 +101,11 @@ export function Thread({ quest, taskId, allowed, onBack, onClose, onOpenTask }: 
       )}
     </>
   );
+}
+
+/** Its own drawer when standalone; a plain region inside the shared right panel when embedded. */
+function Shell({ embedded, open, onClose, children }: { embedded: boolean; open: boolean; onClose: () => void; children: ReactNode }) {
+  return embedded
+    ? <div className="context context-signals notify-drawer is-drawer right-mode" role="region" aria-label="Notifications">{children}</div>
+    : <EdgeDrawer id="notifications-edge-drawer" open={open} label="Notifications" className="context context-signals notify-drawer is-drawer" onClose={onClose}>{children}</EdgeDrawer>;
 }
