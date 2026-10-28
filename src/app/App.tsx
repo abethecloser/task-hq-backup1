@@ -19,7 +19,7 @@ import type { Quest } from '../ui/useQuest.ts';
 import { AllTasks, useRegistryPrefs } from './AllTasks.tsx';
 import type { RegistryPreset } from './AllTasks.tsx';
 import { CompanyWork } from './CompanyWork.tsx';
-import { CalendarPage, CalendarSidebar } from './ContextPanel.tsx';
+import { CalendarPage, Signals as CalendarSidebar } from './ContextPanel.tsx';
 import { TaskPage } from './TaskPage.tsx';
 import type { DeckSection } from './ContextPanel.tsx';
 import { CreateTask } from './CreateTask.tsx';
@@ -79,6 +79,8 @@ const SIGNAL_PANEL = 288;
 const MIN_CANVAS = 600;
 /** With the left panel open too, the canvas may narrow further before the right panel overlays. */
 const MIN_CANVAS_BOTH = 480;
+
+export { CalendarSidebar };
 
 function parseHash(): { view: View; taskId: string | null; leadId: string | null; feedbackId: string | null; lens: { lens: Lens; changes?: Partial<RegistryQuery> } | null } {
   const [, first = '', second = ''] = location.hash.split('?')[0]!.split('/');
@@ -155,6 +157,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const collapseSidebar = sidebar.collapse;
   const width = useViewportWidth();
   const [contextPref, setContextPref] = useContextPref(actor);
+  const [deckSection, setDeckSection] = useDeckSection(actor);
   /** The deck as a drawer, when it was asked for but can't dock beside the canvas. */
   const [deckDrawer, setDeckDrawer] = useState(false);
 
@@ -433,6 +436,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       {(showSignals || showDeckDrawer) && <>
         {showDeckDrawer && <button className="scrim" aria-label="Close instrument deck" onClick={closeDeck} />}
         <CalendarSidebar quest={quest} notifications={notifications} company={company} docked={showSignals}
+          section={deckSection} onSection={setDeckSection}
+          onLens={(lens, filter) => { setDeckDrawer(false); openRegistry(lens, filter === 'blocked' ? { status: 'blocked' } : filter === 'unowned' ? { owner: 'none' } : undefined); }}
+          onRegistry={(lens, changes) => { setDeckDrawer(false); openRegistry(lens, changes); }}
           onOpenNotification={note => { setDeckDrawer(false); openNotification(note); }} onOpenTask={id => { setDeckDrawer(false); openTask(id); }}
           onClose={closeDeck} onExpandCalendar={() => { setDeckDrawer(false); go('calendar'); }}
           onCreate={canCreate ? due => { setDeckDrawer(false); createOn(due); } : undefined} />
