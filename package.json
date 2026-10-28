@@ -17,7 +17,8 @@
     "test:intake:ui": "node scripts/verify-intake-ui.mjs",
     "check:server": "node scripts/sync-functions.mjs && tsc -p tsconfig.server.json",
     "test:integration:db": "node scripts/intake-db/run.mjs",
-    "test:db": "node --test tests/db/*.test.ts"
+    "test:db": "node --test tests/db/*.test.ts",
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "@fontsource/hanken-grotesk": "5.3.0",
