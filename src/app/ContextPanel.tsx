@@ -101,7 +101,6 @@ export function CalendarPullout({ quest, company, onOpenTask, onExpandCalendar, 
   return (
     <section className="pullout-calendar" aria-label="Calendar quick view">
       <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={false} onExpand={onExpandCalendar} onCreate={onCreate} />
-      <button type="button" className="btn btn-ghost btn-sm pullout-full" onClick={onExpandCalendar}>Open full calendar</button>
     </section>
   );
 }

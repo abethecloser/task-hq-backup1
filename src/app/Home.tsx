@@ -1,10 +1,9 @@
 import { useMomentum } from '../ui/useMomentum.ts';
 import { useMemo, useState } from 'react';
-import type { PointerEvent, ReactNode } from 'react';
-import { motion, useReducedMotion, useSpring } from 'motion/react';
+import type { ReactNode } from 'react';
 import type { QuestEvent, QuestState } from '../core/contract.ts';
 import { compose } from '../core/compose.ts';
-import { ago, atRisk, collaboration, homeMetrics, teamActivity, todayProgress } from '../core/dashboard.ts';
+import { ago, atRisk, collaboration, homeMetrics, teamActivity } from '../core/dashboard.ts';
 import type { CollabItem, MentionSource } from '../core/dashboard.ts';
 import { CULTURE_CONTENT, CULTURE_SLOTS } from '../core/culture.ts';
 import type { CultureItem, CultureSlot } from '../core/culture.ts';
@@ -42,7 +41,6 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const queue = useMemo(() => { const { primary, queue: rest } = compose(state, actor, minute); return [primary, ...rest].filter(item => item.taskId || item.leadId); }, [state, actor, minute]);
   const metrics = homeMetrics(state, actor, minute);
-  const progress = todayProgress(state, actor, minute);
   const risks = atRisk(state, actor, minute, company);
   const collab = collaboration(state, actor, company, mentions, read, 4);
   const activity = teamActivity(state, actor, company, 5);
@@ -65,15 +63,8 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
         {next && <button type="button" className="btn btn-primary btn-sm" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}>{nextLabel}</button>}
       </Hero>
 
-      {/* Your plate (four tiles) · what to do next · who is talking to you. */}
+      {/* What to do next and who is talking to you. */}
       <div className="hd-top">
-        <div className="hd-metrics" role="group" aria-label="Your plate">
-          <Metric value={metrics.active} label="Active items" tone="accent" icon={<path d="M5 20v-6M10 20V9M15 20v-9M20 20V5" />} onClick={() => onRegistry('all', { scope: 'mine' })} />
-          <Metric value={metrics.completedToday} label="Completed today" tone="ok" sub={progress.total ? `${progress.done} of ${progress.total} on today’s plate` : undefined}
-            icon={<path d="M3 17l6-6 4 4 8-8M15 7h6v6" />} onClick={() => onRegistry('all', { scope: 'mine', status: 'done' })} />
-          <Metric value={metrics.overdue} label="Overdue" tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />} onClick={() => onRegistry('overdue', { scope: 'mine' })} />
-          <Metric value={metrics.blocked} label="Blocked" tone="warn" sub="marked blocked" icon={<path d="M5 12h14" />} onClick={() => onRegistry('all', { scope: 'mine', status: 'blocked' })} />
-        </div>
         <section className="hd-panel" aria-labelledby="hd-next">
           <PanelHead id="hd-next" title="Up next" sub="Your queue · by priority & due date" tone="accent" icon={<path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5" />}
             more={queue.length > 0 ? { label: `View all (${metrics.active})`, onClick: () => onRegistry('all', { scope: 'mine' }) } : undefined} />
@@ -212,25 +203,6 @@ function PanelHead({ id, title, sub, tone, icon, more }: { id: string; title: st
       <div><h2 id={id}>{title}</h2><small>{sub}</small></div>
       {more && <button type="button" className="hd-more" onClick={more.onClick}>{more.label}<Chevron /></button>}
     </div>
-  );
-}
-
-/** A plate tile. It leans a few pixels toward the pointer and springs back (off with reduced motion). */
-function Metric({ value, label, sub, tone, icon, onClick }: { value: number; label: string; sub?: string; tone: 'accent' | 'ok' | 'stop' | 'warn'; icon: ReactNode; onClick: () => void }) {
-  const reduce = useReducedMotion();
-  const x = useSpring(0, { stiffness: 300, damping: 20 }), y = useSpring(0, { stiffness: 300, damping: 20 });
-  const lean = (event: PointerEvent<HTMLButtonElement>) => {
-    if (reduce || event.pointerType !== 'mouse') return;
-    const r = event.currentTarget.getBoundingClientRect();
-    x.set((event.clientX - r.left - r.width / 2) * 0.08); y.set((event.clientY - r.top - r.height / 2) * 0.08);
-  };
-  return (
-    <motion.button type="button" className={`hd-metric tone-${tone} ${value ? 'has-value' : ''}`} onClick={onClick} style={{ x, y }}
-      onPointerMove={lean} onPointerLeave={() => { x.set(0); y.set(0); }} whileTap={reduce ? undefined : { scale: 0.97 }}>
-      <span className="hd-metric-top"><b>{value}</b><svg className="icon" viewBox="0 0 24 24" aria-hidden="true">{icon}</svg></span>
-      <span className="lbl">{label}</span>
-      {sub && <span className="sub">{sub}</span>}
-    </motion.button>
   );
 }
 
