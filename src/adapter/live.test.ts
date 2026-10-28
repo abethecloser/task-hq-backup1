@@ -54,12 +54,72 @@ test('an HTTP failure cannot be reported as a saved task even with a success-sha
  assert.equal(result.ok,false);assert.equal(result.state.rev,1);
 });
 
+for (const status of [401, 500]) {
+ test(`a failed HTTP ${status} load cannot replace confirmed task state or capabilities`, async t => {
+  const f = fixture();
+  let loads = 0;
+  let expectedRev: unknown;
+  t.mock.method(globalThis, 'fetch', async (_url: unknown, init: { body: string }) => {
+   const body = JSON.parse(init.body);
+   if (body.op === 'load') {
+    loads += 1;
+    if (loads === 2) return new Response(JSON.stringify({ ok: true, state, rev: 99, contract: 6 }), { status });
+    return new Response(JSON.stringify({ ok: true, state, rev: loads === 1 ? 1 : 2, contract: 5 }));
+   }
+   expectedRev = body.expectedRev;
+   return new Response(JSON.stringify({ ok: false, error: 'Synthetic refusal' }), { status: 403 });
+  });
+  await f.backend.load();
+  await assert.rejects(f.backend.load(), /Could not load the workspace/);
+  const refused = await f.backend.dispatch({ type: 'task/comment', id: 't', note: 'Keep confirmed work' }, 'actor');
+  assert.equal(refused.ok, false);
+  assert.equal(refused.state.rev, 1, 'failed load did not poison the cached revision');
+  assert.equal(expectedRev, 1, 'later task writes retain the last confirmed revision');
+  assert.equal(f.backend.supports?.taskArchive, false, 'failed reply cannot advertise new capabilities');
+  assert.equal((await f.backend.load()).rev, 2, 'a subsequent valid load still recovers');
+ });
+}
+
+test('a failed tick cannot replace confirmed task state used by the next write', async t => {
+ const f = fixture();
+ let expectedRev: unknown;
+ t.mock.method(globalThis, 'fetch', async (_url: unknown, init: { body: string }) => {
+  const body = JSON.parse(init.body);
+  if (body.op === 'load') return new Response(JSON.stringify({ ok: true, state, rev: 1, contract: 5 }));
+  if (body.op === 'tick') return new Response(JSON.stringify({ ok: true, state, rev: 99, contract: 6 }), { status: 500 });
+  expectedRev = body.expectedRev;
+  return new Response(JSON.stringify({ ok: false, error: 'Synthetic refusal' }), { status: 403 });
+ });
+ await f.backend.load();
+ await f.backend.tick();
+ const refused = await f.backend.dispatch({ type: 'task/comment', id: 't', note: 'Keep confirmed work' }, 'actor');
+ assert.equal(refused.state.rev, 1);
+ assert.equal(expectedRev, 1);
+ assert.equal(f.backend.supports?.taskArchive, false);
+});
+
+test('a successful tick still advances the confirmed state for later task writes', async t => {
+ const f = fixture();
+ let expectedRev: unknown;
+ t.mock.method(globalThis, 'fetch', async (_url: unknown, init: { body: string }) => {
+  const body = JSON.parse(init.body);
+  if (body.op === 'load' || body.op === 'tick') return new Response(JSON.stringify({ ok: true, state, rev: body.op === 'load' ? 1 : 2, contract: 5 }));
+  expectedRev = body.expectedRev;
+  return new Response(JSON.stringify({ ok: false, error: 'Synthetic refusal' }), { status: 403 });
+ });
+ await f.backend.load();
+ await f.backend.tick();
+ const refused = await f.backend.dispatch({ type: 'task/comment', id: 't', note: 'Use confirmed update' }, 'actor');
+ assert.equal(refused.state.rev, 2);
+ assert.equal(expectedRev, 2);
+});
+
 test('a v5 server opens the gated features; a later reply without a contract closes them again',async t=>{
  const f=fixture();const bodies:Record<string,unknown>[]=[];let contract:number|undefined=5;
  t.mock.method(globalThis,'fetch',async(_url:unknown,init:{body:string})=>{bodies.push(JSON.parse(init.body));return new Response(JSON.stringify({ok:true,state,rev:bodies.length,...(contract?{contract}:{})}));});
  assert.equal(f.backend.supports?.taskTaxonomy,false,'closed until the server says otherwise');
  await f.backend.load();
- assert.deepEqual(f.backend.supports,{taskTaxonomy:true,taskReopen:true,leadOwnership:true,workLabels:true,structuredReferences:true});
+ assert.deepEqual(f.backend.supports,{taskTaxonomy:true,taskReopen:true,leadOwnership:true,workLabels:true,structuredReferences:true,taskArchive:false});
  const drafts=[{text:'@Synthetic owner',spans:[{kind:'person',id:'actor',workspaceId:'synthetic',start:0,end:16,label:'@Synthetic owner'}]}];
  for(const action of [{type:'task/reopen',id:'t',note:'Leak returned'},{type:'task/update',id:'t',changes:{tags:['permits'],dueTime:'09:00'}},{type:'task/comment',id:'t',note:'@Synthetic owner',referenceDrafts:drafts}] as unknown as import('../core/contract.ts').Action[]){
   const result=await f.backend.dispatch(action,'actor');assert.equal(result.ok,true,action.type);assert.deepEqual(bodies.at(-1)!.action,action,'sent unchanged');
@@ -75,4 +135,13 @@ test('a gateway error without a contract does not close features a v5 server ope
  await f.backend.load();status=401;
  const failed=await f.backend.dispatch({type:'task/comment',id:'t',note:'x'},'actor');assert.equal(failed.ok,false);
  assert.equal(f.backend.supports?.taskReopen,true);
+});
+
+test('archiving opens only on a v6 server and is refused before sending otherwise',async t=>{
+ const f=fixture();let contract=5;const bodies:Record<string,unknown>[]=[];
+ t.mock.method(globalThis,'fetch',async(_url:unknown,init:{body:string})=>{bodies.push(JSON.parse(init.body));return new Response(JSON.stringify({ok:true,state,rev:bodies.length,contract}));});
+ await f.backend.load();assert.equal(f.backend.supports?.taskArchive,false);
+ const refused=await f.backend.dispatch({type:'task/archive',id:'t'},'actor');assert.equal(refused.ok,false);assert.equal(bodies.length,1,'nothing sent');
+ contract=6;await f.backend.load();assert.equal(f.backend.supports?.taskArchive,true);
+ const sent=await f.backend.dispatch({type:'task/archive',id:'t'},'actor');assert.equal(sent.ok,true);assert.deepEqual(bodies.at(-1)!.action,{type:'task/archive',id:'t'});
 });
