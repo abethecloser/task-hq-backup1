@@ -6,14 +6,16 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
 import type { EditableTaskFields, Task } from '../core/contract.ts';
 import { canEditTask, canReopenTask, lockedTaskFields } from '../core/permissions.ts';
-import { blockingDeps, dependents, firstName, isOpen, isOverdue, leadById, nameOf, moveForwardPlan, projectName, taskById } from '../core/selectors.ts';
+import { blockingDeps, dependents, firstName, isOpen, isOverdue, leadById, moveForwardPlan, nameOf, projectName, taskById } from '../core/selectors.ts';
+import { completionDetails } from '../core/completed.ts';
 import { Avatar, PersonSelect, TaskTags } from '../ui/components.tsx';
 import { useFeedbackRecord } from '../ui/Feedback.tsx';
-import { ReferenceInput, ReferenceTextarea, ReferencedText } from '../ui/ReferenceEditor.tsx';
+import { ReferenceInput, ReferenceTextarea } from '../ui/ReferenceEditor.tsx';
 import { Select } from '../ui/Select.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import { AssigneeSelect, DueInput, PrioritySelect, StatusMenu } from './TaskControls.tsx';
 import { TaskSituation } from './WorkSurface.tsx';
+import { CommentReply, EventFeed, isComment } from './TaskComments.tsx';
 
 const when = (at: number) => new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const isFormField = (target: EventTarget) => target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable="true"]');
@@ -26,7 +28,6 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
   const [nextAction, setNextAction] = useState(task.nextAction);
   const [description, setDescription] = useState(task.description);
   const [waitingOn, setWaitingOn] = useState(task.waitingOn);
-  const [comment, setComment] = useState('');
   const [tab, setTab] = useState<'comments' | 'activity' | 'history'>('comments');
   const feedback = useFeedbackRecord(task.id);
   const back = useRef<HTMLButtonElement>(null);
@@ -45,18 +46,13 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
   const unlocks = dependents(state, task);
   const candidates = state.tasks.filter(item => (item.id !== task.id && item.status !== 'done') || task.dependsOn.includes(item.id));
   const events = state.events.filter(event => event.taskId === task.id);
-  const comments = events.filter(event => / commented: /.test(event.text));
-  const historyEvents = events.filter(event => !/ commented: /.test(event.text));
+  const comments = events.filter(isComment);
+  const historyEvents = events.filter(event => !isComment(event));
   const feed = tab === 'comments' ? comments : tab === 'history' ? historyEvents : events;
   const created = events.find(event => event.text.includes('created'));
   const people = state.people.filter(item => item.role !== 'reviewer');
   const watching = task.watchers.includes(actor);
 
-  async function addComment(event: FormEvent) {
-    event.preventDefault();
-    const result = await dispatch({ type: 'task/comment', id: task.id, note: comment });
-    if (result.ok) { setComment(''); setTab('comments'); }
-  }
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === 'Escape' && !event.defaultPrevented && !isFormField(event.target)) { event.stopPropagation(); onClose(); }
   }
@@ -122,13 +118,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             {lead && <div className="callout"><b>Lead</b> {lead.name} · {lead.phone} · {lead.address}</div>}
           </section>
           <section className="tp-card" aria-labelledby="tp-people">
-            <h2 id="tp-people" className="ctx-label">People</h2>
-            <dl className="tp-people">
-              <div><dt>Next-step owner</dt><dd>{editable ? <PersonSelect state={state} label="Next-step owner" value={task.nextOwner} onChange={id => void update({ nextOwner: id })} /> : task.nextOwner ? nameOf(state, task.nextOwner) : '—'}</dd></div>
-              <div><dt>Approver</dt><dd>{editable ? <PersonSelect state={state} label="Approver" value={task.approver} emptyLabel="No approval needed" onChange={id => void update({ approver: id })} /> : task.approver ? nameOf(state, task.approver) : 'None'}</dd></div>
-              {(editable || task.decisionOwner) && <div><dt>Decision owner</dt><dd>{editable ? <PersonSelect state={state} label="Decision owner" value={task.decisionOwner} onChange={id => void update({ decisionOwner: id })} /> : nameOf(state, task.decisionOwner)}</dd></div>}
-            </dl>
-            <h3 className="ctx-label tp-sub">Watchers <span>{task.watchers.length}</span></h3>
+            <h2 id="tp-people" className="ctx-label">Watchers <span>{task.watchers.length}</span></h2>
             <ul className="tp-watchers">
               {task.watchers.map(id => (
                 <li key={id}><Avatar state={state} id={id} size="sm" />{id === actor ? 'You' : nameOf(state, id, 'Former member')}
@@ -160,23 +150,32 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             </section>
           )}
 
-          {editable && (
-            <details className="tp-card drawer-details">
-              <summary>More details</summary>
-              <div className="roles">
-                {quest.backend.supports?.taskTaxonomy !== false && <>
-                  <label className="field"><span>Time</span><input type="time" value={task.dueTime ?? ''} disabled={!task.due || locked} onChange={event => void update({ dueTime: event.target.value || undefined })} /></label>
-                  {(state.taxonomy?.types.length ?? 0) > 0 && <label className="field"><span>Type</span><Select value={task.type ?? ''} onChange={event => void update({ type: event.target.value || undefined })}><option value="">No type</option>{state.taxonomy!.types.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</Select></label>}
-                  <label className="field"><span>Tags</span><input defaultValue={(task.tags ?? []).join(' ')} placeholder="permits safety" onBlur={event => { const tags = event.target.value.split(/[\s,]+/).map(tag => tag.replace(/^#/, '').toLowerCase()).filter(Boolean); if (tags.join(' ') !== (task.tags ?? []).join(' ')) void update({ tags }); }} /></label>
-                </>}
-              </div>
-              <details className="deps">
-                <summary>Depends on ({task.dependsOn.length})</summary>
-                {candidates.map(item => <label key={item.id} className={`dep-check ${item.status === 'done' ? 'is-completed' : ''}`}><input type="checkbox" checked={task.dependsOn.includes(item.id)} onChange={() => void update({ dependsOn: toggle(task.dependsOn, item.id) })} />{item.title}</label>)}
-              </details>
-              {task.dependsOn.some(id => !taskById(state, id)) && <p className="muted">A dependency was removed.</p>}
-            </details>
-          )}
+          <details className="tp-card drawer-details">
+            <summary>More details <small>routing, lifecycle{editable ? ', time, tags, dependencies' : ''}</small></summary>
+            <section className="tp-routing" aria-label="Advanced routing">
+              <h3 className="ctx-label tp-sub">Advanced routing</h3>
+              <dl className="tp-people">
+                <div><dt>Next-step owner</dt><dd>{editable ? <PersonSelect state={state} label="Next-step owner" value={task.nextOwner} onChange={id => void update({ nextOwner: id })} /> : task.nextOwner ? nameOf(state, task.nextOwner) : '—'}</dd></div>
+                <div><dt>Approver</dt><dd>{editable ? <PersonSelect state={state} label="Approver" value={task.approver} emptyLabel="No approval needed" onChange={id => void update({ approver: id })} /> : task.approver ? nameOf(state, task.approver) : 'None'}</dd></div>
+                {(editable || task.decisionOwner) && <div><dt>Decision owner</dt><dd>{editable ? <PersonSelect state={state} label="Decision owner" value={task.decisionOwner} onChange={id => void update({ decisionOwner: id })} /> : nameOf(state, task.decisionOwner)}</dd></div>}
+              </dl>
+            </section>
+            <LifecycleReference task={task} />
+            {editable && <>
+                <div className="roles">
+                  {quest.backend.supports?.taskTaxonomy !== false && <>
+                    <label className="field"><span>Time</span><input type="time" value={task.dueTime ?? ''} disabled={!task.due || locked} onChange={event => void update({ dueTime: event.target.value })} /></label>
+                    {(state.taxonomy?.types.length ?? 0) > 0 && <label className="field"><span>Type</span><Select value={task.type ?? ''} onChange={event => void update({ type: event.target.value })}><option value="">No type</option>{state.taxonomy!.types.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</Select></label>}
+                    <label className="field"><span>Tags</span><input defaultValue={(task.tags ?? []).join(' ')} placeholder="permits safety" onBlur={event => { const tags = event.target.value.split(/[\s,]+/).map(tag => tag.replace(/^#/, '').toLowerCase()).filter(Boolean); if (tags.join(' ') !== (task.tags ?? []).join(' ')) void update({ tags }); }} /></label>
+                  </>}
+                </div>
+                <details className="deps">
+                  <summary>Depends on ({task.dependsOn.length})</summary>
+                  {candidates.map(item => <label key={item.id} className={`dep-check ${item.status === 'done' ? 'is-completed' : ''}`}><input type="checkbox" checked={task.dependsOn.includes(item.id)} onChange={() => void update({ dependsOn: toggle(task.dependsOn, item.id) })} />{item.title}</label>)}
+                </details>
+                {task.dependsOn.some(id => !taskById(state, id)) && <p className="muted">A dependency was removed.</p>}
+            </>}
+          </details>
         </div>
 
         <aside className="tp-col tp-conversation" aria-label="Conversation">
@@ -193,19 +192,10 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             </div>
             <p className="muted tp-sub">Recent retained workspace activity; older events may no longer be available.</p>
             {!reviewer && tab === 'comments' && (
-              <form className="task-comment-form" onSubmit={event => void addComment(event)}>
-                <ReferenceTextarea rows={2} maxLength={2000} value={comment} onChange={event => setComment(event.target.value)} aria-label="Task comment" placeholder="Write a comment. Use @ to mention someone." />
-                <button className="btn btn-primary btn-sm" disabled={!comment.trim()}>Comment</button>
-              </form>
+              <CommentReply quest={quest} taskId={task.id} onSent={() => setTab('comments')} />
             )}
             <div id="tp-feed-panel" role="tabpanel" aria-labelledby={`tp-tab-${tab}`}>
-            {feed.length === 0
-              ? <p className="muted">{tab === 'comments' ? 'No comments yet.' : tab === 'history' ? 'No history yet.' : 'No activity yet.'}</p>
-              : (
-                <ol className="ctx-history tp-feed">{feed.slice(0, 60).map(event => (
-                  <li key={event.id} className={event.undone ? 'is-undone' : ''}><time>{when(event.at)}</time><p><ReferencedText text={event.text} document={event.references?.text} /></p></li>
-                ))}</ol>
-              )}
+            <EventFeed events={feed} empty={tab === 'comments' ? 'No comments yet.' : tab === 'history' ? 'No history yet.' : 'No activity yet.'} />
             </div>
           </section>
 
@@ -221,6 +211,7 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
   const [note, setNote] = useState('');
   const [open, setOpen] = useState(false);
   const finish = state.events.find(event => event.taskId === task.id && !event.undone && event.undo?.tasks[task.id] && event.undo.tasks[task.id]!.status !== 'done');
+  const completion = completionDetails(state, task);
   const latest = state.events.find(event => event.taskId === task.id && !event.undone);
   const canUndo = !!finish && finish === latest && finish.actor === actor && !!finish.undo;
   // A live server older than dispatch v5 predates `task/reopen`; there, reopening
@@ -233,9 +224,14 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
     const result = await dispatch({ type: 'task/reopen', id: task.id, note });
     if (result.ok) { setNote(''); setOpen(false); }
   }
+  const by = completion.actor || finish?.actor || '';
+  const approved = finish?.kind === 'approval';
+  const archiveAvailable = backend.supports?.taskArchive !== false && allowed;
   return (
-    <div className="ctx-done">
-      <p><b>Completed {task.completedAt ? when(task.completedAt) : ''}</b>{finish ? ` · ${nameOf(state, finish.actor, 'Former member')}` : ' · Completion actor unavailable in retained history'}</p>
+    <div className={`ctx-done ${task.archivedAt ? 'is-archived' : ''}`}>
+      <p className="ctx-done-state" role="status"><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+        <b>{approved ? 'Approved and completed' : 'Completed'}</b>{completion.at !== null ? ` ${when(completion.at)}` : ''}{by ? ` · ${nameOf(state, by, 'Former member')}` : ' · Completion actor unavailable in retained history'}</p>
+      {task.archivedAt ? <p className="muted">Archived {when(task.archivedAt)}{task.archivedBy ? ` · ${nameOf(state, task.archivedBy, 'someone')}` : ''}. Its history is kept.</p> : null}
       {canUndo && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void dispatch({ type: 'undo', eventId: finish!.id })}>Undo my completion</button>}
       {allowed && reopenAvailable && !open && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(true)}>Reopen…</button>}
       {allowed && reopenAvailable && open && (
@@ -244,6 +240,7 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
           <span className="offer-form-actions"><button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>Cancel</button><button className="btn btn-primary btn-sm" disabled={!note.trim()}>Reopen</button></span>
         </form>
       )}
+      {archiveAvailable && !open && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void dispatch({ type: task.archivedAt ? 'task/unarchive' : 'task/archive', id: task.id })}>{task.archivedAt ? 'Restore from archive' : 'Archive'}</button>}
       {allowed && !reopenAvailable && !canUndo && <p className="muted">Reopening finished work arrives with the next server release. Until then, create a follow-up task.</p>}
     </div>
   );
@@ -259,9 +256,16 @@ export function ResponsibilityCard({ quest, task, onOpen }: { quest: Quest; task
   const action = dependency ? plan.current : task.status === 'review' ? `Review the work${task.approver ? ` · Approver: ${nameOf(state, task.approver)}` : ''}` : task.status === 'blocked' ? `Resolve blocker: ${task.blocker?.note || 'Needs help'}` : task.nextAction || (task.status === 'ready' ? 'Start the work' : 'Finish the work');
   const handoff = task.status !== 'review' && task.status !== 'done' && task.approver ? `Next: review by ${nameOf(state, task.approver)}` : task.nextOwner ? `Next handoff: ${nameOf(state, task.nextOwner)}` : 'Next handoff not assigned';
   return <section className={`tp-story tp-actions ${task.status === 'done' ? 'is-done' : ''}`} aria-labelledby="tp-story-title">
-    <div className="tp-story-person">{responsible && task.status !== 'done' && <Avatar state={state} id={responsible} size="md" />}<div><p className="tp-story-label">Action story</p><h2 id="tp-story-title">{heading}</h2></div></div>
-    {task.status === 'done' ? <Completed quest={quest} task={task} /> : <><p className="tp-story-action">{action}</p>{task.waitingOn && <p>External wait: {task.waitingOn}</p>}<TaskSituation key={task.id} quest={quest} taskId={task.id} onOpen={onOpen} actionsOnly /></>}
+    <div className="tp-story-person">{responsible && task.status !== 'done' && <Avatar state={state} id={responsible} size="md" />}<div><p className="tp-story-label">Who acts next</p><h2 id="tp-story-title">{heading}</h2></div></div>
+    {task.status === 'done' ? <Completed quest={quest} task={task} /> : <><p className="tp-story-action"><span className="tp-story-k">What to do</span>{action}</p>{task.waitingOn && <p>External wait: {task.waitingOn}</p>}<TaskSituation key={task.id} quest={quest} taskId={task.id} onOpen={onOpen} actionsOnly /></>}
     <p className="tp-story-handoff">{handoff}</p>
+  </section>;
+}
+
+/** Where the task sits in the usual lifecycle. A reference only, so it lives under "More details". */
+function LifecycleReference({ task }: { task: Task }) {
+  return <section className="tp-lifecycle" aria-label="Lifecycle reference">
+    <h3 className="ctx-label tp-sub">Lifecycle</h3>
     <ol className="tp-journey" aria-label="Lifecycle reference, not a record of visited states">{(['ready', 'working', 'review', 'done'] as const).map(status => <li key={status} aria-current={task.status === status ? 'step' : undefined}>{({ ready: 'Ready', working: 'Working', review: 'In Review', done: 'Done' })[status]}{status === 'review' && <small>{task.approver ? 'When approval is required' : 'Optional · no approver set'}</small>}</li>)}</ol>
     <p className="tp-story-note">{task.status === 'blocked' ? 'Currently blocked. ' : ''}Lifecycle reference only; steps may be skipped. See History for actual transitions.</p>
   </section>;
