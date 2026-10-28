@@ -1,4 +1,4 @@
-// What People & Roles offers, as pure predicates over the caller's organization role.
+// What People & Access offers, as pure predicates over the caller's organization role.
 // The server decides with its own SQL functions (tenancy_core, team_staging); the DB
 // parity test runs every role × action against the real functions and fails if the UI
 // offers anything the server refuses.

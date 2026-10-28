@@ -82,6 +82,11 @@ export interface Task {
   updatedAt: number;
   lastActivityAt: number;
   completedAt: number | null;
+  /** Who finished it (saved with the completion; older records fall back to the event log). */
+  completedBy?: string | null;
+  /** Archived work stays in history but leaves the default lists. Only completed work can be archived. */
+  archivedAt?: number | null;
+  archivedBy?: string | null;
 }
 
 export type ContactChannel = 'phone' | 'text' | 'email' | 'in-person';
@@ -362,6 +367,9 @@ export type ActionBody =
   | { type: 'task/handoff'; id: string; to: string; note?: string }
   /** Completed work back to Ready (owner, approver, or a coordinator). */
   | { type: 'task/reopen'; id: string; note: string }
+  /** Completed work out of the default lists, history kept (same people who may reopen). */
+  | { type: 'task/archive'; id: string }
+  | { type: 'task/unarchive'; id: string }
   | { type: 'ultra/activate'; taskId: string }
   | { type: 'ultra/release'; reason?: string }
   | { type: 'grant/request'; section: Section; reason: string }

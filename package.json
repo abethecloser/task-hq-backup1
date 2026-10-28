@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "npm run icons && tsc -b && vite build && vite build -c vite.extension.config.ts",
-    "build:app": "tsc -b && vite build",
+    "build": "node scripts/validate-browser-env.mjs && npm run icons && tsc -b && vite build && vite build -c vite.extension.config.ts",
+    "build:app": "node scripts/validate-browser-env.mjs && tsc -b && vite build",
     "build:extension": "npm run icons && vite build -c vite.extension.config.ts",
     "icons": "node scripts/make-icons.mjs",
     "test": "node scripts/sync-functions.mjs && node --test src/core/*.test.ts src/core/tools/*.test.ts src/ui/*.test.ts src/adapter/*.test.ts src/automation/*.test.ts src/integrations/*.test.ts src/auth/*.test.ts supabase/functions/badge-check-in/*.test.ts supabase/functions/dispatch/*.test.ts deploy/dispatch-live/*.test.ts src/activation/handler.test.ts",
@@ -23,7 +23,9 @@
   "dependencies": {
     "@fontsource/hanken-grotesk": "5.3.0",
     "@fontsource/jetbrains-mono": "5.3.0",
+    "@radix-ui/react-popover": "^1.3.1",
     "@supabase/supabase-js": "^2.117.2",
+    "motion": "^12.43.0",
     "qrcode-generator": "1.4.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

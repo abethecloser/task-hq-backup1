@@ -1,4 +1,4 @@
-// Executive Desk: the Executive Brief, Decision Desk and Daily Signal from the
+// Owner overview (formerly Executive Desk and Reports, which were the same page): the Executive Brief, Decision Desk and Daily Signal from the
 // shared core (src/core/executive.ts), computed on the workspace this person is
 // already authorized to load. Nothing runs by itself: every option is performed
 // only after the principal confirms, through the same engine dispatch as any
@@ -13,7 +13,7 @@ import type { Measure } from '../core/metrics.ts';
 import type { BriefItem, Decision, DecisionOption } from '../core/executive.ts';
 import { firstName, isOpen, nameOf } from '../core/selectors.ts';
 import { duration } from '../core/time.ts';
-import { Avatar, Empty } from '../ui/components.tsx';
+import { Avatar } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import { OfferForm } from './WorkSurface.tsx';
 
@@ -40,8 +40,20 @@ export function ExecutiveDesk({ quest, onOpenTask, onOpenLead }: { quest: Quest;
   /* eslint-enable react-hooks/exhaustive-deps */
   const moving = state.tasks.filter(task => isOpen(task) && task.owner && task.owner !== actor);
   const delegated = moving.filter(task => task.createdBy === actor);
-  const waitingPeople = new Set(desk.flatMap(item => item.waiting.map(who => who.personId ?? who.label)));
+  const waitingNames = [...new Set(desk.flatMap(item => item.waiting.map(who => (who.personId ? firstName(state, who.personId) : who.label))))];
+  // At risk: the brief's own blocked and overdue items (no new calculation), counted once each.
+  const riskItems = brief.sections.filter(section => section.key === 'blocked' || section.key === 'overdue').flatMap(section => section.items);
+  const atRisk = new Set(riskItems.map(item => `${item.source.kind}:${item.source.id}`)).size;
   const live = quest.backend.kind === 'live';
+  const [movingOpen, setMovingOpen] = useState(false);
+  const [allMoving, setAllMoving] = useState(false);
+  /** In-page destinations. The app routes on the URL hash, so these never touch it (an #anchor would read as an unknown page and fall back to Home). */
+  const reveal = (id: string) => {
+    const target = document.getElementById(id);
+    if (!target) return;
+    target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    target.querySelector<HTMLElement>('[data-focus-target]')?.focus({ preventScroll: true });
+  };
 
   function markBriefed() {
     try { localStorage.setItem(key, String(Date.now())); } catch { /* this page only */ }
@@ -57,40 +69,54 @@ export function ExecutiveDesk({ quest, onOpenTask, onOpenLead }: { quest: Quest;
     <div className="view exec">
       <header className="view-head">
         <div>
-          <p className="eyebrow">Executive Desk · {new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(now)}{brief.synthetic ? ' · synthetic demo' : ''}</p>
-          <h1>{firstName(state, actor, 'Your')}’s desk</h1>
+          <p className="eyebrow">Owner overview · {new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).format(now)}{brief.synthetic ? ' · synthetic demo' : ''}</p>
+          <h1>{firstName(state, actor, 'Your')}’s overview</h1>
           <p className="lede">{brief.headline}</p>
         </div>
       </header>
 
-      <div className="answers" role="list">
-        <a role="listitem" href="#desk" className={`answer ${brief.needsYou ? 'is-hot' : ''}`}><small>What needs me?</small><b>{brief.needsYou}</b><span>{desk.length ? `${desk.length} decision${desk.length === 1 ? '' : 's'} on your desk` : 'No decisions waiting'}</span></a>
-        <a role="listitem" href="#moving" className="answer"><small>What is moving without me?</small><b>{moving.length}</b><span>{delegated.length ? `${delegated.length} you delegated` : 'open tasks owned by others'}</span></a>
-        <a role="listitem" href="#desk" className={`answer ${waitingPeople.size ? 'is-warn' : ''}`}><small>Who is waiting on a decision?</small><b>{waitingPeople.size}</b><span>{waitingPeople.size ? [...new Set(desk.flatMap(item => item.waiting.map(who => who.personId ? firstName(state, who.personId) : who.label)))].slice(0, 3).join(', ') : 'Nobody is waiting on you'}</span></a>
+      {/* Summary strip: each item goes to its own information on this page. */}
+      <div className="exec-strip" role="list" aria-label="Summary">
+        <button type="button" role="listitem" className={`exec-stat ${brief.needsYou ? 'is-hot' : ''}`} onClick={() => reveal('desk')}>
+          <small>Needs you</small><b>{brief.needsYou}</b>
+          <span>{desk.length ? `${desk.length} decision${desk.length === 1 ? '' : 's'}${waitingNames.length ? ` · ${waitingNames.slice(0, 2).join(', ')}${waitingNames.length > 2 ? ` +${waitingNames.length - 2}` : ''} waiting` : ''}` : 'No decisions waiting'}</span>
+        </button>
+        <button type="button" role="listitem" className="exec-stat" aria-expanded={movingOpen} aria-controls="moving" onClick={() => { setMovingOpen(true); requestAnimationFrame(() => reveal('moving')); }}>
+          <small>Moving without you</small><b>{moving.length}</b>
+          <span>{delegated.length ? `${delegated.length} you delegated` : 'Open work owned by others'}</span>
+        </button>
+        <button type="button" role="listitem" className={`exec-stat ${atRisk ? 'is-warn' : ''}`} onClick={() => reveal('brief')}>
+          <small>At risk</small><b>{atRisk}</b>
+          <span>{atRisk ? 'Blocked or overdue' : 'Nothing blocked or overdue'}</span>
+        </button>
       </div>
 
       <section id="desk" className="exec-section" aria-labelledby="desk-title">
-        <h2 id="desk-title" className="section-label">Decision Desk <span>{desk.length}</span></h2>
-        {desk.length === 0 ? <Empty title="No decisions need your authority">Approvals, access requests, escalations and unowned priority work appear here.</Empty>
+        <h2 id="desk-title" className="section-label" tabIndex={-1} data-focus-target>Decisions &amp; exceptions <span>{desk.length}</span></h2>
+        {desk.length === 0
+          ? <p className="exec-quiet"><i aria-hidden="true">✓</i> No decisions are waiting on you. Approvals, access requests, escalations and unowned priority work appear here.</p>
           : <div className="decisions">{desk.map((item, index) => <DecisionCard key={item.id} quest={quest} decision={item} index={index} onOpenSource={() => openSource(item)} />)}</div>}
       </section>
 
       <section id="moving" className="exec-section" aria-labelledby="moving-title">
-        <h2 id="moving-title" className="section-label">Moving without you <span>{moving.length}</span></h2>
-        {moving.length === 0 ? <p className="muted">No open work is owned by someone else yet.</p> : (
-          <ul className="exec-list">
-            {moving.slice(0, 8).map(task => (
-              <li key={task.id}><button type="button" className="exec-row" onClick={() => onOpenTask(task.id)}>
-                <Avatar state={state} id={task.owner} size="sm" /><span><b>{task.title}</b><small>{nameOf(state, task.owner)} · {task.status}{task.createdBy === actor ? ' · delegated by you' : ''}{task.status === 'blocked' ? ` · blocked ${duration(now - (task.blocker?.at ?? task.lastActivityAt))}` : ''}</small></span>
-              </button></li>
-            ))}
-          </ul>
-        )}
+        <details className="exec-disclosure" open={movingOpen} onToggle={event => setMovingOpen(event.currentTarget.open)}>
+          <summary><h2 id="moving-title" className="section-label" tabIndex={-1} data-focus-target>Moving without you <span>{moving.length}</span></h2><small>{delegated.length ? `${delegated.length} delegated by you` : 'Owned by others'}</small></summary>
+          {moving.length === 0 ? <p className="exec-quiet">No open work is owned by someone else yet.</p> : <>
+            <ul className="exec-list">
+              {(allMoving ? moving : moving.slice(0, 8)).map(task => (
+                <li key={task.id}><button type="button" className="exec-row" onClick={() => onOpenTask(task.id)}>
+                  <Avatar state={state} id={task.owner} size="sm" /><span><b>{task.title}</b><small>{nameOf(state, task.owner)} · {task.status}{task.createdBy === actor ? ' · delegated by you' : ''}{task.status === 'blocked' ? ` · blocked ${duration(now - (task.blocker?.at ?? task.lastActivityAt))}` : ''}</small></span>
+                </button></li>
+              ))}
+            </ul>
+            {moving.length > 8 && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAllMoving(value => !value)}>{allMoving ? 'Show fewer' : `Show all ${moving.length}`}</button>}
+          </>}
+        </details>
       </section>
 
-      <section className="exec-section" aria-labelledby="brief-title">
+      <section id="brief" className="exec-section" aria-labelledby="brief-title">
         <div className="section-head">
-          <h2 id="brief-title" className="section-label">Executive Brief</h2>
+          <h2 id="brief-title" className="section-label" tabIndex={-1} data-focus-target>At risk &amp; changes since your last briefing</h2>
           <button type="button" className="btn btn-ghost btn-sm" onClick={markBriefed} title="Remembered on this device only">Mark briefed now</button>
         </div>
         <div className="brief-grid">
@@ -111,21 +137,24 @@ export function ExecutiveDesk({ quest, onOpenTask, onOpenLead }: { quest: Quest;
         </div>
       </section>
 
-      <section className="exec-section" aria-labelledby="signal-title">
-        <h2 id="signal-title" className="section-label">Daily Signal</h2>
-        <p className="signal-summary">{signal.summary}</p>
-        <div className="signal-totals">
-          <span><b>{signal.totals.completed}</b> completed</span><span><b>{signal.totals.handoffs}</b> handoffs</span><span><b>{signal.totals.helpRequests}</b> help requests</span><span><b>{signal.totals.approvals}</b> approvals</span><span><b>{signal.totals.leadActivity}</b> lead updates</span>
-        </div>
-        <ul className="sig-sources is-inline">{signal.sources.map(source => <li key={source.id} title={source.note}><i className={`sig-dot ${source.status === 'connected' ? 'is-live' : ''}`} aria-hidden="true" />{source.label}<small>{source.status === 'connected' ? (live ? 'live records' : 'synthetic') : 'not connected'}</small></li>)}</ul>
-        <p className="muted">Only Task-HQ records are read. Calls, email, calendar and customer interactions are not connected, so nothing is shown for them rather than guessed.</p>
-      </section>
+      <details className="exec-section exec-disclosure">
+        <summary><h2 className="section-label">Daily signal &amp; operational measures</h2><small>{signal.totals.completed} completed · {signal.totals.handoffs} handoffs · sources and sample sizes inside</small></summary>
+        <section className="exec-sub" aria-labelledby="signal-title">
+          <h2 id="signal-title" className="section-label">Daily Signal</h2>
+          <p className="signal-summary">{signal.summary}</p>
+          <div className="signal-totals">
+            <span><b>{signal.totals.completed}</b> completed</span><span><b>{signal.totals.handoffs}</b> handoffs</span><span><b>{signal.totals.helpRequests}</b> help requests</span><span><b>{signal.totals.approvals}</b> approvals</span><span><b>{signal.totals.leadActivity}</b> lead updates</span>
+          </div>
+          <ul className="sig-sources is-inline">{signal.sources.map(source => <li key={source.id} title={source.note}><i className={`sig-dot ${source.status === 'connected' ? 'is-live' : ''}`} aria-hidden="true" />{source.label}<small>{source.status === 'connected' ? (live ? 'live records' : 'synthetic') : 'not connected'}</small></li>)}</ul>
+          <p className="muted">Only Task-HQ records are read. Calls, email, calendar and customer interactions are not connected, so nothing is shown for them rather than guessed.</p>
+        </section>
 
-      <section className="exec-section" aria-labelledby="measures-title">
-        <h2 id="measures-title" className="section-label">Operational measures</h2>
-        <div className="measure-grid">{measures.measures.map(item => <MeasureCell key={item.key} item={item} />)}</div>
-        <p className="muted">From Task-HQ’s own records{measures.since ? ` since ${new Date(measures.since).toLocaleDateString()}` : ''}{measures.partial ? ' (partial: only the most recent 400 changes are kept)' : ''}. No baselines or savings are estimated; each figure shows how many records it’s based on.</p>
-      </section>
+        <section className="exec-sub" aria-labelledby="measures-title">
+          <h2 id="measures-title" className="section-label">Operational measures</h2>
+          <div className="measure-grid">{measures.measures.map(item => <MeasureCell key={item.key} item={item} />)}</div>
+          <p className="muted">From Task-HQ’s own records{measures.since ? ` since ${new Date(measures.since).toLocaleDateString()}` : ''}{measures.partial ? ' (partial: only the most recent 400 changes are kept)' : ''}. No baselines or savings are estimated; each figure shows how many records it’s based on.</p>
+        </section>
+      </details>
     </div>
   );
 }

@@ -117,7 +117,6 @@
 :root[data-look="brutalist"] .modal,
 :root[data-look="brutalist"] .offer-form,
 :root[data-look="brutalist"] .lens-bar,
-:root[data-look="brutalist"] .seam-toggle,
 :root[data-look="brutalist"] .person-chip,
 :root[data-look="brutalist"] .avatar {
   border-radius: var(--radius);
@@ -128,7 +127,7 @@
 :root[data-look="brutalist"] .rail { border-right: 1px solid var(--ink-rule); }
 :root[data-look="brutalist"] .workspace-panel { border-right: 1px solid var(--ink-rule); }
 :root[data-look="brutalist"] .panel-head { border-bottom: 1px solid var(--ink-rule); }
-:root[data-look="brutalist"] .topbar { border-bottom: 1px solid var(--ink-rule); background: rgb(243 244 245 / 92%); }
+:root[data-look="brutalist"] .topbar { border-bottom: 0; background: rgb(243 244 245 / 92%); }
 :root[data-look="brutalist"] .context { border-left: 1px solid var(--ink-rule); }
 :root[data-look="brutalist"] .context-head { border-bottom: 1px solid var(--ink-rule); }
 :root[data-look="brutalist"] .registry-table,
@@ -189,8 +188,6 @@
 :root[data-look="brutalist"] .segmented button.is-on { background: var(--ink-rule); color: #fff; box-shadow: none; }
 :root[data-look="brutalist"] .registry-tools select,
 :root[data-look="brutalist"] .search-field input { border-color: var(--ink-rule); }
-:root[data-look="brutalist"] .seam-toggle { border-color: var(--ink-rule); box-shadow: 2px 2px 0 var(--ink-rule); }
-:root[data-look="brutalist"] .seam-toggle:hover { box-shadow: 3px 3px 0 var(--accent); border-color: var(--ink-rule); }
 :root[data-look="brutalist"] .rail .nav-item.is-active { background: var(--ink-rule); color: #fff; box-shadow: none; }
 :root[data-look="brutalist"] .rail .nav-item.is-active .nav-pip,
 :root[data-look="brutalist"] .rail .nav-item.is-active .rail-unread { box-shadow: 0 0 0 2px var(--ink-rule); }

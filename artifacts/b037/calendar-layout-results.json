@@ -1,0 +1,72 @@
+{
+  "layout": [
+    {
+      "width": 375,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"viewport\":375,\"closedTab\":{\"x\":0,\"right\":139.234375,\"width\":139.234375,\"y\":172,\"height\":44},\"calendar\":{\"x\":0,\"right\":375,\"width\":375,\"y\":0,\"height\":900},\"adjacentTab\":{\"x\":0,\"right\":139.234375,\"width\":139.234375,\"y\":172,\"height\":44},\"notifications\":{\"x\":0,\"right\":375,\"width\":375,\"y\":0,\"height\":900},\"routePreserved\":true,\"restoration\":true,\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "width": 1024,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"viewport\":1024,\"closedTab\":{\"x\":56,\"right\":195.234375,\"width\":139.234375,\"y\":132,\"height\":44},\"calendar\":{\"x\":56,\"right\":344,\"width\":288,\"y\":0,\"height\":900},\"adjacentTab\":{\"x\":344,\"right\":483.234375,\"width\":139.234375,\"y\":132,\"height\":44},\"notifications\":{\"x\":721,\"right\":1009,\"width\":288,\"y\":0,\"height\":900},\"routePreserved\":true,\"restoration\":true,\"pass\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "width": 1440,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"viewport\":1440,\"closedTab\":{\"x\":56,\"right\":195.234375,\"width\":139.234375,\"y\":132,\"height\":44},\"calendar\":{\"x\":56,\"right\":344,\"width\":288,\"y\":0,\"height\":900},\"adjacentTab\":{\"x\":344,\"right\":483.234375,\"width\":139.234375,\"y\":132,\"height\":44},\"notifications\":{\"x\":1137,\"right\":1425,\"width\":288,\"y\":0,\"height\":900},\"routePreserved\":true,\"restoration\":true,\"pass\":true}\n```"
+          }
+        ]
+      }
+    }
+  ],
+  "keyboard": [
+    {
+      "width": 375,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"closed\":true,\"focusRestored\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "width": 1024,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"closed\":true,\"focusRestored\":true}\n```"
+          }
+        ]
+      }
+    },
+    {
+      "width": 1440,
+      "result": {
+        "content": [
+          {
+            "type": "text",
+            "text": "Script ran on page and returned:\n```json\n{\"closed\":true,\"focusRestored\":true}\n```"
+          }
+        ]
+      }
+    }
+  ]
+}

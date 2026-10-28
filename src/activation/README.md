@@ -63,3 +63,18 @@ The administrator signs in through the normal app, then opens `/activate/index.h
 Isolated HTTPS preview: https://task-ox50kthsu-novum-systems.vercel.app/activate/index.html (no production alias changed).
 
 The isolated preview signs in on its own origin. Continuing to the existing production application requires sign-in there again. The normal same-origin `/activate/index.html` release shares the existing Auth session automatically. Do not transfer sessions through URL parameters.
+
+## Deferred improvement: onboarding pass
+
+Not scheduled and not implemented. Idea: after activation, give a new employee a short, role-aware "onboarding pass" (what they can open, what is preview-only, who to ask) instead of landing directly in the workspace. The activation flow itself stays unchanged until the pilot has run.
+
+## Deferred architecture decision: Tools drawer
+
+Not scheduled and not implemented. The primary sidebar stays unchanged during employee onboarding; no links are moved or removed.
+
+Future idea: an expandable **Tools** drawer as a secondary navigation layer for modular capabilities (Estimates, First Response, Relationships, Operations Workbook).
+
+Requirements to honor when it is built:
+- Keep existing routes and server-enforced permissions exactly as they are.
+- Each entry carries a status label: Live, Preview or Unavailable.
+- Tools are registered from one list, so adding a tool does not require editing primary navigation.

@@ -224,7 +224,7 @@ export interface HomeMetrics { active: number; completedToday: number; overdue: 
 export function homeMetrics(state: QuestState, actor: string, now: number): HomeMetrics {
   const open = myTasks(state, actor, now);
   const today = performance(state, actor, now, 'today');
-  return { active: open.length, completedToday: today.completed, overdue: open.filter(task => isOverdue(task, now)).length, blocked: today.blocked };
+  return { active: open.length, completedToday: today.completed, overdue: open.filter(task => isOverdue(task, now)).length, blocked: open.filter(task => task.status === 'blocked').length };
 }
 
 /** A channel @mention, as the universal inbox already resolved it. */

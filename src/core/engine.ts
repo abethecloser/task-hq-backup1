@@ -160,7 +160,7 @@ function focusGate(state: QuestState, action: Action, actor: string, now: number
 
 function completeTask(d: Draft, task: Task, ctx: ApplyContext): string[] {
   const notes: string[] = [];
-  putTask(d, touch(task, ctx.now, { status: 'done', completedAt: ctx.now, blocker: null, ultra: false }));
+  putTask(d, touch(task, ctx.now, { status: 'done', completedAt: ctx.now, completedBy: ctx.actor, archivedAt: null, archivedBy: null, blocker: null, ultra: false }));
   for (const item of d.s.tasks) {
     if (!item.dependsOn.includes(task.id) || item.status === 'done') continue;
     const still = blockingDeps(d.s, item);
@@ -319,8 +319,9 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       }
       if (task.ultra && !isManager && (changes.owner !== undefined || changes.due !== undefined || changes.priority !== undefined)) return fail(input, 'Only an owner or admin can change owner, due date or priority on an Ultra Priority task.');
       if (![changes.owner, changes.nextOwner, changes.decisionOwner, changes.approver].every(id => validPerson(state, id))) return fail(input, 'That person is not in this workspace.');
+      if (changes.due === '' && task.dueTime && !('dueTime' in changes)) changes.dueTime = undefined;
       if ('type' in changes || 'tags' in changes || 'dueTime' in changes) {
-        const shape = classify(state, { type: changes.type ?? task.type, tags: changes.tags ?? task.tags, dueTime: changes.dueTime ?? task.dueTime, due: changes.due ?? task.due });
+        const shape = classify(state, { ...task, ...changes });
         if (typeof shape === 'string') return fail(input, shape);
         Object.assign(changes, { type: shape.type, tags: shape.tags, dueTime: shape.dueTime });
       }
@@ -415,8 +416,19 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       if (task.owner !== actor && task.approver !== actor && !managerish) return fail(input, 'Only the owner, the approver, or a supervisor, admin or owner can reopen this.');
       const note = action.note.trim();
       if (!note) return fail(input, 'Say why it is being reopened.');
-      putTask(d, touch(task, now, { status: 'ready', completedAt: null, nextAction: note }));
+      putTask(d, touch(task, now, { status: 'ready', completedAt: null, completedBy: null, archivedAt: null, archivedBy: null, nextAction: note }));
       return commit(d, ctx, newId, { kind: 'task', taskId: task.id, undoable: true, text: `${me.name} reopened “${task.title}”: “${note}”.`, message: `Reopened. ${nameOf(state, task.owner, 'It needs an owner')}${task.owner ? ' has it again' : ''}.` });
+    }
+
+    case 'task/archive':
+    case 'task/unarchive': {
+      const task = taskById(state, action.id);
+      const archiving = action.type === 'task/archive';
+      if (!task || task.status !== 'done') return fail(input, 'Only completed work can be archived.');
+      if (task.owner !== actor && task.approver !== actor && !managerish) return fail(input, 'Only the owner, the approver, or a supervisor, admin or owner can archive this.');
+      if (archiving === !!task.archivedAt) return fail(input, archiving ? 'That task is already archived.' : 'That task is not archived.');
+      putTask(d, touch(task, now, archiving ? { archivedAt: now, archivedBy: actor } : { archivedAt: null, archivedBy: null }));
+      return commit(d, ctx, newId, { kind: 'task', taskId: task.id, undoable: true, text: `${me.name} ${archiving ? 'archived' : 'restored from the archive'} “${task.title}”.`, message: archiving ? 'Archived. It stays in history.' : 'Restored from the archive.' });
     }
 
     case 'task/handoff': {

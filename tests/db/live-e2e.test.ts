@@ -85,6 +85,52 @@ test('create → assign → start → complete persists and is visible across se
   } finally { await w.done(); }
 });
 
+test('task edits and mention text persist across users; reassignment preserves history and enforcement', async () => {
+  const w = await world();
+  try {
+    const owner = w.session('tok-owner', w.owner);
+    await owner.load();
+    const created = await owner.dispatch({ type: 'task/create', task: { title: 'Verify the flashing', owner: w.member, due: '2026-10-27' } }, w.owner);
+    assert.ok(created.ok, created.ok ? '' : created.error);
+    const id = created.state.tasks.find(task => task.title === 'Verify the flashing')!.id;
+    const member = w.session('tok-member', w.member);
+    await member.load();
+    const edited = await member.dispatch({ type: 'task/update', id, changes: { title: 'Verify south flashing', description: 'Check the south roof edge', nextAction: 'Bring the inspection photos', due: '2026-10-28' } }, w.member);
+    assert.ok(edited.ok, edited.ok ? '' : edited.error);
+    const note = '@Olive Owner please review the flashing #permits';
+    const commented = await member.dispatch({ type: 'task/comment', id, note }, w.member);
+    assert.ok(commented.ok, commented.ok ? '' : commented.error);
+
+    const seen = await w.session('tok-owner', w.owner).load();
+    const task = seen.tasks.find(task => task.id === id)!;
+    assert.equal(task.title, 'Verify south flashing');
+    assert.equal(task.description, 'Check the south roof edge');
+    assert.equal(task.nextAction, 'Bring the inspection photos');
+    assert.equal(task.due, '2026-10-28');
+    assert.equal(task.owner, w.member);
+    assert.equal(seen.events.find(event => event.id === commented.eventId)?.actor, w.member);
+    assert.ok(seen.events.find(event => event.id === commented.eventId)?.text.includes(note), 'mention/tag text survives database reload verbatim');
+
+    const reviewer = w.session('tok-reviewer', w.reviewer);
+    await reviewer.load();
+    const denied = await reviewer.dispatch({ type: 'task/update', id, changes: { description: 'Unauthorized edit' } }, w.reviewer);
+    assert.equal(denied.ok, false);
+    assert.equal((await owner.load()).rev, seen.rev, 'refused edit does not advance task state');
+    const reassigned = await owner.dispatch({ type: 'task/update', id, changes: { owner: w.owner } }, w.owner);
+    assert.ok(reassigned.ok, reassigned.ok ? '' : reassigned.error);
+    const formerOwner = w.session('tok-member', w.member);
+    await formerOwner.load();
+    const refused = await formerOwner.dispatch({ type: 'task/update', id, changes: { title: 'Former owner edit' } }, w.member);
+    assert.equal(refused.ok, false);
+    const final = await w.session('tok-owner', w.owner).load();
+    assert.equal(final.tasks.find(task => task.id === id)?.owner, w.owner);
+    assert.equal(final.tasks.find(task => task.id === id)?.title, 'Verify south flashing');
+    assert.ok(final.events.some(event => event.id === commented.eventId), 'reassignment preserves the earlier comment');
+    assert.equal(final.events.find(event => event.id === reassigned.eventId)?.kind, 'handoff');
+    assert.equal(final.events.find(event => event.id === reassigned.eventId)?.actor, w.owner);
+  } finally { await w.done(); }
+});
+
 test('outcomes are inspectable: executed effects, denied and failed attempts leave a durable trace', async () => {
   const w = await world();
   try {

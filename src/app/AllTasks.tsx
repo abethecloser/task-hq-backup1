@@ -7,9 +7,10 @@ import { feedbackAttributes } from '../ui/Feedback.tsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
-import { BOARD_ORDER, DEFAULT_QUERY, LEGACY_LENSES, LENSES, LENS_HINTS, LENS_LABELS, SORT_LABELS, boardColumns, queryTasks, rowFlags } from '../core/registry.ts';
+import { BOARD_ORDER, DEFAULT_QUERY, LEGACY_LENSES, LENSES, LENS_HINTS, LENS_LABELS, SORT_LABELS, boardColumns, isCompletedQuery, queryTasks, rowFlags } from '../core/registry.ts';
 import type { Lens, RegistryQuery, Scope, SortKey, StatusFilter } from '../core/registry.ts';
-import { firstName, projectName } from '../core/selectors.ts';
+import { firstName, nameOf, projectName } from '../core/selectors.ts';
+import { completionDetails } from '../core/completed.ts';
 import { localDate, shortDate } from '../core/time.ts';
 import { Avatar, Empty } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
@@ -65,13 +66,14 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
   const { state, actor, now } = quest;
   const { prefs, setPrefs } = registry;
   const query = prefs.query;
+  const completed = isCompletedQuery(query);
   const search = useRef<HTMLInputElement>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     if (!preset) return;
-    setPrefs(current => ({ ...current, query: preset.keep
-      ? { ...current.query, lens: preset.lens }
+    setPrefs(current => ({ ...current, layout: preset.changes?.status === 'done' ? 'table' : current.layout, query: preset.keep
+      ? { ...current.query, lens: preset.lens, ...(isCompletedQuery(current.query) ? { status: 'open' as const } : {}) }
       : { ...DEFAULT_QUERY, sort: current.query.sort, scope: current.query.scope, lens: preset.lens, ...preset.changes } }));
     if (!preset.keep) setPendingDraft(null); // a jump from elsewhere replaces any unapplied choices
     onPresetApplied?.(); // applied once: returning to All Tasks later keeps the person's own filters
@@ -104,12 +106,12 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
   const live = quest.backend.kind === 'live';
 
   return (
-    <div className="view registry">
+    <div className={`view registry ${completed ? 'is-completed' : ''}`}>
       <header className="view-head">
         <div>
           <p className="eyebrow">{live ? `${state.workspace.name} · task registry` : 'Task-HQ Demo · synthetic records'}</p>
           <div className="view-title-row">
-            <h1>{query.lens === 'all' ? 'All Tasks' : LENS_LABELS[query.lens]}</h1>
+            <h1>{completed ? 'Completed' : query.lens === 'all' ? 'Tasks' : LENS_LABELS[query.lens]}</h1>
             <div className="scope-seg" role="group" aria-label="Whose tasks">
               <button type="button" aria-pressed={query.scope === 'mine'} onClick={() => pickScope('mine')}>
                 <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 21a7.5 7.5 0 0 1 15 0" /></svg>My work
@@ -119,13 +121,9 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
               </button>
             </div>
           </div>
-          <p className="lede">{query.lens === 'watching' ? LENS_HINTS.watching : `${query.scope === 'mine' ? 'Your work' : 'The whole company'} · ${LENS_HINTS[query.lens]}`}</p>
+          <p className="lede">{completed ? `${query.scope === 'mine' ? 'Your completed work' : 'Completed work visible in this company'} · ${query.sort === 'urgency' ? 'newest completions first' : SORT_LABELS[query.sort].toLowerCase()}. Open a task for comments, history, Reopen or Archive.` : query.lens === 'watching' ? LENS_HINTS.watching : `${query.scope === 'mine' ? 'Your work' : 'The whole company'} · ${LENS_HINTS[query.lens]}`}</p>
         </div>
-        {canCreate && (
-          <button type="button" className="btn btn-primary new-task-btn" onClick={onCreate} title="New task (N)">
-            <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>New task
-          </button>
-        )}
+        {/* New task is the top bar's quick action. */}
       </header>
 
 
@@ -142,7 +140,7 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
           Filters{pending && <span className="filters-pending-dot" title="Changes not applied yet" />}{activeFilters > 0 && <span className="filters-badge" aria-label={`${activeFilters} active`}>{activeFilters}</span>}
         </button>
         <Select value={query.sort} onChange={event => set({ sort: event.target.value as SortKey })} aria-label="Sort">
-          {(Object.keys(SORT_LABELS) as SortKey[]).map(sort => <option key={sort} value={sort}>Sort: {SORT_LABELS[sort]}</option>)}
+          {(Object.keys(SORT_LABELS) as SortKey[]).map(sort => <option key={sort} value={sort}>Sort: {completed && sort === 'urgency' ? 'Completed · newest first' : SORT_LABELS[sort]}</option>)}
         </Select>
         <span className="registry-meta">
           <span className="filters-count">{tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}</span>
@@ -159,8 +157,8 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
       </div>
 
       {tasks.length === 0
-        ? <Empty title={filtered ? 'No tasks match these filters' : EMPTY[query.lens]}>
-            {!filtered && query.lens === 'all' && canCreate ? 'Create the first one with New task (N).' : undefined}
+        ? <Empty title={completed ? 'No completed tasks in this scope' : filtered ? 'No tasks match these filters' : EMPTY[query.lens]}>
+            {completed ? 'Completed tasks stay here until archived or reopened. Try the other scope or adjust your filters.' : !filtered && query.lens === 'all' && canCreate ? 'Create the first one with New task (N).' : undefined}
           </Empty>
         : prefs.layout === 'board'
           ? <Board quest={quest} tasks={tasks} selectedId={selectedId} onSelect={onSelect} />
@@ -203,7 +201,7 @@ function Table({ quest, tasks, selectedId, onSelect }: { quest: Quest; tasks: Ta
               <span className="cell-task-text">
                 <button type="button" className="row-open" aria-label={`Open ${task.title}`} aria-current={task.id === selectedId || undefined} onClick={event => { event.stopPropagation(); onSelect(task.id); }}><strong>{task.title}</strong></button>
                 {task.projectId && <span className="cell-project">{projectName(state, task.projectId)}</span>}
-                <small>{task.status === 'blocked' ? `Blocked: ${task.blocker?.note ?? ''}` : task.status === 'done' ? `Completed ${task.completedAt ? new Date(task.completedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}` : task.nextAction ? `Next: ${task.nextAction}` : 'No next action yet'}</small>
+                <small>{task.status === 'blocked' ? `Blocked: ${task.blocker?.note ?? ''}` : task.status === 'done' ? <CompletionMeta quest={quest} task={task} /> : task.nextAction ? `Next: ${task.nextAction}` : 'No next action yet'}</small>
                 <span className="cell-flags"><Flags quest={quest} task={task} priority={false} /></span>
               </span>
             </span>
@@ -231,6 +229,7 @@ function Board({ quest, tasks, selectedId, onSelect }: { quest: Quest; tasks: Ta
             {column.tasks.map(task => (
               <button key={task.id} type="button" className={`board-card ${task.id === selectedId ? 'is-selected' : ''}`} onClick={() => onSelect(task.id)} aria-current={task.id === selectedId || undefined}>
                 <strong>{task.title}</strong>
+                {task.status === 'done' && <small><CompletionMeta quest={quest} task={task} /></small>}
                 <span className="cell-flags"><Flags quest={quest} task={task} /></span>
                 <span className="board-meta"><Avatar state={state} id={task.owner} size="sm" />{task.owner ? firstName(state, task.owner) : 'Unassigned'}{task.due && <> · <span className={rowFlags(state, task, now).overdue ? 'text-danger' : ''}>{shortDate(task.due, today)}</span></>}</span>
               </button>
@@ -241,4 +240,9 @@ function Board({ quest, tasks, selectedId, onSelect }: { quest: Quest; tasks: Ta
       ))}
     </div>
   );
+}
+
+function CompletionMeta({ quest, task }: { quest: Quest; task: Task }) {
+  const { actor, at } = completionDetails(quest.state, task);
+  return <>Completed by {actor ? nameOf(quest.state, actor, 'Former member') : 'actor unavailable'} · {at !== null ? <time dateTime={new Date(at).toISOString()}>{new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</time> : 'time unavailable'}</>;
 }

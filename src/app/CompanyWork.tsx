@@ -25,8 +25,8 @@ export function CompanyWork({ quest, onOpen }: { quest: Quest; onOpen: (id: stri
       <header className="view-head">
         <div>
           <p className="eyebrow">Shared visibility</p>
-          <h1>Company Work</h1>
-          <p className="lede">Everything the team is moving. Everyone in {quest.backend.kind === 'live' ? state.workspace.name : 'this demo workspace'} can see it; owners and approvers control what moves.</p>
+          <h1>Projects</h1>
+          <p className="lede">Coordinate daily work by project. Scan status, then open a task to see who acts next.</p>
         </div>
       </header>
       <div className="filters" role="group" aria-label="Filters">
@@ -46,12 +46,19 @@ export function CompanyWork({ quest, onOpen }: { quest: Quest; onOpen: (id: stri
         </Select>
         <span className="filters-count">{tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}</span>
       </div>
-      {byProject.length === 0 ? <Empty title="No tasks match these filters" /> : byProject.map(group => (
+      {byProject.length === 0 ? <Empty title="No tasks match these filters" /> : byProject.map(group => {
+        const next = group.tasks.find(task => task.status !== 'done');
+        const summary = (Object.keys(STATUS_LABELS) as TaskStatus[])
+          .map(key => ({ label: STATUS_LABELS[key], count: group.tasks.filter(task => task.status === key).length }))
+          .filter(item => item.count)
+          .map(item => `${item.count} ${item.label.toLowerCase()}`).join(' · ');
+        return (
         <section key={group.id || 'none'} className="group">
-          <h3 className="group-title">{group.name} <span>{group.tasks.length}</span></h3>
-          <div className="rows">{group.tasks.map(task => <TaskRow key={task.id} quest={quest} task={task} onOpen={onOpen} />)}</div>
+          <h3 className="group-title">{group.name} <span>{group.tasks.length} {group.tasks.length === 1 ? 'task' : 'tasks'}</span></h3>
+          <p className="muted">{summary}{project || who || status !== 'open' ? ' · filtered view' : ''}</p>
+          <div className="rows">{group.tasks.map(task => <TaskRow key={task.id} quest={quest} task={task} priority={task.id === next?.id} onOpen={onOpen} />)}</div>
         </section>
-      ))}
+      ); })}
     </div>
   );
 }

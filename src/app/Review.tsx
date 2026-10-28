@@ -415,7 +415,7 @@ export function ReviewerWelcome({ quest, onOpenFeedback, go }: { quest: Quest; o
       <div className="welcome-grid">
         <div><b>You can</b><ul>{REVIEWER_SCOPE.map(line => <li key={line}>{line}</li>)}</ul></div>
         <div><b>Try these screens</b><ul>
-          <li><button type="button" className="link" onClick={() => go('company-work')}>Company Work</button> — every job the team is moving</li>
+          <li><button type="button" className="link" onClick={() => go('company-work')}>Projects</button> — every job the team is moving</li>
           <li><button type="button" className="link" onClick={() => go('leads')}>Speed to Lead</button> — select a lead to open its instrument deck</li>
           <li><button type="button" className="link" onClick={() => go('needs-attention')}>Needs Attention</button> — what Task-HQ flags and why</li>
         </ul></div>
