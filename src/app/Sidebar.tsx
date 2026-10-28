@@ -13,11 +13,11 @@ import type { Notification } from './notifications.ts';
 import { useDropdown } from '../ui/useDropdown.tsx';
 
 const MOBILE_QUERY = '(max-width: 760px)';
-export const PANEL_MIN = 232;
-export const PANEL_MAX = 420;
-export const PANEL_DEFAULT = 320;
+export const PANEL_MIN = 220;
+export const PANEL_MAX = 315;
+export const PANEL_DEFAULT = 240;
 /** The earlier default; a width still at it moves to the new default (it was never chosen by hand). */
-const OLD_DEFAULT = 288;
+const OLD_DEFAULT = 320;
 const READ_LIMIT = 300;
 const storageKey = (actor: string) => `quest.sidebar.v1.${actor}`;
 

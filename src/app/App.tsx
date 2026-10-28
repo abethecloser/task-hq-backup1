@@ -59,7 +59,7 @@ import { notificationsFor } from './notifications.ts';
 import { PREVIEW_VIEWS, PreviewNotice } from './PreviewNotice.tsx';
 import { canonicalPage, pageStatus } from '../core/navigation.ts';
 import type { AppPageId } from '../core/navigation.ts';
-import { closeTemporaryRight, openTemporaryRight, togglePullout } from '../core/layout.ts';
+import { bothFit, closeTemporaryRight, openTemporaryRight, togglePullout } from '../core/layout.ts';
 import type { PulloutRoom, Pullouts } from '../core/layout.ts';
 import { splitFilters } from '../core/task-filters.ts';
 import type { Notification } from './notifications.ts';
@@ -353,6 +353,12 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   // Calendar owns the persisted, clamped panel width; both right panes reuse it.
   const rightPanelWidth = sidebar.width;
   const room: PulloutRoom = { viewport: width, mobile: sidebar.isMobile, calendarWidth: sidebar.width, notificationsWidth: rightPanelWidth, minCanvasBoth: MIN_CANVAS_BOTH, minCanvas: MIN_CANVAS };
+  useEffect(() => {
+    if (!sidebar.isMobile && rightPanelOpen && sidebar.open && !bothFit(room)) {
+      restoreCalendar.current = true;
+      sidebar.toggle();
+    }
+  }, [width, sidebar.width, sidebar.isMobile, rightPanelOpen, sidebar.open]);
   const pullouts: Pullouts = { calendar: !sidebar.isMobile && calendarAllowed && sidebar.open, notifications: rightPanelOpen };
   function showPullouts(next: Pullouts) {
     if (!next.notifications) { setNotifOpen(false); setAskOpen(false); }
@@ -428,8 +434,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         onSelect={id => id === 'all-tasks' ? openLens(registryView.lens) : id === 'calendar' && !sidebar.isMobile ? (calendarAllowed ? toggleLeft() : go('calendar')) : go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
-          ? <><LookSwitch compact /><ModeChip quest={quest} /><p>Signed in as {me.name && !me.name.includes('@') ? me.name : live.email} · {ROLE_LABELS[live.role]}{live.isPlatformAdmin ? ' · platform admin (separate)' : ''}</p><button type="button" className="link exit-demo" onClick={live.onSignOut}>Sign out</button></>
-          : <><LookSwitch compact /><ModeChip quest={quest} /><p><b>Task-HQ Demo</b> · synthetic people and data. Changes stay on this device; teammates are not notified.</p>{onExitDemo && <button type="button" className="link exit-demo" onClick={onExitDemo}>Sign in to Task HQ</button>}</>}
+          ? <><ModeChip quest={quest} /><p>Signed in as {me.name && !me.name.includes('@') ? me.name : live.email} · {ROLE_LABELS[live.role]}{live.isPlatformAdmin ? ' · platform admin (separate)' : ''}</p><button type="button" className="link exit-demo" onClick={live.onSignOut}>Sign out</button></>
+          : <><ModeChip quest={quest} /><p><b>Task-HQ Demo</b> · synthetic people and data. Changes stay on this device; teammates are not notified.</p>{onExitDemo && <button type="button" className="link exit-demo" onClick={onExitDemo}>Sign in to Task HQ</button>}</>}
       />
       <main className="main" inert={sidebar.isMobile && edgePanelOpen}>
         {!live && onExitDemo && <aside className="demo-access" aria-label="Task HQ demo">

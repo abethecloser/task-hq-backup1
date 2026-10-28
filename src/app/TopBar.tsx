@@ -33,11 +33,12 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title
   useLayoutEffect(() => {
     const node = bar.current;
     if (!node) return;
-    const publish = () => document.documentElement.style.setProperty('--topbar-h', `${node.offsetTop + node.offsetHeight}px`);
+    const publish = () => document.documentElement.style.setProperty('--topbar-h', `${node.getBoundingClientRect().bottom}px`);
     publish();
     const observer = new ResizeObserver(publish);
     observer.observe(node);
-    return () => observer.disconnect();
+    window.addEventListener('scroll', publish, { passive: true });
+    return () => { observer.disconnect(); window.removeEventListener('scroll', publish); };
   }, []);
   return (
     <header ref={bar} className={`topbar ${sections ? 'has-sections' : ''} ${tabs ? 'has-sub' : ''}`}>
