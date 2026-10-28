@@ -17,15 +17,3 @@ export const PAGE_STATUS: Readonly<Record<AppPageId, PageStatus>> = {
 export function pageStatus(view: string): PageStatus {
   return APP_PAGE_IDS.includes(view as AppPageId) ? PAGE_STATUS[view as AppPageId] : 'preview';
 }
-
-/** Retired page ids that open another page, so saved `#/reports` links keep working. */
-export const PAGE_ALIASES: Readonly<Partial<Record<AppPageId, AppPageId>>> = { reports: 'executive' };
-
-export function canonicalPage<T extends string>(view: T): T | AppPageId {
-  return PAGE_ALIASES[view as AppPageId] ?? view;
-}
-
-/** Pages shown in everyday navigation: live, and not an alias of another page. */
-export const EVERYDAY_PAGES: readonly AppPageId[] = APP_PAGE_IDS.filter(id => PAGE_STATUS[id] === 'live' && !PAGE_ALIASES[id]);
-/** Preview pages stay reachable, in a separate group, so unfinished modules don't crowd daily work. */
-export const PREVIEW_PAGES: readonly AppPageId[] = APP_PAGE_IDS.filter(id => PAGE_STATUS[id] === 'preview');

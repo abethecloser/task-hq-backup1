@@ -1,0 +1,42 @@
+--- a/package.json
++++ b/package.json
+@@ -5,8 +5,8 @@
+   "type": "module",
+   "scripts": {
+     "dev": "vite --host 0.0.0.0",
+-    "build": "npm run icons && tsc -b && vite build && vite build -c vite.extension.config.ts",
+-    "build:app": "tsc -b && vite build",
++    "build": "node scripts/validate-browser-env.mjs && npm run icons && tsc -b && vite build && vite build -c vite.extension.config.ts",
++    "build:app": "node scripts/validate-browser-env.mjs && tsc -b && vite build",
+     "build:extension": "npm run icons && vite build -c vite.extension.config.ts",
+     "icons": "node scripts/make-icons.mjs",
+     "test": "node scripts/sync-functions.mjs && node --test src/core/*.test.ts src/core/tools/*.test.ts src/ui/*.test.ts src/adapter/*.test.ts src/automation/*.test.ts src/integrations/*.test.ts src/auth/*.test.ts supabase/functions/badge-check-in/*.test.ts supabase/functions/dispatch/*.test.ts deploy/dispatch-live/*.test.ts src/activation/handler.test.ts src/shifts/workday.test.ts",
+--- a/src/auth/client.ts
++++ b/src/auth/client.ts
+@@ -15,7 +15,12 @@
+   } catch { return false; }
+ }
+ 
+-export const backendConfigured = !!(url && key && !isSecretKey(key));
++function isHttpUrl(value: string | undefined): boolean {
++  try { return ['https:', 'http:'].includes(new URL(value ?? '').protocol); }
++  catch { return false; }
++}
++
++export const backendConfigured = !!(isHttpUrl(url) && key && !isSecretKey(key));
+ if (key && isSecretKey(key)) console.error('Refusing a secret Supabase key in the browser. Use the publishable key.');
+ 
+ let client: SupabaseClient | null = null;
+--- /dev/null
++++ b/scripts/validate-browser-env.mjs
+@@ -0,0 +1,10 @@
++import { loadEnv } from 'vite';
++const env = { ...loadEnv('production', process.cwd(), ''), ...process.env };
++let url;
++try { url = new URL(env.VITE_SUPABASE_URL); } catch { throw new Error('Invalid VITE_SUPABASE_URL: production requires an HTTP(S) backend URL.'); }
++if (!['https:', 'http:'].includes(url.protocol)) throw new Error('VITE_SUPABASE_URL must use HTTP(S).');
++const key = env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
++let role;
++try { role = JSON.parse(Buffer.from(key.split('.')[1] || '', 'base64url').toString()).role; } catch {}
++if (!(key.startsWith('sb_publishable_') || role === 'anon')) throw new Error('Production requires a Supabase publishable or anon key.');
++console.log('Browser backend configuration validated:', url.hostname);

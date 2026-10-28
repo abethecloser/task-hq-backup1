@@ -10,8 +10,6 @@ interface ServerReply { ok: boolean; state?: QuestState; rev?: number; message?:
 
 /** dispatch v5 is the first release that advertises a contract; v4 replies carry none. */
 const FULL_CONTRACT = 5;
-/** dispatch v6 adds completedBy and `task/archive`/`task/unarchive`; older servers answer 400 for them. */
-const ARCHIVE_CONTRACT = 6;
 
 // dispatch v4 (verified against the deployed source on 2026-10-20) predates these
 // features; they are refused before sending until a reply advertises the v5 contract.
@@ -70,14 +68,13 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
     label: `Shared · ${org.name}`,
     detail: `Saved to Task-HQ. Everyone in ${org.name} sees changes as they happen. Permissions are checked on the server.`,
     async load() {
-      const { status, reply } = await call({ op: 'load' });
-      if (status < 200 || status >= 300 || !reply.ok || !reply.state) throw new Error(reply.error ?? 'Could not load the workspace.');
+      const { reply } = await call({ op: 'load' });
+      if (!reply.ok || !reply.state) throw new Error(reply.error ?? 'Could not load the workspace.');
       return remember(reply.state, reply.rev);
     },
     async dispatch(action: Action): Promise<DispatchResult> {
       const full = contract >= FULL_CONTRACT;
-      const archiveGate = (action.type === 'task/archive' || action.type === 'task/unarchive') && contract < ARCHIVE_CONTRACT ? 'Archiving is unavailable on the current shared server. Nothing was sent.' : null;
-      const error = archiveGate ?? (full ? null : unsupported(action));
+      const error = full ? null : unsupported(action);
       if (error) return { ok: false, state: latest!, error };
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const { status, reply } = await call({ op: 'dispatch', action: full ? action : withoutReferenceDrafts(action), expectedRev: latest?.rev });
@@ -93,8 +90,8 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
       // Temporary access expires on the server; ask at most every 5 seconds.
       if (Date.now() - lastTick < 5000) return;
       lastTick = Date.now();
-      const { status, reply } = await call({ op: 'tick' });
-      if (status >= 200 && status < 300 && reply.ok && reply.state) remember(reply.state, reply.rev);
+      const { reply } = await call({ op: 'tick' });
+      if (reply.ok && reply.state) remember(reply.state, reply.rev);
     },
     subscribe(listener) {
       const channel = client.channel(`workspace-${org.id}`)
@@ -115,7 +112,7 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
     async outboxCount() { return 0; },
     get supports(): BackendSupports {
       const full = contract >= FULL_CONTRACT;
-      return { taskTaxonomy: full, taskReopen: full, leadOwnership: full, workLabels: full, structuredReferences: full, taskArchive: contract >= ARCHIVE_CONTRACT };
+      return { taskTaxonomy: full, taskReopen: full, leadOwnership: full, workLabels: full, structuredReferences: full };
     },
   };
 }

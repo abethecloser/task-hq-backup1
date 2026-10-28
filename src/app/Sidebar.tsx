@@ -1,9 +1,8 @@
 // Persistent workspace sidebar: a 56px Instrument Rail that is always visible, plus
 // a resizable pullout beside it. On desktop the pullout reflows the main content (the
 // shell reserves its width) and never covers it. On mobile it is a dismissible drawer.
-// The rail navigates; the attached Calendar tab opens the left quick view.
-// Notifications live in a drawer on the right (NotificationDrawer.tsx). On mobile the rail is
-// hidden, so this drawer carries navigation instead.
+// The rail navigates; the pullout is live awareness (Inbox · Attention · Activity — see
+// Awareness.tsx). On mobile the rail is hidden, so the drawer also carries navigation.
 // Open state, width, tab, read items and snoozes are saved per person in localStorage;
 // they are presentation preferences on this device, not backend records.
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,9 +14,7 @@ import { useDropdown } from '../ui/useDropdown.tsx';
 const MOBILE_QUERY = '(max-width: 760px)';
 export const PANEL_MIN = 232;
 export const PANEL_MAX = 420;
-export const PANEL_DEFAULT = 320;
-/** The earlier default; a width still at it moves to the new default (it was never chosen by hand). */
-const OLD_DEFAULT = 288;
+export const PANEL_DEFAULT = 288;
 const READ_LIMIT = 300;
 const storageKey = (actor: string) => `quest.sidebar.v1.${actor}`;
 
@@ -32,9 +29,8 @@ function loadPrefs(actor: string): Prefs {
     const raw = JSON.parse(localStorage.getItem(storageKey(actor)) ?? 'null');
     if (!raw || typeof raw !== 'object') return fallback;
     return {
-      // The calendar pullout always starts closed; width, read items, snoozes and the tab are what persist.
-      open: false,
-      width: typeof raw.width === 'number' && raw.width !== OLD_DEFAULT ? clampWidth(raw.width) : PANEL_DEFAULT,
+      open: raw.open === true,
+      width: typeof raw.width === 'number' ? clampWidth(raw.width) : PANEL_DEFAULT,
       read: Array.isArray(raw.read) ? raw.read.filter((id: unknown): id is string => typeof id === 'string') : [],
       tab: TABS.includes(raw.tab) ? raw.tab : 'inbox',
       snoozes: Array.isArray(raw.snoozes) ? raw.snoozes.filter((item: unknown): item is Snooze => !!item && typeof (item as Snooze).id === 'string' && typeof (item as Snooze).until === 'number').slice(-100) : [],
@@ -123,11 +119,7 @@ export interface SidebarItem {
   label: string;
   icon: ReactNode;
   count?: number;
-  /** Unit of the badge, so task totals are not mistaken for project totals. */
-  countLabel?: string;
   hot?: boolean;
-  /** Not ready for daily use: listed under Previews instead of the everyday items. */
-  preview?: boolean;
   active: boolean;
   /** Short, role-appropriate line shown under the section in the panel. */
   info?: string;
@@ -137,8 +129,7 @@ function unreadIn(notes: Notification[], read: Set<string>, section?: string) {
   return notes.filter(note => (!section || note.section === section) && !read.has(note.id)).length;
 }
 
-export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, pullout, pulloutTitle, pulloutHead, settings, account, calendarAccess }: {
-  calendarAccess?: ReactNode;
+export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, awareness, settings, account }: {
   control: SidebarControl;
   items: SidebarItem[];
   brand: ReactNode;
@@ -147,11 +138,8 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
   footer: ReactNode;
   /** Task notifications, for per-section unread pips on the rail. */
   notifications: Notification[];
-  /** The left pullout's body (the calendar quick view), shown on desktop only. */
-  pullout: ReactNode;
-  pulloutTitle: string;
-  /** Wide screens: replaces the title with a control (the panel's tab switch); the title stays as its label. */
-  pulloutHead?: ReactNode;
+  /** The pullout body: Inbox · Attention · Activity. */
+  awareness: ReactNode;
   /** The settings menu at the foot of the rail; `close` dismisses it after a choice. */
   settings: (close: () => void) => ReactNode;
   /** Who is signed in: their mark on the rail, and the account menu. */
@@ -171,38 +159,6 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
     onBlur: () => setHint(null),
   });
 
-  // Everyday pages first. Preview modules stay one click away in a collapsed group, and the
-  // group opens by itself while one of them is the current page so you never lose your place.
-  const everyday = items.filter(item => !item.preview);
-  const previews = items.filter(item => item.preview);
-  const [previewsOpen, setPreviewsOpen] = useState(false);
-  const showPreviews = previewsOpen || previews.some(item => item.active);
-
-  const itemName = (item: SidebarItem, unread = 0) => `${item.label}${item.preview ? ', preview' : ''}${item.count ? `, ${item.count}${item.countLabel ? ` ${item.countLabel}` : item.hot ? ' need attention' : ''}` : ''}${unread ? `, ${unread} unread` : ''}`;
-  const railItem = (item: SidebarItem) => {
-    const unread = unreadIn(notifications, read, item.id);
-    return (
-      <button key={item.id} type="button" className={`nav-item ${item.active ? 'is-active' : ''}`}
-        aria-current={item.active ? 'page' : undefined} aria-label={itemName(item, unread)}
-        {...hintFor(item.label, [item.preview ? 'Preview' : '', item.info?.replace(/\.$/, ''), item.count && item.countLabel ? `${item.count} ${item.countLabel}` : '', unread ? `${unread} unread` : ''].filter(Boolean).join(' · ') || undefined)}
-        onClick={() => { setHint(null); onSelect(item.id); control.afterNavigate(); }}>
-        <span className="nav-icon">
-          {item.icon}
-          {unread > 0 ? <span className="rail-unread" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>
-            : item.hot && <i className="nav-pip" aria-hidden="true" />}
-        </span>
-      </button>
-    );
-  };
-  const panelItem = (item: SidebarItem) => (
-    <button key={item.id} type="button" className={item.active ? 'is-active' : ''} aria-current={item.active ? 'page' : undefined}
-      aria-label={item.preview || (item.count && item.countLabel) ? `${item.label}${item.preview ? ', preview' : ''}${item.count && item.countLabel ? `, ${item.count} ${item.countLabel}` : ''}` : item.label}
-      onClick={() => { onSelect(item.id); control.afterNavigate(); }}>
-      {item.icon}<span>{item.label}</span>
-      {item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`} title={item.countLabel ? `${item.count} ${item.countLabel}` : undefined}>{item.count}</span> : null}
-    </button>
-  );
-
   useEffect(() => {
     const node = panel.current;
     if (!node) return;
@@ -212,12 +168,6 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
   useEffect(() => {
     if (isMobile && control.mobileOpen) panel.current?.querySelector<HTMLElement>('.panel-close')?.focus();
   }, [isMobile, control.mobileOpen]);
-
-  useEffect(() => {
-    if (!isMobile && control.open && document.activeElement?.id === 'calendar-edge-launcher') {
-      panel.current?.querySelector<HTMLElement>('.panel-close')?.focus({ preventScroll: true });
-    }
-  }, [isMobile, control.open]);
 
   function onResizeKey(event: KeyboardEvent) {
     const step = event.shiftKey ? 48 : 16;
@@ -263,23 +213,22 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
       <aside className="rail" aria-label="Instrument Rail">
         <div className="sidebar-brand">{brand}</div>
         <nav className="nav" aria-label="Task-HQ sections">
-          <div className="nav-primary">
-            {everyday.filter(item => item.id === 'home' || item.id === 'calendar').map(item => item.id === 'calendar' && calendarAccess ? <div key={item.id} className="rail-calendar-access">{calendarAccess}</div> : railItem(item))}
-          </div>
-          <div className="nav-secondary">
-          {everyday.filter(item => item.id !== 'home' && item.id !== 'calendar').map(railItem)}
-          {previews.length > 0 && (
-            <>
-              <button type="button" className={`nav-item nav-group-toggle ${showPreviews ? 'is-open' : ''}`} aria-expanded={showPreviews} aria-controls="nav-previews"
-                aria-label={`Previews, ${previews.length} modules not ready for daily use`}
-                {...hintFor('Previews', `${previews.length} modules not ready for daily use`)}
-                onClick={() => { setHint(null); setPreviewsOpen(open => !open); }}>
-                <span className="nav-icon"><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={showPreviews ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} /></svg></span>
+          {items.map(item => {
+            const unread = unreadIn(notifications, read, item.id);
+            const name = `${item.label}${item.count ? `, ${item.count}${item.hot ? ' need attention' : ''}` : ''}${unread ? `, ${unread} unread` : ''}`;
+            return (
+              <button key={item.id} type="button" className={`nav-item ${item.active ? 'is-active' : ''}`}
+                aria-current={item.active ? 'page' : undefined} aria-label={name}
+                {...hintFor(item.label, [item.info?.replace(/\.$/, ''), unread ? `${unread} unread` : ''].filter(Boolean).join(' · ') || undefined)}
+                onClick={() => { setHint(null); onSelect(item.id); control.afterNavigate(); }}>
+                <span className="nav-icon">
+                  {item.icon}
+                  {unread > 0 ? <span className="rail-unread" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>
+                    : item.hot && <i className="nav-pip" aria-hidden="true" />}
+                </span>
               </button>
-              {showPreviews && <div id="nav-previews" className="nav-previews" role="group" aria-label="Previews">{previews.map(railItem)}</div>}
-            </>
-          )}
-          </div>
+            );
+          })}
         </nav>
         <div className="sidebar-foot">
           <RailMenu label="Settings" className="rail-settings" hint={hintFor('Settings', 'Look and workspace')} icon={<svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>}>{settings}</RailMenu>
@@ -294,19 +243,10 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
       <aside id="quest-sidebar" ref={panel} className="workspace-panel" aria-label="Workspace sidebar" aria-hidden={panelHidden || undefined}
         data-state={panelHidden ? 'collapsed' : 'expanded'} data-resizing={control.resizing || undefined}
         style={isMobile ? undefined : { width: control.width }}
-        onKeyDown={event => {
-          if (event.key === 'Escape') {
-            event.stopPropagation();
-            if (isMobile) control.closeMobile();
-            else { control.toggle(); document.getElementById('calendar-edge-launcher')?.focus({ preventScroll: true }); }
-          }
-        }}>
+        onKeyDown={event => { if (isMobile && event.key === 'Escape') { event.stopPropagation(); control.closeMobile(); } }}>
         <div className="panel-head">
-          {isMobile || !pulloutHead ? <span className="panel-title">{isMobile ? <>Task-<b>HQ</b></> : pulloutTitle}</span> : pulloutHead}
-          <button type="button" className="icon-btn panel-close" aria-label={isMobile ? 'Close navigation' : `Close ${pulloutTitle.toLowerCase()}`} onClick={() => {
-            if (isMobile) control.closeMobile();
-            else { control.toggle(); document.getElementById('calendar-edge-launcher')?.focus({ preventScroll: true }); }
-          }}>
+          <span className="panel-title">Task-<b>HQ</b></span>
+          <button type="button" className="icon-btn panel-close" aria-label={isMobile ? 'Close navigation' : 'Collapse sidebar'} onClick={isMobile ? control.closeMobile : control.toggle}>
             <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={isMobile ? 'M6 6l12 12M18 6 6 18' : 'M15 6l-6 6 6 6'} /></svg>
           </button>
         </div>
@@ -317,20 +257,16 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
               <button type="button" className="nav-create panel-create" disabled={!create.enabled} onClick={() => { create.onCreate(); control.afterNavigate(); }}>
                 <span aria-hidden="true">+</span> New task
               </button>
-              {everyday.map(panelItem)}
-              {previews.length > 0 && (
-                <>
-                  <button type="button" className={`panel-group-toggle ${showPreviews ? 'is-open' : ''}`} aria-expanded={showPreviews} aria-controls="panel-previews"
-                    onClick={() => setPreviewsOpen(open => !open)}>
-                    <span>Previews <small>not ready for daily use</small></span>
-                    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={showPreviews ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} /></svg>
-                  </button>
-                  {showPreviews && <div id="panel-previews" className="panel-previews" role="group" aria-label="Previews">{previews.map(panelItem)}</div>}
-                </>
-              )}
+              {items.map(item => (
+                <button key={item.id} type="button" className={item.active ? 'is-active' : ''} aria-current={item.active ? 'page' : undefined}
+                  onClick={() => { onSelect(item.id); control.afterNavigate(); }}>
+                  {item.icon}<span>{item.label}</span>
+                  {item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`}>{item.count}</span> : null}
+                </button>
+              ))}
             </nav>
           )}
-          {!isMobile && pullout}
+          {awareness}
         </div>
 
         <div className="panel-foot">{footer}</div>

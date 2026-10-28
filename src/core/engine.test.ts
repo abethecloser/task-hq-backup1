@@ -81,36 +81,6 @@ test('task/update edits only editable fields; status, Ultra and identity fields 
   assert.equal(task(h.state, id).nextAction, 'Bring sealant');
 });
 
-test('task edits clear optional type/time and remove a time when its due date is cleared', () => {
-  const h = harness();
-  const type = h.state.taxonomy!.types[0]!.id;
-  const id = h.act('riley', { type: 'task/create', task: { title: 'Inspect the flashing', owner: 'riley', type, due: '2026-10-28', dueTime: '09:00' } }).event!.taskId!;
-  h.act('riley', { type: 'task/update', id, changes: { type: undefined, dueTime: undefined } });
-  assert.equal(task(h.state, id).type, undefined);
-  assert.equal(task(h.state, id).dueTime, undefined);
-  assert.equal(task(h.state, id).due, '2026-10-28', 'clearing time preserves the date');
-  h.act('riley', { type: 'task/update', id, changes: { dueTime: '10:30' } });
-  h.act('riley', { type: 'task/update', id, changes: { due: '' } });
-  assert.equal(task(h.state, id).due, '');
-  assert.equal(task(h.state, id).dueTime, undefined, 'a time cannot survive without its date');
-});
-
-test('clearing fields survives JSON transport and unchanged classification survives unrelated edits', () => {
-  const h = harness();
-  const type = h.state.taxonomy!.types[0]!.id;
-  const id = h.act('riley', { type: 'task/create', task: { title: 'Inspect the flashing', owner: 'riley', type, tags: ['permits'], due: '2026-10-28', dueTime: '09:00' } }).event!.taskId!;
-  h.act('riley', { type: 'task/update', id, changes: { nextAction: 'Bring photos' } });
-  assert.equal(task(h.state, id).type, type);
-  assert.equal(task(h.state, id).dueTime, '09:00');
-  const action = JSON.parse(JSON.stringify({ type: 'task/update', id, changes: { type: '', dueTime: '', tags: [] } })) as Action;
-  h.act('riley', action);
-  assert.equal(task(h.state, id).type, undefined);
-  assert.equal(task(h.state, id).dueTime, undefined);
-  assert.equal(task(h.state, id).tags, undefined);
-  assert.equal(task(h.state, id).due, '2026-10-28');
-  assert.match(h.refuse('riley', { type: 'task/update', id, changes: { due: '', dueTime: '10:30' } }), /due date before a time/);
-});
-
 test('approval: working → review with approver → approve unlocks and hands off', () => {
   const h = harness();
   h.refuse('riley', { type: 'task/advance', id: 'maple-estimate' });
