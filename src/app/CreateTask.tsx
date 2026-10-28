@@ -24,7 +24,8 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
   const types = state.taxonomy?.types ?? [];
   // Proposed people from the one-line description are suggestions until chosen.
   const [proposed, setProposed] = useState<{ owner?: { id: string; name: string }; approver?: { id: string; name: string } }>({});
-  function fill(parsed: Draft) {
+  function fill(parsed: Draft | undefined) {
+    if (!parsed) return;
     const member = (p: Draft['owner']) => (p && p.ref.kind === 'member' ? { id: p.ref.id, name: p.ref.name } : undefined);
     set({ title: parsed.title, priority: parsed.priority, ...(parsed.due ? { due: parsed.due } : {}),
       ...(taxonomyOk ? { type: parsed.type || undefined, tags: parsed.tags.map(item => item.tag), dueTime: parsed.dueTime || undefined } : {}),

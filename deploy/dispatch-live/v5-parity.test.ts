@@ -164,8 +164,10 @@ test('rollback is safe: production v4 keeps working on state written by v5', () 
   }
 });
 
-test('v5 core is the current engine, byte for byte', async () => {
+// v5 is a frozen production snapshot; sync:functions updates the current dispatch
+// bundle instead. The behavioral tests above continue exercising frozen v5.
+test('current dispatch core matches the current engine, byte for byte', async () => {
   const { readFileSync, readdirSync } = await import('node:fs');
-  const dir = new URL('./v5/core/', import.meta.url);
+  const dir = new URL('../../supabase/functions/dispatch/core/', import.meta.url);
   for (const file of readdirSync(dir)) assert.equal(readFileSync(new URL(file, dir), 'utf8'), readFileSync(new URL(`../../src/core/${file}`, import.meta.url), 'utf8'), `${file} drifted; run npm run sync:functions`);
 });
