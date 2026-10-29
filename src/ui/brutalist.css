@@ -57,8 +57,8 @@
 :root[data-look="brutalist"] .context-label,
 :root[data-look="brutalist"] .ctx-label,
 :root[data-look="brutalist"] .answer small,
-:root[data-look="brutalist"] .decision-kind { font-size: 11px; font-weight: 500; color: var(--ink-2); }
-:root[data-look="brutalist"] .view-head .lede { font-size: 15px; color: var(--ink-2); }
+:root[data-look="brutalist"] .decision-kind { font-size: 13px; font-weight: 500; color: var(--ink-2); }
+:root[data-look="brutalist"] .view-head .lede { font-size: 18px; color: var(--ink-2); }
 :root[data-look="brutalist"] .situation-headline,
 :root[data-look="brutalist"] .empty h3,
 :root[data-look="brutalist"] .panel h3,
@@ -184,7 +184,7 @@
 :root[data-look="brutalist"] .lens:last-child { border-right: 0; }
 :root[data-look="brutalist"] .lens.is-active { background: var(--ink-rule); }
 :root[data-look="brutalist"] .segmented { border-color: var(--ink-rule); padding: 0; }
-:root[data-look="brutalist"] .segmented button { min-height: 32px; font-family: var(--mono); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; font-size: 11px; }
+:root[data-look="brutalist"] .segmented button { min-height: 32px; font-family: var(--mono); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; font-size: 13px; }
 :root[data-look="brutalist"] .segmented button.is-on { background: var(--ink-rule); color: #fff; box-shadow: none; }
 :root[data-look="brutalist"] .registry-tools select,
 :root[data-look="brutalist"] .search-field input { border-color: var(--ink-rule); }
@@ -195,11 +195,11 @@
 :root[data-look="brutalist"] .panel-section-head.is-active .panel-count:not(.is-hot) { color: #c9c9cf; }
 :root[data-look="brutalist"] .demo-flag { border: 1px solid var(--accent); background: var(--accent); color: #fff; }
 :root[data-look="brutalist"] .workspace-chip { border: 1px solid var(--ink-rule); background: transparent; }
-:root[data-look="brutalist"] .role-chip { border-color: var(--ink-rule); font-family: var(--mono); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+:root[data-look="brutalist"] .role-chip { border-color: var(--ink-rule); font-family: var(--mono); font-weight: 500; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
 :root[data-look="brutalist"] .role-chip.role-owner { border-color: var(--accent); background: var(--accent); color: #fff; }
 :root[data-look="brutalist"] .status-chip,
 :root[data-look="brutalist"] .pill,
-:root[data-look="brutalist"] .tag { font-family: var(--mono); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; font-size: 10.5px; }
+:root[data-look="brutalist"] .tag { font-family: var(--mono); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; font-size: 12.5px; }
 :root[data-look="brutalist"] .signal-totals span { border-color: var(--ink-rule); font-family: var(--mono); }
 :root[data-look="brutalist"] .signal-totals b { font-family: var(--display); font-weight: 900; }
 :root[data-look="brutalist"] .sig-dot.is-live { animation: none; box-shadow: none; }
@@ -216,8 +216,8 @@
 :root[data-look="brutalist"] .shell .avatar { border-radius: 0 !important; }
 
 @media (max-width: 760px) {
-  :root[data-look="brutalist"] .view-head h1 { font-size: 40px; }
-  :root[data-look="brutalist"] .answer b { font-size: 44px; }
+  :root[data-look="brutalist"] .view-head h1 { font-size: 48px; }
+  :root[data-look="brutalist"] .answer b { font-size: 53px; }
   :root[data-look="brutalist"] .lens { border-right: 1px solid var(--ink-rule); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -232,7 +232,7 @@
 /* Rail labels in the brutalist look: hard black tag, orange offset, mono detail. */
 :root[data-look="brutalist"] .rail-hint { border: 1px solid var(--ink-rule); border-radius: 0; background: var(--ink-rule); box-shadow: 3px 3px 0 var(--accent); }
 :root[data-look="brutalist"] .rail-hint::before { background: var(--ink-rule); }
-:root[data-look="brutalist"] .rail-hint small { font: 500 10.5px/1.3 var(--mono); letter-spacing: .04em; text-transform: uppercase; }
-:root[data-look="brutalist"] .view-head h1 { font: 900 clamp(40px, 5.4vw, 76px)/.9 var(--display); letter-spacing: -.045em; text-transform: uppercase; }
-:root[data-look="brutalist"] .signal-summary { font: 500 13px/1.55 var(--mono); letter-spacing: 0; color: var(--ink); }
-@media (max-width: 760px) { :root[data-look="brutalist"] .view-head h1 { font-size: 40px; } }
+:root[data-look="brutalist"] .rail-hint small { font: 500 12.5px/1.3 var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+:root[data-look="brutalist"] .view-head h1 { font: 900 clamp(48px, 5.4vw, 91px)/.9 var(--display); letter-spacing: -.045em; text-transform: uppercase; }
+:root[data-look="brutalist"] .signal-summary { font: 500 15.5px/1.55 var(--mono); letter-spacing: 0; color: var(--ink); }
+@media (max-width: 760px) { :root[data-look="brutalist"] .view-head h1 { font-size: 48px; } }

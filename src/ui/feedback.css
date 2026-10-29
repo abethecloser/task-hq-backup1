@@ -2,17 +2,17 @@
 .feedback-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px; padding: 7px 28px; border-bottom: 1px solid var(--hair); background: var(--card); color: var(--ink-2); }
 .feedback-result { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .feedback-result > div { display: grid; gap: 2px; min-width: 0; }
-.feedback-result strong { color: var(--ink); font-size: 11.5px; font-weight: 750; }
-.feedback-symbol { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--hair-2); border-radius: 6px; color: var(--accent-ink); font-size: 17px; font-weight: 800; }
-.feedback-detail { overflow: hidden; max-width: 68ch; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.feedback-result strong { color: var(--ink); font-size: 14px; font-weight: 750; }
+.feedback-symbol { flex: none; display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--hair-2); border-radius: 6px; color: var(--accent-ink); font-size: 20.5px; font-weight: 800; }
+.feedback-detail { overflow: hidden; max-width: 68ch; color: var(--muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .feedback-controls { display: flex; align-items: center; gap: 8px; flex: none; }
-.feedback-controls details { position: relative; font-size: 11px; }
+.feedback-controls details { position: relative; font-size: 13px; }
 .feedback-controls summary { cursor: pointer; padding: 6px; }
 .feedback-preferences { position: absolute; z-index: 80; right: 0; top: 100%; display: grid; gap: 12px; width: 250px; padding: 16px; border: 1px solid var(--hair-2); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow-lift); }
 .feedback-preferences label { display: flex; align-items: center; gap: 8px; }
 .feedback-preferences input { min-height: 16px !important; }
 .feedback-preferences small { color: var(--muted); line-height: 1.5; }
-.record-cue, .aware-feedback { color: var(--accent-ink); font-size: 11px; font-weight: 750; }
+.record-cue, .aware-feedback { color: var(--accent-ink); font-size: 13px; font-weight: 750; }
 [data-feedback-phase="processing"] { cursor: progress; }
 .feedback-bar[data-feedback-phase="processing"] .feedback-symbol { animation: feedback-process .9s linear infinite; }
 [data-feedback-phase="denied"], [data-feedback-phase="failed"] { --feedback-edge: var(--danger); }
@@ -47,6 +47,6 @@
 
 /* Completion keeps its motion and adds a readable route to the retained record. */
 .feedback-message-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.feedback-bar.is-completion .feedback-message-line strong { font-size: 14px; }
-.feedback-message-line button { min-height: 44px; max-width: 100%; font-size: 14px; white-space: normal; }
+.feedback-bar.is-completion .feedback-message-line strong { font-size: 17px; }
+.feedback-message-line button { min-height: 44px; max-width: 100%; font-size: 17px; white-space: normal; }
 @media (max-width: 600px) { .feedback-bar.is-completion { flex-wrap: wrap; } }
