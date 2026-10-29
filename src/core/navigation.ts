@@ -27,5 +27,8 @@ export function canonicalPage<T extends string>(view: T): T | AppPageId {
 
 /** Pages shown in everyday navigation: live, and not an alias of another page. */
 export const EVERYDAY_PAGES: readonly AppPageId[] = APP_PAGE_IDS.filter(id => PAGE_STATUS[id] === 'live' && !PAGE_ALIASES[id]);
+/** Archived modules: out of navigation, but their pages, data and history are untouched and still open by
+ * address (#/leads, #/relationships, #/agents). Remove an id here to restore it. */
+export const ARCHIVED_PAGES: readonly AppPageId[] = ['leads', 'relationships', 'agents'];
 /** Preview pages stay reachable, in a separate group, so unfinished modules don't crowd daily work. */
-export const PREVIEW_PAGES: readonly AppPageId[] = APP_PAGE_IDS.filter(id => PAGE_STATUS[id] === 'preview');
+export const PREVIEW_PAGES: readonly AppPageId[] = APP_PAGE_IDS.filter(id => PAGE_STATUS[id] === 'preview' && !ARCHIVED_PAGES.includes(id));

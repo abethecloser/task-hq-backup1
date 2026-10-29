@@ -51,7 +51,7 @@ export function LivingView({ quest, company, projectId, person, focusProjectId, 
                   <title>{`${d.title} · ${STATUS_LABELS[d.status]}${d.owner ? ` · ${firstName(state, d.owner)}` : ''}`}</title>
                 </circle>
               ))}
-              {item.r > 26 && <text className="lv-name" x={item.x} y={item.y + item.r + 0} dy="-6" textAnchor="middle">{clip(item.name, Math.floor(item.r / 4))}</text>}
+              <text className="lv-name" x={item.x} y={item.y + item.r + 14} textAnchor="middle">{clip(item.name, Math.max(10, Math.floor(item.r / 3)))}<tspan className="lv-count"> · {item.open}</tspan></text>
             </g>
           );
         })}
@@ -68,25 +68,20 @@ export function LivingView({ quest, company, projectId, person, focusProjectId, 
           <button type="button" className="link" onClick={() => onOpen(dot.id)}>Open task</button>
         </div>}
         <Group label="What’s moving" empty="Nothing moved in the last 48 hours." items={movingNow.slice(0, 3)} onPick={id => setTaskId(id)} picked={taskId} />
-        <Group label="Needs attention" empty="Nothing overdue, blocked or waiting." items={attention.slice(0, 3)} hot onPick={id => setTaskId(id)} picked={taskId} />
-        <div className="lv-group">
-          <p className="pt-label">Who’s involved</p>
-          {involved.length === 0 ? <p className="hd-quiet">Nobody has open work here.</p> : <div className="lv-people">
-            {involved.slice(0, 8).map(item => <button key={item.person} type="button" className="lv-person" aria-pressed={person === item.person}
-              onClick={() => { setTaskId(null); onPerson(person === item.person ? null : item.person); }}>{item.name}<b>{item.open}</b></button>)}
-          </div>}
-        </div>
+        <Group label="Needs attention" empty="Nothing overdue, blocked or waiting." items={attention.slice(0, 3)} more={attention.length - 3} hot onPick={id => setTaskId(id)} picked={taskId} />
+        <p className="lv-involved"><span className="pt-label">Who’s involved</span> {involved.length === 0 ? 'Nobody has open work here.' : `${involved.slice(0, 4).map(item => item.name).join(', ')}${involved.length > 4 ? ` +${involved.length - 4}` : ''}`}</p>
         <p className="lv-key" aria-hidden="true"><i className="s-working" />In progress <i className="s-review" />Review <i className="s-blocked" />Blocked <i className="s-ready" />Not started <i className="s-done" />Done</p>
       </aside>
     </div>
   );
 }
 
-function Group({ label, items, empty, hot, onPick, picked }: { label: string; items: { id: string; title: string }[]; empty: string; hot?: boolean; onPick: (id: string) => void; picked: string | null }) {
+function Group({ label, items, empty, hot, more = 0, onPick, picked }: { label: string; items: { id: string; title: string }[]; empty: string; hot?: boolean; more?: number; onPick: (id: string) => void; picked: string | null }) {
   return <div className="lv-group">
     <p className="pt-label">{label}</p>
     {items.length === 0 ? <p className="hd-quiet">{empty}</p> : <ul className="lv-list">
-      {items.map(item => <li key={item.id}><button type="button" className={`${hot ? 'is-hot' : ''} ${picked === item.id ? 'is-on' : ''}`} aria-pressed={picked === item.id} onClick={() => onPick(item.id)}>{item.title}</button></li>)}
+      {items.map(item => <li key={item.id}><button type="button" className={`${hot ? 'is-hot' : ''} ${picked === item.id ? 'is-on' : ''}`} aria-pressed={picked === item.id} title={item.title} onClick={() => onPick(item.id)}>{item.title}</button></li>)}
+      {more > 0 && <li className="lv-more">+{more} more</li>}
     </ul>}
   </div>;
 }

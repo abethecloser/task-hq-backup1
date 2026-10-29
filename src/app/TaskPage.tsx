@@ -33,7 +33,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
   const feedback = useFeedbackRecord(task.id);
   const back = useRef<HTMLButtonElement>(null);
   useEffect(() => { setTitle(task.title); setNextAction(task.nextAction); setDescription(task.description); setWaitingOn(task.waitingOn); }, [task.title, task.nextAction, task.description, task.waitingOn]);
-  useEffect(() => { window.scrollTo(0, 0); back.current?.focus({ preventScroll: true }); }, [task.id]);
+  useEffect(() => { window.scrollTo(0, 0); document.querySelector('.main > .content')?.scrollTo(0, 0); back.current?.focus({ preventScroll: true }); }, [task.id]);
 
   const me = state.people.find(item => item.id === actor);
   const reviewer = me?.role === 'reviewer';
@@ -85,7 +85,6 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
         <div className="ctx-tags"><TaskTags state={state} task={task} now={quest.now} /></div>
       </header>
 
-      <ResponsibilityCard quest={quest} task={task} onOpen={onOpen} />
 
       <dl className="tp-facts" aria-label="Status, assigned, priority and due date">
         <div><dt>Status</dt><dd><StatusMenu quest={quest} task={task} /></dd></div>
@@ -97,8 +96,9 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
           : projectName(state, task.projectId) || '—'}</dd></div>
       </dl>
 
-      <div className="tp-grid">
+      <div className="tp-grid is-three">
         <div className="tp-col tp-details" aria-label="Task details">
+          <ResponsibilityCard quest={quest} task={task} onOpen={onOpen} />
           <section className="tp-card" aria-labelledby="tp-brief">
             <h2 id="tp-brief" className="ctx-label">Brief</h2>
             {task.status !== 'done' && (
@@ -118,49 +118,10 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             )}
             {lead && <div className="callout"><b>Lead</b> {lead.name} · {lead.phone} · {lead.address}</div>}
           </section>
-          <section className="tp-card" aria-labelledby="tp-people">
-            <h2 id="tp-people" className="ctx-label">Watchers <span>{task.watchers.length}</span></h2>
-            <ul className="tp-watchers">
-              {task.watchers.map(id => (
-                <li key={id}><Avatar state={state} id={id} size="sm" />{id === actor ? 'You' : nameOf(state, id, 'Former member')}
-                  {(editable || id === actor) && <button type="button" className="icon-btn" aria-label={`Remove ${id === actor ? 'yourself' : nameOf(state, id)} from watchers`} onClick={() => void update({ watchers: task.watchers.filter(item => item !== id) })}>×</button>}
-                </li>
-              ))}
-              {task.watchers.length === 0 && <li className="muted">Nobody is watching yet.</li>}
-            </ul>
-            {editable && people.some(item => !task.watchers.includes(item.id)) && (
-              <Select className="inline-select" value="" aria-label="Add a watcher" onChange={event => { if (event.target.value) void update({ watchers: [...task.watchers, event.target.value] }); }}>
-                <option value="">+ Add a watcher</option>
-                {people.filter(item => !task.watchers.includes(item.id)).map(item => <option key={item.id} value={item.id}>{item.id === actor ? `${item.name} (you)` : item.name}</option>)}
-              </Select>
-            )}
-            {!editable && !reviewer && <p className="muted">Watch this task to follow its comments and changes.</p>}
-          </section>
 
-          {(waitsOn.length > 0 || unlocks.length > 0) && (
-            <section className="tp-card ctx-deps" aria-label="Dependencies">
-              {waitsOn.length > 0 && <>
-                <h2 className="ctx-label">Starts after</h2>
-                <ul>{waitsOn.map(item => <li key={item.id}><button type="button" className="ctx-link" onClick={() => onOpen(item.id)}><span className={`state-dot dot-${item.status}`} aria-hidden="true" />{item.title}<small>{item.status === 'done' ? 'done' : `${firstName(state, item.owner, 'unassigned')} · ${item.status}`}</small></button></li>)}</ul>
-              </>}
-              {unlocks.length > 0 && <>
-                <h2 className="ctx-label">Unlocks</h2>
-                <ul>{unlocks.map(item => <li key={item.id}><button type="button" className="ctx-link" onClick={() => onOpen(item.id)}><span className={`state-dot dot-${item.status}`} aria-hidden="true" />{item.title}<small>{firstName(state, item.owner || task.nextOwner, 'needs an owner')}</small></button></li>)}</ul>
-              </>}
-              {blockingDeps(state, task).length > 0 && isOpen(task) && <p className="muted">This task can’t move until the work above is done.</p>}
-            </section>
-          )}
 
           <details className="tp-card drawer-details">
-            <summary>More details <small>routing, lifecycle{editable ? ', time, tags, dependencies' : ''}</small></summary>
-            <section className="tp-routing" aria-label="Advanced routing">
-              <h3 className="ctx-label tp-sub">Advanced routing</h3>
-              <dl className="tp-people">
-                <div><dt>Next-step owner</dt><dd>{editable ? <PersonSelect state={state} label="Next-step owner" value={task.nextOwner} onChange={id => void update({ nextOwner: id })} /> : task.nextOwner ? nameOf(state, task.nextOwner) : '—'}</dd></div>
-                <div><dt>Approver</dt><dd>{editable ? <PersonSelect state={state} label="Approver" value={task.approver} emptyLabel="No approval needed" onChange={id => void update({ approver: id })} /> : task.approver ? nameOf(state, task.approver) : 'None'}</dd></div>
-                {(editable || task.decisionOwner) && <div><dt>Decision owner</dt><dd>{editable ? <PersonSelect state={state} label="Decision owner" value={task.decisionOwner} onChange={id => void update({ decisionOwner: id })} /> : nameOf(state, task.decisionOwner)}</dd></div>}
-              </dl>
-            </section>
+            <summary>More details <small>lifecycle{editable ? ', time, tags, dependencies' : ''}</small></summary>
             <LifecycleReference task={task} />
             {editable && <>
                 <div className="roles">
@@ -180,7 +141,6 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
         </div>
 
         <aside className="tp-col tp-conversation" aria-label="Conversation">
-          {!reviewer && <QuickActions quest={quest} task={task} />}
           <section className="tp-card tp-talk" aria-label="Comments and activity">
             <div className="tp-tabs" role="tablist" aria-label="Comments, activity and history" onKeyDown={event => {
               const tabs = ['comments', 'activity', 'history'] as const;
@@ -201,6 +161,48 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             </div>
           </section>
 
+        </aside>
+        <aside className="tp-col tp-side" aria-label="Actions, people and handoffs">
+          {!reviewer && <QuickActions quest={quest} task={task} />}
+          <section className="tp-card" aria-labelledby="tp-people">
+            <h2 id="tp-people" className="ctx-label">Watchers <span>{task.watchers.length}</span></h2>
+            <ul className="tp-watchers">
+              {task.watchers.map(id => (
+                <li key={id}><Avatar state={state} id={id} size="sm" />{id === actor ? 'You' : nameOf(state, id, 'Former member')}
+                  {(editable || id === actor) && <button type="button" className="icon-btn" aria-label={`Remove ${id === actor ? 'yourself' : nameOf(state, id)} from watchers`} onClick={() => void update({ watchers: task.watchers.filter(item => item !== id) })}>×</button>}
+                </li>
+              ))}
+              {task.watchers.length === 0 && <li className="muted">Nobody is watching yet.</li>}
+            </ul>
+            {editable && people.some(item => !task.watchers.includes(item.id)) && (
+              <Select className="inline-select" value="" aria-label="Add a watcher" onChange={event => { if (event.target.value) void update({ watchers: [...task.watchers, event.target.value] }); }}>
+                <option value="">+ Add a watcher</option>
+                {people.filter(item => !task.watchers.includes(item.id)).map(item => <option key={item.id} value={item.id}>{item.id === actor ? `${item.name} (you)` : item.name}</option>)}
+              </Select>
+            )}
+            {!editable && !reviewer && <p className="muted">Watch this task to follow its comments and changes.</p>}
+          </section>
+          <section className="tp-card tp-routing" aria-labelledby="tp-handoffs">
+            <h2 id="tp-handoffs" className="ctx-label">Handoffs</h2>
+            <dl className="tp-people">
+              <div><dt>Next-step owner</dt><dd>{editable ? <PersonSelect state={state} label="Next-step owner" value={task.nextOwner} onChange={id => void update({ nextOwner: id })} /> : task.nextOwner ? nameOf(state, task.nextOwner) : '—'}</dd></div>
+              <div><dt>Approver</dt><dd>{editable ? <PersonSelect state={state} label="Approver" value={task.approver} emptyLabel="No approval needed" onChange={id => void update({ approver: id })} /> : task.approver ? nameOf(state, task.approver) : 'None'}</dd></div>
+              {(editable || task.decisionOwner) && <div><dt>Decision owner</dt><dd>{editable ? <PersonSelect state={state} label="Decision owner" value={task.decisionOwner} onChange={id => void update({ decisionOwner: id })} /> : nameOf(state, task.decisionOwner)}</dd></div>}
+            </dl>
+          </section>
+          {(waitsOn.length > 0 || unlocks.length > 0) && (
+            <section className="tp-card ctx-deps" aria-label="Dependencies">
+              {waitsOn.length > 0 && <>
+                <h2 className="ctx-label">Starts after</h2>
+                <ul>{waitsOn.map(item => <li key={item.id}><button type="button" className="ctx-link" onClick={() => onOpen(item.id)}><span className={`state-dot dot-${item.status}`} aria-hidden="true" />{item.title}<small>{item.status === 'done' ? 'done' : `${firstName(state, item.owner, 'unassigned')} · ${item.status}`}</small></button></li>)}</ul>
+              </>}
+              {unlocks.length > 0 && <>
+                <h2 className="ctx-label">Unlocks</h2>
+                <ul>{unlocks.map(item => <li key={item.id}><button type="button" className="ctx-link" onClick={() => onOpen(item.id)}><span className={`state-dot dot-${item.status}`} aria-hidden="true" />{item.title}<small>{firstName(state, item.owner || task.nextOwner, 'needs an owner')}</small></button></li>)}</ul>
+              </>}
+              {blockingDeps(state, task).length > 0 && isOpen(task) && <p className="muted">This task can’t move until the work above is done.</p>}
+            </section>
+          )}
         </aside>
       </div>
     </article>

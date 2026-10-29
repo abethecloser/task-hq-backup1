@@ -67,8 +67,11 @@ export function livingLayout(state: QuestState, actor: string, now: number, comp
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   centres.forEach((c, i) => { minX = Math.min(minX, c.x - raw[i]!); maxX = Math.max(maxX, c.x + raw[i]!); minY = Math.min(minY, c.y - raw[i]!); maxY = Math.max(maxY, c.y + raw[i]!); });
   const pad = 12;
-  const scale = groups.length ? Math.min((size.width - pad * 2) / (maxX - minX), (size.height - pad * 2) / (maxY - minY)) : 1;
-  const offX = (size.width - (maxX - minX) * scale) / 2 - minX * scale, offY = (size.height - (maxY - minY) * scale) / 2 - minY * scale;
+  // Fit the cluster, but never blow a few projects up to fill the stage: the largest bubble stays
+  // at most ~28% of the stage height in radius, so one or two projects read as anchors, not walls.
+  const fit = groups.length ? Math.min((size.width - pad * 2) / (maxX - minX), (size.height - pad * 2 - 18) / (maxY - minY)) : 1;
+  const scale = Math.min(fit, (size.height * 0.28) / Math.max(...raw, 1));
+  const offX = (size.width - (maxX - minX) * scale) / 2 - minX * scale, offY = (size.height - 18 - (maxY - minY) * scale) / 2 - minY * scale;
 
   const bubbles = groups.map((group, i): LivingBubble => {
     const r = raw[i]! * scale, x = centres[i]!.x * scale + offX, y = centres[i]!.y * scale + offY;
@@ -76,7 +79,7 @@ export function livingLayout(state: QuestState, actor: string, now: number, comp
     const owners = new Map<string, number>();
     for (const task of open) if (task.owner) owners.set(task.owner, (owners.get(task.owner) ?? 0) + 1);
     const spots = phyllotaxis(group.tasks.length);
-    const dotR = Math.max(2.5, Math.min(9, (r * 0.78) / Math.sqrt(group.tasks.length) * 0.55));
+    const dotR = Math.max(3, Math.min(7, (r * 0.78) / Math.sqrt(group.tasks.length) * 0.5));
     return {
       id: group.id, name: group.id === NO_PROJECT ? 'No project' : state.projects.find(item => item.id === group.id)?.name ?? 'Removed project',
       x, y, r, total: group.tasks.length, open: open.length, done: group.tasks.length - open.length,

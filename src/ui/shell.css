@@ -421,3 +421,16 @@
 .lv-key { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; color: var(--muted); font-size: 12px; }
 .lv-key i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
 .lv-key i.s-done { background: var(--done, #16a34a); }
+
+/* Living refinement: project names under each bubble, readable side panel that never pushes past its column. */
+.lv { max-width: 100%; }
+.lv-name { fill: var(--ink-2); font-size: 12px; font-weight: 750; letter-spacing: 0; }
+.lv-count { fill: var(--muted); font-weight: 650; }
+.lv-skin { fill: color-mix(in srgb, var(--accent) 5%, transparent); }
+.lv-detail, .lv-group, .lv-list, .lv-list li { min-width: 0; }
+.lv-list { grid-template-columns: minmax(0, 1fr); }
+.lv-list button { display: block; max-width: 100%; }
+.lv-more { padding: 2px 8px; color: var(--muted); font-size: 13px; }
+.lv-involved { margin: 0; overflow-wrap: anywhere; font-size: 14px; }
+.lv-involved .pt-label { display: block; margin-bottom: 2px; }
+@container (max-width: 640px) { .lv-stage { max-height: 300px; } }
