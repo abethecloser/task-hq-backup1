@@ -8,6 +8,7 @@ import type { EditableTaskFields, Task } from '../core/contract.ts';
 import { canEditTask, canReopenTask, lockedTaskFields } from '../core/permissions.ts';
 import { blockingDeps, dependents, firstName, isOpen, isOverdue, leadById, moveForwardPlan, nameOf, projectName, taskById } from '../core/selectors.ts';
 import { completionDetails } from '../core/completed.ts';
+import { MAX_ITEMS, addItem, removeItem, splitChecklist, toggleItem, withNotes } from '../core/checklist.ts';
 import { Avatar, PersonSelect, TaskTags } from '../ui/components.tsx';
 import { useFeedbackRecord } from '../ui/Feedback.tsx';
 import { ReferenceInput, ReferenceTextarea } from '../ui/ReferenceEditor.tsx';
@@ -27,12 +28,13 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
   const { state, actor, dispatch } = quest;
   const [title, setTitle] = useState(task.title);
   const [nextAction, setNextAction] = useState(task.nextAction);
-  const [description, setDescription] = useState(task.description);
+  // Notes field shows the description's notes; the trailing checklist block is edited in Checklist.
+  const [description, setDescription] = useState(() => splitChecklist(task.description).notes);
   const [waitingOn, setWaitingOn] = useState(task.waitingOn);
   const [tab, setTab] = useState<'comments' | 'activity' | 'history'>('comments');
   const feedback = useFeedbackRecord(task.id);
   const back = useRef<HTMLButtonElement>(null);
-  useEffect(() => { setTitle(task.title); setNextAction(task.nextAction); setDescription(task.description); setWaitingOn(task.waitingOn); }, [task.title, task.nextAction, task.description, task.waitingOn]);
+  useEffect(() => { setTitle(task.title); setNextAction(task.nextAction); setDescription(splitChecklist(task.description).notes); setWaitingOn(task.waitingOn); }, [task.title, task.nextAction, task.description, task.waitingOn]);
   useEffect(() => { window.scrollTo(0, 0); document.querySelector('.main > .content')?.scrollTo(0, 0); back.current?.focus({ preventScroll: true }); }, [task.id]);
 
   const me = state.people.find(item => item.id === actor);
@@ -109,7 +111,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             )}
             <label className="field"><span>Notes</span>
               <ReferenceTextarea referenceDocument={task.references?.description} rows={4} value={description} maxLength={1000} readOnly={!editable} placeholder={editable ? 'Context, @people and #tags' : 'No notes'}
-                onChange={event => setDescription(event.target.value)} onBlur={() => saveText('description', description)} />
+                onChange={event => setDescription(event.target.value)} onBlur={() => { const next = withNotes(task.description, description.trim()); if (next !== task.description) void update({ description: next }); }} />
             </label>
             {(editable || task.waitingOn) && (
               <label className="field"><span>Waiting on (outside Task-HQ)</span>
@@ -118,6 +120,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             )}
             {lead && <div className="callout"><b>Lead</b> {lead.name} · {lead.phone} · {lead.address}</div>}
           </section>
+          <Checklist quest={quest} task={task} editable={editable} />
 
 
           <details className="tp-card drawer-details">
@@ -206,6 +209,31 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
         </aside>
       </div>
     </article>
+  );
+}
+
+/** Checklist: steps stored in the task description (core/checklist.ts), saved with the usual task/update. */
+function Checklist({ quest, task, editable }: { quest: Quest; task: Task; editable: boolean }) {
+  const [draft, setDraft] = useState('');
+  const { items } = splitChecklist(task.description);
+  const done = items.filter(item => item.done).length;
+  const save = (description: string | null) => { if (description != null && description !== task.description) void quest.dispatch({ type: 'task/update', id: task.id, changes: { description } }); };
+  if (!editable && items.length === 0) return null;
+  return (
+    <section className="tp-card tp-checklist" aria-labelledby="tp-checklist-title">
+      <h2 id="tp-checklist-title" className="ctx-label">Checklist {items.length > 0 && <span>{done}/{items.length}</span>}</h2>
+      {items.length > 0 && <i className="tp-check-meter" aria-hidden="true"><i style={{ width: `${(done / items.length) * 100}%` }} /></i>}
+      {items.length > 0 && <ul className="tp-check-list">
+        {items.map((item, index) => <li key={`${index}-${item.text}`} className={item.done ? 'is-done' : ''}>
+          <label><input type="checkbox" checked={item.done} disabled={!editable} onChange={() => save(toggleItem(task.description, index))} /><span>{item.text}</span></label>
+          {editable && <button type="button" className="icon-btn" aria-label={`Remove “${item.text}”`} onClick={() => save(removeItem(task.description, index))}>×</button>}
+        </li>)}
+      </ul>}
+      {editable && items.length < MAX_ITEMS && <form className="tp-check-add" onSubmit={event => { event.preventDefault(); const next = addItem(task.description, draft); if (next) { save(next); setDraft(''); } }}>
+        <input value={draft} maxLength={120} placeholder="Add a step" aria-label="Add a checklist step" onChange={event => setDraft(event.target.value)} />
+        <button className="btn btn-sm" disabled={!draft.trim()}>Add</button>
+      </form>}
+    </section>
   );
 }
 
