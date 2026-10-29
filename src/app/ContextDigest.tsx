@@ -16,6 +16,9 @@ export interface DigestActions {
   onOpenProjects: () => void;
   onOpenCalendar?: () => void;
   onCreate?: () => void;
+  /** Inbox awareness: the unread count (same as the bell) and where the inbox opens. */
+  inboxUnread: number; onOpenInbox: () => void;
+  onOpenAttention: () => void;
 }
 
 /** V6 header block: completion ring for the work in view, plus the quick actions this viewer may take. */
@@ -38,6 +41,10 @@ export function WorkspaceSummary({ quest, actions }: { quest: Quest; actions: Di
         {actions.onCreate && <button type="button" onClick={actions.onCreate}><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Task</button>}
         {actions.onOpenCalendar && <button type="button" className="is-cal" onClick={actions.onOpenCalendar}><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4" /></svg>Calendar</button>}
       </div>}
+      <button type="button" className={`cx-inbox ${actions.inboxUnread ? 'has-unread' : ''}`} onClick={actions.onOpenInbox}>
+        <span><i aria-hidden="true" />Inbox · {actions.inboxUnread ? <b>{actions.inboxUnread > 99 ? '99+' : actions.inboxUnread} unread</b> : 'caught up'}</span>
+        <em>Open<svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7l5 5-5 5" /></svg></em>
+      </button>
     </div>
   );
 }
@@ -48,7 +55,7 @@ export function DigestLead({ quest, actions }: { quest: Quest; actions: DigestAc
   const intel = useMemo(() => projectIntel(state, actor, now, actions.company), [state, actor, now, actions.company]);
   const today = localDate(now);
   return <>
-    <Section title="Needs a hand" count={intel.attention.length}>
+    <Section title="Needs a hand" count={intel.attention.length} more={{ label: 'View all', onClick: actions.onOpenAttention }}>
       {intel.attention.length === 0 ? <p className="cx-empty">Nothing overdue or blocked.</p> : <ul className="cx-list">
         {intel.attention.slice(0, 3).map(({ task, reason }) => <li key={task.id}><button type="button" className="cx-card is-hand" onClick={() => actions.onOpenTask(task.id)}>
           <strong>{task.title}</strong>
@@ -79,10 +86,10 @@ export function DigestTail({ quest, actions }: { quest: Quest; actions: DigestAc
   );
 }
 
-function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
+function Section({ title, count, more, children }: { title: string; count?: number; more?: { label: string; onClick: () => void }; children: ReactNode }) {
   return (
     <section className="cx-section" aria-label={title}>
-      <h3 className="cx-label">{title}{count ? <span className="cx-count">{count}</span> : null}</h3>
+      <h3 className="cx-label"><span>{title}</span><span className="cx-label-end">{more && <button type="button" className="cx-more" onClick={more.onClick}>{more.label}</button>}{count ? <span className="cx-count">{count}</span> : null}</span></h3>
       {children}
     </section>
   );

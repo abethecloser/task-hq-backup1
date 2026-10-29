@@ -20,6 +20,7 @@ import './ui/brutalist.css';
 import './ui/shell.css';
 import './ui/wallboard.css';
 import './ui/panels.css';
+import './ui/cta.css';
 import { applyLook } from './ui/look.ts';
 
 // Entry: real sign-in by default on the web; the synthetic demo is a separate,

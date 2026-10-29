@@ -13,7 +13,7 @@ import { LEGACY_LENSES, LENSES, LENS_LABELS, completedQuery, isCompletedQuery, l
 import { canCreateTask } from '../core/permissions.ts';
 import { insights, insightsFor } from '../core/rules.ts';
 import { activeGrant, activeLeads, inFocus, leadBucket, myTasks, person, taskById } from '../core/selectors.ts';
-import { LookSwitch, ModeChip, BrandMark, ToastBar } from '../ui/components.tsx';
+import { LookSwitch, ModeChip, BrandMark, ToastBar, CtaArrow } from '../ui/components.tsx';
 import { useQuest } from '../ui/useQuest.ts';
 import type { Quest } from '../ui/useQuest.ts';
 import { AllTasks, useRegistryPrefs } from './AllTasks.tsx';
@@ -30,6 +30,7 @@ import { ExecutiveDesk } from './ExecutiveDesk.tsx';
 import { Activity, Settings } from './Settings.tsx';
 import { Home } from './Home.tsx';
 import { CollabDock } from './CollabDock.tsx';
+import type { DockTab } from './CollabDock.tsx';
 import { AskTasks } from './AskTasks.tsx';
 import { AccountMark, AccountMenu, TopBar } from './TopBar.tsx';
 import { NeedsAttention } from './NeedsAttention.tsx';
@@ -145,6 +146,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   /** Bottom collaboration dock (Home). Remembered on this device, like the calendar pullout. */
   const [dockOpen, setDockOpen] = useState(() => { try { return localStorage.getItem(DOCK_KEY) === 'open'; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem(DOCK_KEY, dockOpen ? 'open' : 'closed'); } catch { /* storage unavailable: this page only */ } }, [dockOpen]);
+  const [dockTab, setDockTab] = useState<DockTab>('inbox');
   /** Notifications drawer (right). Session-only: it always starts closed. The calendar pullout (left) is `sidebar.open`. */
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -450,7 +452,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       <main className="main" inert={sidebar.isMobile && edgePanelOpen}>
         {!live && onExitDemo && <aside className="demo-access" aria-label="Task HQ demo">
           <div><strong>Task HQ Demo</strong><span>Sample data · changes stay on this device</span></div>
-          <button type="button" className="btn btn-primary" onClick={onExitDemo}>Sign in to Task HQ</button>
+          <button type="button" className="btn btn-primary cta-fill" onClick={onExitDemo}><span className="cta-fill-label">Sign in to Task HQ</span><CtaArrow /></button>
         </aside>}
         <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen} notifOpen={notifOpen}
           title={(VIEW_LABELS[view] ?? '').replace(' · Preview', '')}
@@ -502,11 +504,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         </section>
 
         {/* Bottom collaboration dock: in the main column, so expanding it takes height from the center. */}
-        {hasDock && <CollabDock quest={quest} company={company} open={dockOpen} onToggle={() => setDockOpen(value => !value)}
-          mentions={mentions} read={sidebar.read}
-          unseen={{ count: inboxUnread, latest: inbox.items.find(item => !sidebar.read.has(item.id))?.title }} onUnseen={() => { sidebar.setTab('inbox'); if (!notifOpen) toggleNotifications(); }}
-          onOpen={openTask} onOpenMention={item => { sidebar.markRead([item.id]); location.hash = `#/inbox/${encodeURIComponent(item.channelId ?? '')}/${encodeURIComponent(item.messageId ?? '')}`; }}
-          onActivity={() => go('activity')} />}
+        {hasDock && <CollabDock quest={quest} company={company} open={dockOpen} onToggle={() => setDockOpen(value => !value)} tab={dockTab} onTab={setDockTab}
+          inbox={inbox} data={inboxData} read={sidebar.read} markRead={sidebar.markRead} mentions={mentions}
+          onOpen={openTask} onOpenLead={openLead} onActivity={() => go('activity')} onOpenInboxPage={() => go('inbox')} />}
 
         <nav className="tabbar" aria-label="Task-HQ sections">
           {[
@@ -541,6 +541,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
               onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')}
               context={sidebar.isMobile || focused ? undefined : {
                 company, onOpenProjects: () => go('company-work'), onOpenCalendar: calendarAllowed ? () => go('calendar') : undefined, onCreate: canCreate ? () => setCreating(true) : undefined,
+                inboxUnread, onOpenAttention: () => go('needs-attention'),
+                // The inbox lives in the bottom dock on Home; elsewhere the Inbox page holds it.
+                onOpenInbox: () => { if (hasDock) { setDockTab('inbox'); setDockOpen(true); } else go('inbox'); },
                 onOpenTask: id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); },
               }} />
           </div>

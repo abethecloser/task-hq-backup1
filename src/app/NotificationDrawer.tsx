@@ -56,12 +56,17 @@ export function NotificationDrawer({ quest, control, inbox, attention, data, det
         : <>
             <header className="context-head"><span className="context-label">{context ? 'Notifications & context' : 'Notifications'}</span><button type="button" className="icon-btn" aria-label="Close notifications" onClick={onClose}>×</button></header>
             <div className={`context-body notify-body ${context ? 'has-context' : ''}`}>
-              {context && <WorkspaceSummary quest={quest} actions={context} />}
-              <Awareness quest={quest} control={sheet} inbox={inbox} attention={attention}
-                inboxLead={context && <DigestLead quest={quest} actions={context} />} inboxTail={context && <DigestTail quest={quest} actions={context} />}
+              {context
+                ? <>
+                    {/* Wide screens: operational context only. The inbox itself lives in the bottom dock (Home) or the Inbox page. */}
+                    <WorkspaceSummary quest={quest} actions={context} />
+                    <DigestLead quest={quest} actions={context} />
+                    <DigestTail quest={quest} actions={context} />
+                  </>
+                : <Awareness quest={quest} control={sheet} inbox={inbox} attention={attention}
                 onOpenTask={selectTask} onOpenThread={selectTask} onOpenLead={selectLead}
                 onOpenItem={entry => { if (entry.channelId) { back(); setItem(entry); } else if (entry.taskId) selectTask(entry.taskId); else if (entry.leadId) selectLead(entry.leadId); else { back(); setItem(entry); } }}
-                onOpenInbox={() => { onOpenInbox(); onClose(); }} onOpenAttention={() => { onOpenAttention(); onClose(); }} onOpenActivity={() => { onOpenActivity(); onClose(); }} />
+                onOpenInbox={() => { onOpenInbox(); onClose(); }} onOpenAttention={() => { onOpenAttention(); onClose(); }} onOpenActivity={() => { onOpenActivity(); onClose(); }} />}
             </div>
           </>}
     </Shell>

@@ -11,7 +11,7 @@ import type { Lens, RegistryQuery } from '../core/registry.ts';
 import { firstName, projectName, taskById } from '../core/selectors.ts';
 import { localDate, shortDate } from '../core/time.ts';
 import { PRODUCT } from '../core/workspace.ts';
-import { MoveForward } from '../ui/components.tsx';
+import { CtaArrow, MoveForward } from '../ui/components.tsx';
 import { ProjectTeam } from './ProjectTeam.tsx';
 import { BannerAdjust, BannerEditor, bannerLook, useBanner } from './HeroBanner.tsx';
 import type { Quest } from '../ui/useQuest.ts';
@@ -53,7 +53,7 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
     <div className="view home-dash">
       {/* New task lives in the top bar; the banner keeps only the next step. */}
       <Hero eyebrow={greeting.eyebrow} primary={greeting.primary} support={greeting.support} banner={banner}>
-        {next && <button type="button" className="btn btn-primary btn-sm" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}>{nextLabel}</button>}
+        {next && <button type="button" className="btn btn-primary btn-sm cta-fill" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}><span className="cta-fill-label">{nextLabel}</span><CtaArrow /></button>}
       </Hero>
 
       {/* One workspace surface: queue and risk, then intel and culture. Conversation and activity live in the bottom collaboration dock. */}

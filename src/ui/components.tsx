@@ -215,3 +215,8 @@ export function LookSwitch({ compact = false }: { compact?: boolean }) {
     </span>
   );
 }
+
+/** Trailing arrow circle for a `cta-fill` button: the hover fill grows out of it (see cta.css). */
+export function CtaArrow() {
+  return <span className="cta-fill-arrow" aria-hidden="true"><svg className="icon" viewBox="0 0 24 24"><path d="M5 12h13M13 7l5 5-5 5" /></svg></span>;
+}

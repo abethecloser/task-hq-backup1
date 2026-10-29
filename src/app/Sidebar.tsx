@@ -15,9 +15,9 @@ import { useDropdown } from '../ui/useDropdown.tsx';
 const MOBILE_QUERY = '(max-width: 760px)';
 export const PANEL_MIN = 220;
 export const PANEL_MAX = 315;
-export const PANEL_DEFAULT = 288;
+export const PANEL_DEFAULT = 256;
 /** Earlier defaults; a width still at one moves to the current default (it was never chosen by hand). */
-const OLD_DEFAULTS = [320, 240];
+const OLD_DEFAULTS = [320, 240, 288];
 const READ_LIMIT = 300;
 const storageKey = (actor: string) => `quest.sidebar.v1.${actor}`;
 
