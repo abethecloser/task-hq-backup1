@@ -14,7 +14,7 @@ Adaptive task management for individuals and organizations, plus the **Task-HQ C
 
 - **App:** https://task-hq-three.vercel.app. Sign in with a real account, or open the Task-HQ Demo from the sign-in page.
 - **Backend:** Supabase `task-hq` (`xthyyxnfjaxmtrqrhyxc`): Auth, Postgres with RLS (`supabase/migrations`), and the `dispatch` Edge Function, the only write path for task data.
-- **Deploy the web app:** `vercel deploy --prod` (team `novum-systems`, project `task-hq`; env `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` hold publishable values only).
+- **Deploy the web app:** automatic. Vercel (team `novum-systems`, project `task-hq`) is connected to this repository: merging to `main` deploys production (`task.questroofing.com`), and every other branch or pull request gets a preview deployment. Env `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` (Production and Preview) hold publishable values only. To roll back, promote an earlier deployment in Vercel.
 - **Deploy the server:** `npm run sync:functions && supabase functions deploy dispatch --project-ref xthyyxnfjaxmtrqrhyxc --use-api`.
 - **Isolation test:** run `supabase/tests/rls_isolation.sql` in the SQL editor. It rolls back and prints `RESULT pass=… fail=…`.
 - **Status, two-user test and open decisions:** see [READINESS.md](READINESS.md).
