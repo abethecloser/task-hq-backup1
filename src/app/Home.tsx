@@ -3,7 +3,10 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { QuestEvent, QuestState } from '../core/contract.ts';
 import { compose } from '../core/compose.ts';
-import { ago, atRisk, homeMetrics } from '../core/dashboard.ts';
+import { ago, atRisk, homeMetrics, performance } from '../core/dashboard.ts';
+import { HOME_PERIODS, HOME_PERIOD_LABELS, inHomePeriod, loadHomePeriod, riskInPeriod, saveHomePeriod } from '../core/home-period.ts';
+import type { HomePeriod } from '../core/home-period.ts';
+import { DEFAULT_QUERY, queryTasks } from '../core/registry.ts';
 import type { CollabItem } from '../core/dashboard.ts';
 import { CULTURE_CONTENT, CULTURE_SLOTS } from '../core/culture.ts';
 import type { CultureItem, CultureSlot } from '../core/culture.ts';
@@ -34,9 +37,21 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
   const minute = Math.floor(now / 60000) * 60000;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const queue = useMemo(() => { const { primary, queue: rest } = compose(state, actor, minute); return [primary, ...rest].filter(item => item.taskId || item.leadId); }, [state, actor, minute]);
+  // Today | This week: one scope for the performance strip, Up next and At risk (Today unless chosen otherwise).
+  const [period, setPeriod] = useState<HomePeriod>(() => { try { return loadHomePeriod(localStorage); } catch { return 'today'; } });
+  const choosePeriod = (next: HomePeriod) => { setPeriod(next); try { saveHomePeriod(localStorage, next); } catch { /* this page only */ } };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fullQueue = useMemo(() => { const { primary, queue: rest } = compose(state, actor, minute); return [primary, ...rest].filter(item => item.taskId || item.leadId); }, [state, actor, minute]);
+  const queue = fullQueue.filter(item => { const task = item.taskId ? taskById(state, item.taskId) : undefined; return !task || inHomePeriod(task, period, minute); });
   const metrics = homeMetrics(state, actor, minute);
-  const risks = atRisk(state, actor, minute, company);
+  const allRisksInView = atRisk(state, actor, minute, company);
+  const risks = allRisksInView.filter(item => riskInPeriod(item, period, minute));
+  // Your performance: Completed from the period's completion log; the others count exactly what their link opens.
+  const done = performance(state, actor, minute, period).completed;
+  const count = (lens: 'all' | 'today', changes: Partial<typeof DEFAULT_QUERY>) => queryTasks(state, actor, minute, { ...DEFAULT_QUERY, lens, ...changes }).length;
+  const openCount = count('all', { scope: 'mine' });
+  const dueCount = count('all', { scope: 'mine', due: period === 'today' ? 'today' : 'week' });
+  const blockedCount = count('all', { scope: 'mine', status: 'blocked' });
   const greeting = useMomentum(quest, company);
   const today = localDate(minute);
   const next = queue[0];
@@ -56,16 +71,33 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
         {next && <button type="button" className="btn btn-primary btn-sm cta-fill" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}><span className="cta-fill-label">{nextLabel}</span><CtaArrow /></button>}
       </Hero>
 
+      {/* Your performance, scoped by the dashboard period (which also scopes Up next and At risk below). */}
+      <section className="hd-perf" aria-labelledby="hd-perf-title">
+        <div className="hd-perf-head">
+          <h2 id="hd-perf-title">Your performance</h2>
+          <div className="seg hd-period" role="group" aria-label="Dashboard period">
+            {HOME_PERIODS.map(value => <button key={value} type="button" aria-pressed={period === value} onClick={() => choosePeriod(value)}>{HOME_PERIOD_LABELS[value]}</button>)}
+          </div>
+        </div>
+        <div className="hd-perf-grid">
+          <PerfMetric value={done} label={period === 'today' ? 'Completed today' : 'Completed this week'} tone="ok" onClick={() => onRegistry('all', { scope: 'mine', status: 'done', sort: 'updated' })} hint="Open your completed work" />
+          <PerfMetric value={openCount} label="Open workload" tone="neutral" onClick={() => onRegistry('all', { scope: 'mine' })} hint="Open all your open work" />
+          <PerfMetric value={dueCount} label={period === 'today' ? 'Due today' : 'Due this week'} sub={period === 'week' ? 'next 7 days' : undefined} tone="accent" onClick={() => onRegistry('all', { scope: 'mine', due: period === 'today' ? 'today' : 'week' })} hint="Open the work due in this period" />
+          <PerfMetric value={blockedCount} label="Blocked" tone="stop" onClick={() => onRegistry('all', { scope: 'mine', status: 'blocked' })} hint="Open your blocked work" />
+        </div>
+      </section>
+
       {/* One workspace surface: queue and risk, then intel and culture. Conversation and activity live in the bottom collaboration dock. */}
       <div className="hd-workspace">
       <div className="hd-top">
         <section className="hd-panel" aria-labelledby="hd-next">
-          <PanelHead id="hd-next" title="Up next" sub="Your queue · by priority & due date" tone="accent" icon={<path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5" />}
+          <PanelHead id="hd-next" title="Up next" sub={`Your queue · ${period === 'today' ? 'today' : 'this week'} · by priority & due date`} tone="accent" icon={<path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5" />}
             more={queue.length > 0 ? { label: `View all (${metrics.active})`, onClick: () => onRegistry('all', { scope: 'mine' }) } : undefined} />
           {queue.length === 0
             ? <div className="hd-empty">
                 <span className="hd-empty-mark"><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h11v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4zM16 11h2a2 2 0 0 1 0 4h-2M8 3v3M12 3v3" /></svg></span>
-                <h3>Queue is clear.</h3><p>Nothing is waiting on you right now.</p>
+                <h3>{fullQueue.length ? `Nothing more ${period === 'today' ? 'today' : 'this week'}.` : 'Queue is clear.'}</h3>
+                <p>{fullQueue.length ? <>Later work is waiting. <button type="button" className="link" onClick={() => choosePeriod('week')}>Show this week</button></> : 'Nothing is waiting on you right now.'}</p>
               </div>
             : <ul className="hd-list hd-queue">
                 {queue.slice(0, 5).map(item => {
@@ -86,10 +118,10 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
               </ul>}
         </section>
         <section className="hd-panel" aria-labelledby="hd-risk">
-          <PanelHead id="hd-risk" title="At risk" sub="Needs attention" tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />}
+          <PanelHead id="hd-risk" title="At risk" sub={`Needs attention · ${period === 'today' ? 'today' : 'this week'}`} tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />}
             more={risks.length > 4 ? { label: allRisks ? 'Show fewer' : `View all (${risks.length})`, onClick: () => setAllRisks(value => !value) } : undefined} />
           {risks.length === 0
-            ? <p className="hd-quiet">Nothing is at risk{company ? '' : ' on your work'}.</p>
+            ? <p className="hd-quiet">Nothing is at risk{company ? '' : ' on your work'}{allRisksInView.length ? ` ${period === 'today' ? 'today' : 'this week'}` : ''}.</p>
             : <ul className="hd-list">
                 {(allRisks ? risks : risks.slice(0, 4)).map(({ task, reasons }) => (
                   <li key={task.id} className="hd-row is-risk">
@@ -209,6 +241,15 @@ function CultureSpotlight({ items }: { items: CultureItem[] }) {
       </div>
       <div className="hd-dots" aria-hidden="true">{(inSlot.length ? inSlot : [null]).map((_, at) => <i key={at} className={at === Math.min(index, Math.max(0, inSlot.length - 1)) ? 'is-on' : ''} />)}</div>
     </section>
+  );
+}
+
+/** One compact performance figure; it opens the matching task list. */
+function PerfMetric({ value, label, sub, tone, onClick, hint }: { value: number; label: string; sub?: string; tone: 'ok' | 'neutral' | 'accent' | 'stop'; onClick: () => void; hint: string }) {
+  return (
+    <button type="button" className={`hd-perf-metric tone-${tone} ${value ? 'has-value' : ''}`} onClick={onClick} title={hint} aria-label={`${label}: ${value}. ${hint}.`}>
+      <b>{value}</b><span>{label}{sub && <small>{sub}</small>}</span>
+    </button>
   );
 }
 

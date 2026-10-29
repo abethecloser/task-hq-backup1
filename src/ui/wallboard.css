@@ -235,3 +235,23 @@
   .dock-task { grid-template-columns: minmax(0, 1fr); }
   .dock-task-context { display: none; }
 }
+
+/* Your performance — compact strip under the hero, with the dashboard's Today | This week scope. */
+.home-dash .hd-perf { display: grid; gap: 10px; }
+.home-dash .hd-perf-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.home-dash .hd-perf-head h2 { margin: 0; color: #9ca3af; font-size: 12px; font-weight: 750; letter-spacing: .18em; text-transform: uppercase; }
+.home-dash .hd-period { flex: none; padding: 3px; border-radius: 10px; background: #f3f4f6; }
+.home-dash .hd-period button { min-height: 30px; padding: 0 12px; border-radius: 8px; color: #6b7280; font-size: 14px; font-weight: 650; }
+.home-dash .hd-period button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgb(17 24 39 / 10%); }
+.home-dash .hd-period button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.home-dash .hd-perf-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.home-dash .hd-perf-metric { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 64px; padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; box-shadow: 0 1px 2px rgb(17 24 39 / 4%); transition: border-color .15s ease, background-color .15s ease; }
+.home-dash .hd-perf-metric:hover { border-color: #fed7aa; background: #fffaf6; }
+.home-dash .hd-perf-metric:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.home-dash .hd-perf-metric b { flex: none; min-width: 1.4ch; color: var(--ink); font: 800 28px/1 var(--display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.home-dash .hd-perf-metric span { display: grid; min-width: 0; color: #4b5563; font-size: 14px; font-weight: 650; line-height: 1.25; }
+.home-dash .hd-perf-metric small { color: #9ca3af; font-size: 12px; font-weight: 600; }
+.home-dash .hd-perf-metric.tone-ok.has-value b { color: #15803d; }
+.home-dash .hd-perf-metric.tone-accent.has-value b { color: var(--accent-ink); }
+.home-dash .hd-perf-metric.tone-stop.has-value b { color: var(--stop-ink, #b4231a); }
+@container home (max-width: 760px) { .home-dash .hd-perf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
