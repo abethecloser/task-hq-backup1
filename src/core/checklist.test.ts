@@ -25,7 +25,7 @@ test('editing notes keeps the checklist; a checklist with no notes stands alone'
   const d = joinChecklist('', [{ text: 'Photos', done: false }]);
   assert.equal(d, 'Checklist:\n- [ ] Photos');
   assert.equal(withNotes(d, 'New context'), 'New context\n\nChecklist:\n- [ ] Photos');
-  assert.equal(splitChecklist('- [X] Upper case counts').items[0]!.done, true);
+  assert.equal(splitChecklist('Checklist:\n- [X] Upper case counts').items[0]!.done, true);
 });
 
 test('blank items and overly long lists are refused', () => {
@@ -33,4 +33,15 @@ test('blank items and overly long lists are refused', () => {
   let d = '';
   for (let i = 0; i < MAX_ITEMS; i++) d = addItem(d, `Item ${i}`)!;
   assert.equal(addItem(d, 'One too many'), null);
+});
+
+test('Markdown checkboxes without the Checklist header stay notes', () => {
+  const legacy = 'Before the crew arrives:\n- [ ] Move the cars\n- [x] Unlock the side gate';
+  assert.deepEqual(splitChecklist(legacy), { notes: legacy, items: [] });
+  assert.deepEqual(splitChecklist('- [ ] Only a checkbox line'), { notes: '- [ ] Only a checkbox line', items: [] });
+  // Adding a step keeps the old lines as notes and starts a real checklist after them.
+  const next = addItem(legacy, 'Photo the roof')!;
+  assert.equal(next, `${legacy}\n\nChecklist:\n- [ ] Photo the roof`);
+  assert.deepEqual(splitChecklist(next), { notes: legacy, items: [{ text: 'Photo the roof', done: false }] });
+  assert.equal(withNotes(legacy, legacy), legacy, 'saving the notes unchanged leaves the description unchanged');
 });

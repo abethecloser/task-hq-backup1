@@ -1,4 +1,5 @@
-// Task checklist, stored in the task's existing description as a trailing markdown block:
+// Task checklist, stored in the task's existing description as a trailing markdown block that
+// starts with a "Checklist:" header:
 //
 //   Notes the team wrote…
 //
@@ -22,11 +23,11 @@ export function splitChecklist(description: string): SplitDescription {
   const lines = description.replace(/\s+$/, '').split('\n');
   let start = lines.length;
   while (start > 0 && ITEM.test(lines[start - 1]!.trim())) start -= 1;
-  if (start === lines.length) return { notes: description, items: [] };
+  // Only a block introduced by the "Checklist:" header is a checklist. A description that merely ends
+  // with Markdown checkboxes (written before this feature, or as notes) stays notes, untouched.
+  if (start === lines.length || start === 0 || !HEADER.test(lines[start - 1]!.trim())) return { notes: description, items: [] };
   const items = lines.slice(start).map(line => { const match = ITEM.exec(line.trim())!; return { text: match[2]!.trim(), done: match[1] !== ' ' }; });
-  let end = start;
-  if (end > 0 && HEADER.test(lines[end - 1]!.trim())) end -= 1;
-  return { notes: lines.slice(0, end).join('\n').replace(/\s+$/, ''), items };
+  return { notes: lines.slice(0, start - 1).join('\n').replace(/\s+$/, ''), items };
 }
 
 export function joinChecklist(notes: string, items: ChecklistItem[]): string {
