@@ -96,6 +96,7 @@ export function AccountMenu({ quest, close }: { quest: Quest; close: () => void 
         <button type="button" role="menuitem" onClick={() => { close(); live.onSignOut(); }}>Sign out</button>
       </>
     : <>
+        <button type="button" role="menuitem" onClick={() => { close(); location.hash = '#/client'; }}>Preview client workspace<small>What a client sees for Northside re-roof</small></button>
         <p className="menu-note">Working as (demo person)</p>
         {state.people.map(item => (
           <button key={item.id} type="button" role="menuitemradio" aria-checked={item.id === actor} className={item.id === actor ? 'is-on' : ''} onClick={() => { close(); setActor(item.id); }}>

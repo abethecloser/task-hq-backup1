@@ -196,7 +196,7 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
                   return <li key={item.id}><button type="button" className={`dock-item ${unread ? 'is-unread' : ''} ${on ? 'is-picked' : ''}`} onClick={() => openItem(item)}>
                     <span className="dock-item-kind">{unread && <i className="dock-dot" aria-label="Unread" />}<b>{item.kind === 'mention' ? 'Mention' : item.kind === 'message' ? 'Message' : 'Task'}</b><em>{item.workspace.name}</em><time>{ago(item.at, now)}</time></span>
                     <strong>{item.title}</strong>
-                    <small>{item.from ? `${firstName(state, item.from) || data.messaging?.people.find(person => person.id === item.from)?.name || item.from}: ` : ''}{item.detail}</small>
+                    <small>{item.from ? `${firstName(state, item.from, '') || data.messaging?.people.find(person => person.id === item.from)?.name || item.from}: ` : ''}{item.detail}</small>
                   </button></li>;
                 })}
               </ul>}

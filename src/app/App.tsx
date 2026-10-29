@@ -25,6 +25,7 @@ import type { DeckSection } from './ContextPanel.tsx';
 import { localDate } from '../core/time.ts';
 import { EdgeDrawer } from '../ui/EdgeDrawer.tsx';
 import { WorkNavigator } from './WorkNavigator.tsx';
+import { ClientWorkspace } from './ClientWorkspace.tsx';
 import { CreateTask, discardCreateDraft, hasCreateDraft } from './CreateTask.tsx';
 import { ExecutiveDesk } from './ExecutiveDesk.tsx';
 import { Activity, Settings } from './Settings.tsx';
@@ -107,10 +108,21 @@ function useViewportWidth() {
   return width;
 }
 
+/** The client workspace route. Demo only: live Task HQ has no client grants yet, so the route is ignored there. */
+function useClientRoute() {
+  const read = () => /^#\/client(\/|$)/.test(location.hash);
+  const [on, setOn] = useState(read);
+  useEffect(() => { const update = () => setOn(read()); window.addEventListener('hashchange', update); return () => window.removeEventListener('hashchange', update); }, []);
+  return on;
+}
+
 export default function App({ onExitDemo, backend }: { onExitDemo?: () => void; backend?: QuestBackend } = {}) {
   const quest = useQuest('app', backend);
+  const live = useLive();
+  const client = useClientRoute();
   if (quest.loadError) return <LoadError message={quest.loadError} />;
   if (!quest.state || !quest.actor) return <div className="boot"><BrandMark size={42} /><span>Opening Task-HQ…</span></div>;
+  if (client && !live) return <ClientWorkspace quest={quest as Quest} onExit={() => { location.hash = '#/home'; }} />;
   return <FeedbackProvider feedback={quest.feedback}><ReferenceProvider scope={referenceScope(quest.state, quest.actor)} drafts={quest.referenceDrafts}><Shell quest={quest as Quest} onExitDemo={onExitDemo} /></ReferenceProvider></FeedbackProvider>;
 }
 
