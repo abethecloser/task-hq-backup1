@@ -358,3 +358,21 @@
   .shell.has-dock > .main > :not(.content) { flex: none; }
   .shell.has-dock > .main > .content { flex: 1 1 auto; width: 100%; min-height: 0; max-width: none; margin: 0; padding-inline: max(var(--bleed), calc((100% - 1600px) / 2 + var(--bleed))); padding-bottom: 40px; overflow-y: auto; overscroll-behavior: contain; }
 }
+
+/* ── Full-width dock (Home, wide screens) ───────────────────────────────────────────────────
+   The dock spans beneath both side panels (the same negative margins the top bar uses); the panels
+   end at its live height (--dock-h, published by CollabDock) and keep their own scrolling. */
+@media (min-width: 761px) {
+  .shell.has-dock > .main > .collab-dock { margin-left: calc(-1 * var(--panel-offset, 0px)); margin-right: calc(-1 * var(--context-offset, 0px)); }
+  :root .shell.has-dock .workspace-panel, :root .shell.has-dock .notification-edge { bottom: var(--dock-h, 0px); }
+  /* With the dock at half height or more, the shortened left panel scrolls as a whole (calendar, Work Views
+     and account) so its footer can't crowd out the content. Lower, the footer stays anchored as usual. */
+  :root[data-dock-tall] .shell.has-dock .workspace-panel { overflow-y: auto; overscroll-behavior: contain; }
+  :root[data-dock-tall] .shell.has-dock .workspace-panel > .panel-scroll { flex: 1 0 auto; overflow: visible; }
+  /* Edge toggles stay centered on the visible part of the panels. */
+  :root .shell.has-dock .seam { top: calc((var(--topbar-h, 60px) + 100dvh - var(--dock-h, 0px)) / 2); }
+  /* Full height: the dock takes the whole workspace under the header; the center and panels yield it. */
+  :root[data-dock-full] .shell.has-dock .seam,
+  :root[data-dock-full] .shell.has-dock :is(.workspace-panel, .notification-edge) { visibility: hidden; border-top-width: 0; }
+  :root[data-dock-full] .shell.has-dock > .main > .content { flex: 0 0 0; height: 0; min-height: 0; padding-block: 0; overflow: hidden; visibility: hidden; }
+}

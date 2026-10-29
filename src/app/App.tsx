@@ -544,7 +544,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
               onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')}
               context={sidebar.isMobile || focused ? undefined : {
                 company, onOpenProjects: () => go('company-work'), onOpenCalendar: calendarAllowed ? () => go('calendar') : undefined, onCreate: canCreate ? () => setCreating(true) : undefined,
-                onOpenAttention: () => go('needs-attention'),
+                onOpenAttention: () => go('needs-attention'), onOpenNextAll: () => openLens('all'), onOpenActivity: () => go('activity'),
                 onOpenTask: id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); },
               }} />
           </div>

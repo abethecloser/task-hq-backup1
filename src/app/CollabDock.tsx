@@ -16,7 +16,10 @@ import { collaboration, teamActivity, ago } from '../core/dashboard.ts';
 import type { MentionSource } from '../core/dashboard.ts';
 import { channelsFor } from '../core/inbox.ts';
 import type { InboxItem, UniversalInbox } from '../core/inbox.ts';
-import { firstName, taskById } from '../core/selectors.ts';
+import { firstName, nameOf, projectName, taskById } from '../core/selectors.ts';
+import { STATUS_LABELS } from '../core/contract.ts';
+import { responsibility } from '../core/responsibility.ts';
+import { localDate, shortDate } from '../core/time.ts';
 import type { Quest } from '../ui/useQuest.ts';
 import { COLLAB_VERB, Chevron, Initial, Recent } from './Home.tsx';
 import { ChannelThread } from './Inbox.tsx';
@@ -94,6 +97,16 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
   const [drag, setDrag] = useState<{ startY: number; startH: number; height: number; moved: boolean } | null>(null);
   const height = drag ? drag.height : heights[snap];
   const open = snap !== 'collapsed' || (!!drag && drag.height > DOCK_RAIL + 8);
+  // The shell lays the side panels out above the dock (they end at --dock-h) and hides the center at full height.
+  const full = height >= heights.full - 2;
+  const tall = height >= heights.half - 2;
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--dock-h', `${Math.round(height)}px`);
+    root.toggleAttribute('data-dock-full', full);
+    root.toggleAttribute('data-dock-tall', tall);
+  }, [height, full, tall]);
+  useLayoutEffect(() => () => { const root = document.documentElement; root.style.removeProperty('--dock-h'); root.removeAttribute('data-dock-full'); root.removeAttribute('data-dock-tall'); }, []);
   function startDrag(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
     event.preventDefault();
@@ -260,13 +273,29 @@ function Reader({ quest, reading, data, postable, onPick, onOpen, onOpenInboxPag
     <div className="dock-scroll"><p className="hd-quiet">Pick an inbox item, a channel or a task comment to read the thread and reply here.</p></div>
   </>;
   const comments = taskEvents(state.events, task.id).filter(isComment);
-  return <>
-    <header className="dock-head"><h2>{task.title}</h2><button type="button" className="hd-more" onClick={() => onOpen(task.id)}>Open task<Chevron /></button></header>
-    <div className="dock-scroll"><EventFeed events={comments} empty="No comments on this task yet." /></div>
-    <div className="dock-reply">
-      {canReply(quest)
-        ? <CommentReply quest={quest} taskId={task.id} label={`Reply on ${task.title}`} placeholder="Write a reply. Use @ to mention someone." send="Reply" />
-        : <p className="hd-quiet">Reviewer view: no replies.</p>}
+  const who = responsibility(state, task);
+  const today = localDate(quest.now);
+  return <div className="dock-task">
+    <div className="dock-task-thread">
+      <header className="dock-head"><h2>{task.title}</h2><button type="button" className="hd-more" onClick={() => onOpen(task.id)}>Open task<Chevron /></button></header>
+      <div className="dock-scroll"><EventFeed events={comments} empty="No comments on this task yet." /></div>
+      <div className="dock-reply">
+        {canReply(quest)
+          ? <CommentReply quest={quest} taskId={task.id} label={`Reply on ${task.title}`} placeholder="Write a reply. Use @ to mention someone." send="Reply" />
+          : <p className="hd-quiet">Reviewer view: no replies.</p>}
+      </div>
     </div>
-  </>;
+    {/* Task context beside the thread (shown where the dock is wide enough). */}
+    <aside className="dock-task-context" aria-label="Task details">
+      <dl>
+        <div><dt>Status</dt><dd><span className={`pill pill-${task.status}`}>{STATUS_LABELS[task.status]}</span></dd></div>
+        <div><dt>Owner</dt><dd>{task.owner ? nameOf(state, task.owner) : 'Unassigned'}</dd></div>
+        <div><dt>Due</dt><dd className={task.due && task.due < today && task.status !== 'done' ? 'is-late' : ''}>{task.due ? shortDate(task.due, today) : 'No date'}{task.dueTime ? ` · ${task.dueTime}` : ''}</dd></div>
+        <div><dt>Priority</dt><dd>{task.ultra ? 'Ultra' : task.priority ? task.priority[0]!.toUpperCase() + task.priority.slice(1) : 'Normal'}</dd></div>
+        {task.projectId && <div><dt>Project</dt><dd>{projectName(state, task.projectId)}</dd></div>}
+        {who && <div><dt>Acts next</dt><dd>{who.actor ? nameOf(state, who.actor) : 'Nobody yet'}</dd></div>}
+      </dl>
+      {who && <p className="dock-task-next"><b>What to do</b>{who.action}</p>}
+    </aside>
+  </div>;
 }

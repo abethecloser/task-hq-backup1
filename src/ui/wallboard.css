@@ -218,3 +218,20 @@
 }
 @container dock (max-width: 560px) { .dock-label, .dock-sep { display: none; } }
 @media (prefers-reduced-motion: reduce) { .collab-dock { transition: none; } }
+
+/* Task thread with its context (status, owner, due, priority, project, who acts next) beside it. */
+.dock-reader { container: reader / inline-size; }
+.dock-task { display: grid; flex: 1 1 auto; grid-template-columns: minmax(0, 1fr) 248px; min-height: 0; }
+.dock-task-thread { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.dock-task-context { min-height: 0; padding: 14px 18px; overflow-y: auto; border-left: 1px solid var(--dock-line-soft); background: var(--card, #fff); }
+.dock-task-context dl { display: grid; gap: 10px; margin: 0; }
+.dock-task-context dl > div { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: baseline; gap: 8px; }
+.dock-task-context dt { color: var(--dock-micro); font-size: 11.5px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.dock-task-context dd { overflow: hidden; margin: 0; color: var(--ink); font-size: 14.5px; font-weight: 600; text-overflow: ellipsis; }
+.dock-task-context dd.is-late { color: var(--stop-ink, #b4231a); }
+.dock-task-next { display: grid; gap: 4px; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--dock-line-soft); color: var(--ink-2); font-size: 14px; line-height: 1.4; }
+.dock-task-next b { color: var(--dock-micro); font-size: 11.5px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+@container reader (max-width: 620px) {
+  .dock-task { grid-template-columns: minmax(0, 1fr); }
+  .dock-task-context { display: none; }
+}

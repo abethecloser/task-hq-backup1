@@ -10,6 +10,9 @@ import { localDate, shortDate } from '../core/time.ts';
 import type { Quest } from '../ui/useQuest.ts';
 import { Recent } from './Home.tsx';
 
+/** The right panel is an overview: each list previews this many items, and View all opens the rest. */
+const PREVIEW = 2;
+
 export interface DigestActions {
   company: boolean;
   onOpenTask: (id: string) => void;
@@ -17,6 +20,8 @@ export interface DigestActions {
   onOpenCalendar?: () => void;
   onCreate?: () => void;
   onOpenAttention: () => void;
+  /** Where Next actions and Recent activity continue (the task list and the activity page). */
+  onOpenNextAll: () => void; onOpenActivity: () => void;
 }
 
 /** V6 header block: completion ring for the work in view, plus the quick actions this viewer may take. */
@@ -51,15 +56,15 @@ export function DigestLead({ quest, actions }: { quest: Quest; actions: DigestAc
   return <>
     <Section title="Needs a hand" count={intel.attention.length} more={{ label: 'View all', onClick: actions.onOpenAttention }}>
       {intel.attention.length === 0 ? <p className="cx-empty">Nothing overdue or blocked.</p> : <ul className="cx-list">
-        {intel.attention.slice(0, 3).map(({ task, reason }) => <li key={task.id}><button type="button" className="cx-card is-hand" onClick={() => actions.onOpenTask(task.id)}>
+        {intel.attention.slice(0, PREVIEW).map(({ task, reason }) => <li key={task.id}><button type="button" className="cx-card is-hand" onClick={() => actions.onOpenTask(task.id)}>
           <strong>{task.title}</strong>
           <small><em className={reason === 'Overdue' ? 'is-late' : 'is-blocked'}><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" /></svg>{reason}</em><i aria-hidden="true">•</i><span>{firstName(state, task.owner, 'Unassigned')}</span></small>
         </button></li>)}
       </ul>}
     </Section>
-    <Section title="Next actions">
+    <Section title="Next actions" more={intel.next.length ? { label: intel.next.length > PREVIEW ? `View all (${intel.next.length})` : 'View all', onClick: actions.onOpenNextAll } : undefined}>
       {intel.next.length === 0 ? <p className="cx-empty">No open work ready to move.</p> : <ul className="cx-list">
-        {intel.next.slice(0, 3).map(task => <li key={task.id}><button type="button" className="cx-card" onClick={() => actions.onOpenTask(task.id)}>
+        {intel.next.slice(0, PREVIEW).map(task => <li key={task.id}><button type="button" className="cx-card" onClick={() => actions.onOpenTask(task.id)}>
           <strong>{task.nextAction || task.title}</strong>
           <small>{[task.due ? `due ${shortDate(task.due, today)}` : task.nextAction ? task.title : firstName(state, task.owner, 'Unassigned'), task.projectId ? projectName(state, task.projectId) : ''].filter(Boolean).map((part, index) => <span key={index}>{index > 0 && <i aria-hidden="true">•</i>}{part}</span>)}</small>
         </button></li>)}
@@ -73,7 +78,7 @@ export function DigestTail({ quest, actions }: { quest: Quest; actions: DigestAc
   const { state, actor } = quest;
   const activity = useMemo(() => teamActivity(state, actor, actions.company, 3), [state, actor, actions.company]);
   return (
-    <Section title="Recent activity">
+    <Section title="Recent activity" more={{ label: 'View all', onClick: actions.onOpenActivity }}>
       {activity.length === 0 ? <p className="cx-empty">No activity yet.</p>
         : <ul className="cx-activity hd-list hd-feed">{activity.map(event => <li key={event.id}><Recent event={event} quest={quest} onOpen={actions.onOpenTask} /></li>)}</ul>}
     </Section>

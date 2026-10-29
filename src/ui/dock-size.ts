@@ -1,11 +1,11 @@
 // Bottom dock sizing: four snap positions computed from the height available below the header,
 // and the one saved preference (`quest-dock-height`). Pure, so the snapping rules are testable.
-export type DockSnap = 'collapsed' | 'default' | 'half' | 'expanded';
-export const DOCK_SNAPS: DockSnap[] = ['collapsed', 'default', 'half', 'expanded'];
-export const DOCK_SNAP_LABELS: Record<DockSnap, string> = { collapsed: 'Collapsed', default: 'Default', half: 'Halfway', expanded: 'Expanded' };
+export type DockSnap = 'collapsed' | 'default' | 'half' | 'expanded' | 'full';
+export const DOCK_SNAPS: DockSnap[] = ['collapsed', 'default', 'half', 'expanded', 'full'];
+export const DOCK_SNAP_LABELS: Record<DockSnap, string> = { collapsed: 'Collapsed', default: 'Default', half: 'Halfway', expanded: 'Expanded', full: 'Full height' };
 /** The collapsed ribbon. */
 export const DOCK_RAIL = 52;
-/** The Wallboard keeps at least this much height, even with the dock fully expanded. */
+/** In the Expanded position the Wallboard keeps at least this much height (Full height gives it all to the dock). */
 export const DOCK_MIN_CENTER = 88;
 export const DOCK_STORAGE_KEY = 'quest-dock-height';
 const LEGACY_KEY = 'taskhq.collab-dock';
@@ -15,15 +15,16 @@ export const DOCK_DEFAULT_PREF: DockPreference = { snap: 'collapsed', last: 'def
 
 /** Heights in px for a workspace `avail` px tall (viewport bottom minus the top of the center). Always ascending. */
 export function snapHeights(avail: number): Record<DockSnap, number> {
-  const expanded = Math.max(DOCK_RAIL + 3, Math.round(avail - DOCK_MIN_CENTER));
+  const full = Math.max(DOCK_RAIL + 4, Math.round(avail));
+  const expanded = Math.min(full - 1, Math.max(DOCK_RAIL + 3, Math.min(Math.round(avail - DOCK_MIN_CENTER), Math.round(avail * 0.72))));
   const def = Math.min(expanded - 2, Math.max(DOCK_RAIL + 1, Math.min(420, Math.max(220, Math.round(avail * 0.33)))));
   const half = Math.min(expanded - 1, Math.max(def + 1, Math.round(avail * 0.5)));
-  return { collapsed: DOCK_RAIL, default: def, half, expanded };
+  return { collapsed: DOCK_RAIL, default: def, half, expanded, full };
 }
 
 export function clampDock(height: number, avail: number) {
   const heights = snapHeights(avail);
-  return Math.min(heights.expanded, Math.max(DOCK_RAIL, Math.round(height)));
+  return Math.min(heights.full, Math.max(DOCK_RAIL, Math.round(height)));
 }
 
 export function nearestSnap(height: number, avail: number): DockSnap {
@@ -41,7 +42,7 @@ export function withSnap(pref: DockPreference, snap: DockSnap): DockPreference {
 }
 
 type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
-const isOpenSnap = (value: unknown): value is DockPreference['last'] => value === 'default' || value === 'half' || value === 'expanded';
+const isOpenSnap = (value: unknown): value is DockPreference['last'] => value === 'default' || value === 'half' || value === 'expanded' || value === 'full';
 
 export function loadDockPreference(store: Store): DockPreference {
   try {
