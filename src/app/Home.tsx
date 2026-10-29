@@ -3,35 +3,35 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { QuestEvent, QuestState } from '../core/contract.ts';
 import { compose } from '../core/compose.ts';
-import { ago, atRisk, collaboration, homeMetrics, teamActivity } from '../core/dashboard.ts';
-import type { CollabItem, MentionSource } from '../core/dashboard.ts';
+import { ago, atRisk, homeMetrics, performance } from '../core/dashboard.ts';
+import { HOME_PERIODS, HOME_PERIOD_LABELS, inHomePeriod, loadHomePeriod, riskInPeriod, saveHomePeriod } from '../core/home-period.ts';
+import type { HomePeriod } from '../core/home-period.ts';
+import { DEFAULT_QUERY, queryTasks } from '../core/registry.ts';
+import type { CollabItem } from '../core/dashboard.ts';
 import { CULTURE_CONTENT, CULTURE_SLOTS } from '../core/culture.ts';
 import type { CultureItem, CultureSlot } from '../core/culture.ts';
 import type { Lens, RegistryQuery } from '../core/registry.ts';
 import { firstName, projectName, taskById } from '../core/selectors.ts';
 import { localDate, shortDate } from '../core/time.ts';
 import { PRODUCT } from '../core/workspace.ts';
-import { MoveForward } from '../ui/components.tsx';
+import { CtaArrow, MoveForward } from '../ui/components.tsx';
 import { ProjectTeam } from './ProjectTeam.tsx';
 import { BannerAdjust, BannerEditor, bannerLook, useBanner } from './HeroBanner.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import type { DeckSection } from './ContextPanel.tsx';
 
-// Home: the day at a glance. Momentum greeting; plate tiles · Up next · Comments & mentions;
-// At risk · Team activity; Projects & team · Culture. The calendar lives in the left panel.
+// Home: the day at a glance. Momentum greeting; Up next · At risk; Projects & team · Culture.
+// The calendar lives in the left panel; comments, mentions and activity in the bottom dock (CollabDock).
 // Everything is read from records; team-wide panels need the same access as Company Work.
-export function Home({ quest, company, canCreate, canDeck, unseen, mentions, read, onUnseen, onOpen, onOpenLead, onOpenMention, onCreate, onRegistry, onDeck, onTeam, onActivity, culture = CULTURE_CONTENT }: {
+export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, onCreate, onRegistry, onDeck, onTeam, culture = CULTURE_CONTENT, focusTaskId, onClearFocus }: {
   quest: Quest; company: boolean; canCreate: boolean;
   /** Whether the Instrument Deck (calendar, insights) is available to this viewer here. */
   canDeck: boolean;
-  /** Updates in the person's inbox they haven't opened yet (the same read set as the bell). */
-  unseen: { count: number; latest?: string };
-  /** Channel @mentions from the universal inbox, and its read set. */
-  mentions: MentionSource[]; read: Set<string>;
-  onUnseen: () => void;
-  onOpen: (id: string) => void; onOpenLead: (id: string) => void; onOpenMention: (item: CollabItem) => void; onCreate: () => void;
+  onOpen: (id: string) => void; onOpenLead: (id: string) => void; onCreate: () => void;
   onRegistry: (lens: Lens, changes?: Partial<RegistryQuery>) => void;
-  onDeck: (section: DeckSection) => void; onTeam: () => void; onActivity: () => void;
+  onDeck: (section: DeckSection) => void; onTeam: () => void;
+  /** The task the dock is reading, focused in the overview's Living view. */
+  focusTaskId?: string | null; onClearFocus?: () => void;
   culture?: CultureItem[];
 }) {
   const { state, actor, now } = quest;
@@ -39,11 +39,21 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
   const minute = Math.floor(now / 60000) * 60000;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const queue = useMemo(() => { const { primary, queue: rest } = compose(state, actor, minute); return [primary, ...rest].filter(item => item.taskId || item.leadId); }, [state, actor, minute]);
+  // Today | This week: one scope for the performance strip, Up next and At risk (Today unless chosen otherwise).
+  const [period, setPeriod] = useState<HomePeriod>(() => { try { return loadHomePeriod(localStorage); } catch { return 'today'; } });
+  const choosePeriod = (next: HomePeriod) => { setPeriod(next); try { saveHomePeriod(localStorage, next); } catch { /* this page only */ } };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const fullQueue = useMemo(() => { const { primary, queue: rest } = compose(state, actor, minute); return [primary, ...rest].filter(item => item.taskId || item.leadId); }, [state, actor, minute]);
+  const queue = fullQueue.filter(item => { const task = item.taskId ? taskById(state, item.taskId) : undefined; return !task || inHomePeriod(task, period, minute); });
   const metrics = homeMetrics(state, actor, minute);
-  const risks = atRisk(state, actor, minute, company);
-  const collab = collaboration(state, actor, company, mentions, read, 4);
-  const activity = teamActivity(state, actor, company, 5);
+  const allRisksInView = atRisk(state, actor, minute, company);
+  const risks = allRisksInView.filter(item => riskInPeriod(item, period, minute));
+  // Your performance: Completed from the period's completion log; the others count exactly what their link opens.
+  const done = performance(state, actor, minute, period).completed;
+  const count = (lens: 'all' | 'today', changes: Partial<typeof DEFAULT_QUERY>) => queryTasks(state, actor, minute, { ...DEFAULT_QUERY, lens, ...changes }).length;
+  const openCount = count('all', { scope: 'mine' });
+  const dueCount = count('all', { scope: 'mine', due: period === 'today' ? 'today' : 'week' });
+  const blockedCount = count('all', { scope: 'mine', status: 'blocked' });
   const greeting = useMomentum(quest, company);
   const today = localDate(minute);
   const next = queue[0];
@@ -60,18 +70,36 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
     <div className="view home-dash">
       {/* New task lives in the top bar; the banner keeps only the next step. */}
       <Hero eyebrow={greeting.eyebrow} primary={greeting.primary} support={greeting.support} banner={banner}>
-        {next && <button type="button" className="btn btn-primary btn-sm" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}>{nextLabel}</button>}
+        {next && <button type="button" className="btn btn-primary btn-sm cta-fill" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}><span className="cta-fill-label">{nextLabel}</span><CtaArrow /></button>}
       </Hero>
 
-      {/* What to do next and who is talking to you. */}
+      {/* Your performance, scoped by the dashboard period (which also scopes Up next and At risk below). */}
+      <section className="hd-perf" aria-labelledby="hd-perf-title">
+        <div className="hd-perf-head">
+          <h2 id="hd-perf-title">Your performance</h2>
+          <div className="seg hd-period" role="group" aria-label="Dashboard period">
+            {HOME_PERIODS.map(value => <button key={value} type="button" aria-pressed={period === value} onClick={() => choosePeriod(value)}>{HOME_PERIOD_LABELS[value]}</button>)}
+          </div>
+        </div>
+        <div className="hd-perf-grid">
+          <PerfMetric value={done} label={period === 'today' ? 'Completed today' : 'Completed this week'} tone="ok" onClick={() => onRegistry('all', { scope: 'mine', status: 'done', sort: 'updated' })} hint="Open your completed work" />
+          <PerfMetric value={openCount} label="Open workload" tone="neutral" onClick={() => onRegistry('all', { scope: 'mine' })} hint="Open all your open work" />
+          <PerfMetric value={dueCount} label={period === 'today' ? 'Due today' : 'Due this week'} sub={period === 'week' ? 'next 7 days' : undefined} tone="accent" onClick={() => onRegistry('all', { scope: 'mine', due: period === 'today' ? 'today' : 'week' })} hint="Open the work due in this period" />
+          <PerfMetric value={blockedCount} label="Blocked" tone="stop" onClick={() => onRegistry('all', { scope: 'mine', status: 'blocked' })} hint="Open your blocked work" />
+        </div>
+      </section>
+
+      {/* One workspace surface: queue and risk, then intel and culture. Conversation and activity live in the bottom collaboration dock. */}
+      <div className="hd-workspace">
       <div className="hd-top">
         <section className="hd-panel" aria-labelledby="hd-next">
-          <PanelHead id="hd-next" title="Up next" sub="Your queue · by priority & due date" tone="accent" icon={<path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5" />}
+          <PanelHead id="hd-next" title="Up next" sub={`Your queue · ${period === 'today' ? 'today' : 'this week'} · by priority & due date`} tone="accent" icon={<path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5" />}
             more={queue.length > 0 ? { label: `View all (${metrics.active})`, onClick: () => onRegistry('all', { scope: 'mine' }) } : undefined} />
           {queue.length === 0
             ? <div className="hd-empty">
                 <span className="hd-empty-mark"><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h11v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4zM16 11h2a2 2 0 0 1 0 4h-2M8 3v3M12 3v3" /></svg></span>
-                <h3>Queue is clear.</h3><p>Nothing is waiting on you right now.</p>
+                <h3>{fullQueue.length ? `Nothing more ${period === 'today' ? 'today' : 'this week'}.` : 'Queue is clear.'}</h3>
+                <p>{fullQueue.length ? <>Later work is waiting. <button type="button" className="link" onClick={() => choosePeriod('week')}>Show this week</button></> : 'Nothing is waiting on you right now.'}</p>
               </div>
             : <ul className="hd-list hd-queue">
                 {queue.slice(0, 5).map(item => {
@@ -91,73 +119,34 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
                 })}
               </ul>}
         </section>
-        <section className="hd-panel hd-collab" aria-labelledby="hd-comments">
-          <div className="hd-head">
-            <Tile tone="accent"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z" /></Tile>
-            <div><h2 id="hd-comments">Comments &amp; mentions</h2><small>On your work</small></div>
-            <button type="button" className={`hd-unread ${unseen.count ? 'has-unseen' : ''}`} onClick={onUnseen}
-              aria-label={unseen.count ? `Inbox: ${unseen.count} unread across all updates — open inbox` : 'Inbox: all caught up — open inbox'} title={unseen.latest ? `Latest in your inbox: ${unseen.latest}` : 'Open inbox'}>
-              {unseen.count ? <>Inbox · <b>{unseen.count > 99 ? '99+' : unseen.count}</b> unread</> : 'Inbox · caught up'}
-              <Chevron />
-            </button>
-          </div>
-          {collab.length === 0
-            ? <p className="hd-quiet">No comments or mentions on your work yet. Comments on tasks you’re part of and @mentions of you land here.</p>
-            : <ul className="hd-list hd-feed">
-                {collab.map(item => (
-                  <li key={item.id}>
-                    <button type="button" className={`hd-act ${item.unread ? 'is-unread' : ''}`} onClick={() => (item.channelId ? onOpenMention(item) : item.taskId && onOpen(item.taskId))}>
-                      <Initial state={state} id={item.from} />
-                      <span className="t"><b>{firstName(state, item.from, 'Someone')}</b> {COLLAB_VERB[item.kind]} <span className="q">{item.context.replace(/^Mentioned you in /, '')}</span><small>{item.text}</small></span>
-                      <time dateTime={new Date(item.at).toISOString()}>{ago(item.at, now)}</time>
-                    </button>
-                  </li>
-                ))}
-              </ul>}
-        </section>
-      </div>
-
-      <div className="hd-row3 is-pair">
-
         <section className="hd-panel" aria-labelledby="hd-risk">
-          <PanelHead id="hd-risk" title="At risk" sub="Needs attention" tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />}
+          <PanelHead id="hd-risk" title="At risk" sub={`Needs attention · ${period === 'today' ? 'today' : 'this week'}`} tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />}
             more={risks.length > 4 ? { label: allRisks ? 'Show fewer' : `View all (${risks.length})`, onClick: () => setAllRisks(value => !value) } : undefined} />
           {risks.length === 0
-            ? <p className="hd-quiet">Nothing is at risk{company ? '' : ' on your work'}.</p>
+            ? <p className="hd-quiet">Nothing is at risk{company ? '' : ' on your work'}{allRisksInView.length ? ` ${period === 'today' ? 'today' : 'this week'}` : ''}.</p>
             : <ul className="hd-list">
                 {(allRisks ? risks : risks.slice(0, 4)).map(({ task, reasons }) => (
                   <li key={task.id} className="hd-row is-risk">
                     <button type="button" className="hd-row-main" onClick={() => onOpen(task.id)}>
                       <strong>{task.title}</strong><small>{firstName(state, task.owner)} · {reasons.join(' · ')}</small>
                     </button>
-                    <span className="tag tag-overdue">{task.ultra ? 'ultra' : 'at risk'}</span>
+                    <span className={`hd-badge ${task.ultra ? 'is-ultra' : ''}`}>{task.ultra ? 'ultra' : 'at risk'}</span>
                   </li>
                 ))}
-              </ul>}
-        </section>
-
-        <section className="hd-panel" aria-labelledby="hd-activity">
-          <PanelHead id="hd-activity" title="Team activity" sub={company ? 'Recent · all work you can see' : 'Recent · your work'} tone="neutral" icon={<path d="M3 12h4l3-8 4 16 3-8h4" />}
-            more={{ label: 'View all', onClick: onActivity }} />
-          {activity.length === 0
-            ? <p className="hd-quiet">No activity yet. Task changes, handoffs and comments appear here as they happen.</p>
-            : <ul className="hd-list hd-feed">
-                {activity.map(event => <li key={event.id}><Recent event={event} quest={quest} onOpen={onOpen} /></li>)}
               </ul>}
         </section>
       </div>
 
       <div className="hd-row3 is-bottom is-intel">
-        <ProjectTeam quest={quest} company={company} onOpen={onOpen} />
-
-
+        <ProjectTeam quest={quest} company={company} onOpen={onOpen} focusTaskId={focusTaskId} onClearFocus={onClearFocus} />
         <CultureSpotlight items={culture} />
+      </div>
       </div>
     </div>
   );
 }
 
-const COLLAB_VERB: Record<CollabItem['kind'], string> = { comment: 'commented on', mention: 'mentioned you in', reply: 'replied on' };
+export const COLLAB_VERB: Record<CollabItem['kind'], string> = { comment: 'commented on', mention: 'mentioned you in', reply: 'replied on' };
 
 /** Momentum greeting with the architectural treatment, kept to a compact height. */
 function Hero({ eyebrow, primary, support, banner, children }: { eyebrow: string; primary: string; support: string; banner: ReturnType<typeof useBanner>; children: ReactNode }) {
@@ -257,7 +246,16 @@ function CultureSpotlight({ items }: { items: CultureItem[] }) {
   );
 }
 
-function Chevron({ left = false }: { left?: boolean }) {
+/** One compact performance figure; it opens the matching task list. */
+function PerfMetric({ value, label, sub, tone, onClick, hint }: { value: number; label: string; sub?: string; tone: 'ok' | 'neutral' | 'accent' | 'stop'; onClick: () => void; hint: string }) {
+  return (
+    <button type="button" className={`hd-perf-metric tone-${tone} ${value ? 'has-value' : ''}`} onClick={onClick} title={hint} aria-label={`${label}: ${value}. ${hint}.`}>
+      <b>{value}</b><span>{label}{sub && <small>{sub}</small>}</span>
+    </button>
+  );
+}
+
+export function Chevron({ left = false }: { left?: boolean }) {
   return <svg className="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d={left ? 'M14 7l-5 5 5 5' : 'M10 7l5 5-5 5'} /></svg>;
 }
 
@@ -266,7 +264,7 @@ function Tile({ tone, children }: { tone: 'accent' | 'stop' | 'act' | 'neutral';
 }
 
 const TINTS = ['t-accent', 't-ok', 't-act'];
-function Initial({ state, id }: { state: QuestState; id: string }) {
+export function Initial({ state, id }: { state: QuestState; id: string }) {
   const tint = TINTS[[...id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % TINTS.length];
   const name = state.people.find(item => item.id === id)?.name ?? firstName(state, id, '?');
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]!.toUpperCase()).join('');
@@ -274,7 +272,7 @@ function Initial({ state, id }: { state: QuestState; id: string }) {
 }
 
 /** Event text with quoted task titles set apart, like "Maya started · Order shingles". */
-function Recent({ event, quest, onOpen }: { event: QuestEvent; quest: Quest; onOpen: (id: string) => void }) {
+export function Recent({ event, quest, onOpen }: { event: QuestEvent; quest: Quest; onOpen: (id: string) => void }) {
   const parts = event.text.split(/(“[^”]*”)/);
   const task = event.taskId ? taskById(quest.state, event.taskId) : undefined;
   const where = task ? projectName(quest.state, task.projectId) : '';

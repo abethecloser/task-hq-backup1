@@ -62,3 +62,16 @@ test('percentages never round up to 100 before everything is done', () => {
   assert.equal(percentOf(200, 200), 100);
   assert.equal(percentOf(0, 0), 0);
 });
+
+test('blocked and waiting are counted apart, so labels match their numbers', () => {
+  const state = world();
+  const waiter = blankTask('r4', { title: 'r4', owner: 'maya', projectId: 'roof' }, 'jordan', NOW);
+  waiter.status = 'ready';
+  waiter.dependsOn = ['r2'];
+  state.tasks.push(waiter);
+  const intel = projectIntel(state, 'jordan', NOW, true);
+  const roof = intel.projects.find(item => item.id === 'roof')!;
+  assert.deepEqual([roof.blocked, roof.waiting], [1, 1]);
+  const maya = intel.people.find(item => item.person === 'maya')!;
+  assert.deepEqual([maya.blocked, maya.waiting, maya.byStatus.blocked], [1, 1, 1]);
+});

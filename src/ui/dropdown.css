@@ -1,6 +1,6 @@
 .hq-select-menu { position: fixed; z-index: 1900; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; padding: 5px; border: 1px solid var(--hair-2); border-radius: 11px; background: #fff; color: var(--ink); box-shadow: var(--shadow-lift); }
 .hq-select-menu [role="listbox"] { display: grid; gap: 2px; }
-.hq-select-menu [role="option"] { min-height: 37px; padding: 8px 10px; border: 0; border-radius: 9px; background: transparent; color: inherit; font: inherit; font-size: 13px; text-align: left; }
+.hq-select-menu [role="option"] { min-height: 37px; padding: 8px 10px; border: 0; border-radius: 9px; background: transparent; color: inherit; font: inherit; font-size: 15.5px; text-align: left; }
 .hq-select-menu [role="option"]:hover, .hq-select-menu .is-active { background: var(--sunk); }
 .hq-select-menu [aria-selected="true"] { background: var(--sunk) linear-gradient(var(--accent-mark), var(--accent-mark)) left center / 2px calc(100% - 14px) no-repeat; color: var(--ink); font-weight: 650; }
 .hq-select-menu [role="option"]:disabled { opacity: .45; }

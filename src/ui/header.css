@@ -1,0 +1,43 @@
+/* Header: primary navigation centered on the whole viewport, and a collapsed-by-default search.
+   The top bar always starts at the rail and spans to the viewport's right edge (it extends over both
+   side panels), so the viewport center in its coordinates is 50vw minus the rail. */
+@media (min-width: 981px) {
+  :root:root:root .topbar.has-sections > .top-nav {
+    position: absolute; top: 0; left: calc(50vw - var(--rail, 56px)); height: 60px; margin: 0; transform: translateX(-50%);
+  }
+}
+
+/* Search sits in a fixed 38px slot; the form is positioned inside it and grows leftward. */
+.top-search-slot { position: relative; flex: none; width: 38px; height: 38px; }
+:root:root:root .topbar .top-search-slot > .top-search {
+  position: absolute; top: 50%; right: 0; z-index: 5; width: 38px; min-width: 0; max-width: none; height: 38px; flex: none;
+  border: 1px solid transparent; border-radius: 10px; background: transparent; transform: translateY(-50%);
+  transition: width .24s cubic-bezier(.22, 1, .36, 1), background-color .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+:root:root:root .topbar .top-search-slot > .top-search input { min-height: 36px; height: 36px; padding-right: 10px; background: transparent; cursor: pointer; }
+:root:root:root .topbar .top-search-slot > .top-search .icon { left: 10px; color: var(--ink-2); }
+:root:root:root .topbar .top-search-slot > .top-search:not(:focus-within):not(.has-text):not(.has-reference) input::placeholder { color: transparent; }
+:root:root:root .topbar .top-search-slot > .top-search:hover:not(:focus-within) { background: var(--sunk, #f6f7f8); }
+/* Expanded: focus (click or keyboard), text or a picked reference keep it open; hover previews it on wide bars. */
+:root:root:root .topbar .top-search-slot > .top-search:is(:focus-within, .has-text, .has-reference) {
+  width: 280px; border-color: #e5e7eb; background: #fff; box-shadow: 0 6px 18px rgb(17 24 39 / 8%);
+}
+:root:root:root .topbar .top-search-slot > .top-search:is(:focus-within, .has-text, .has-reference) input { cursor: text; }
+@media (min-width: 1200px) and (hover: hover) {
+  :root:root:root .topbar .top-search-slot > .top-search:hover { width: 280px; border-color: #e5e7eb; background: #fff; }
+  :root:root:root .topbar .top-search-slot > .top-search:hover input::placeholder { color: var(--faint); }
+}
+/* Narrower bars: the open field drops just below the header as a popover, clear of the navigation. */
+@media (max-width: 1199px) {
+  :root:root:root .topbar .top-search-slot > .top-search:is(:focus-within, .has-text, .has-reference) {
+    top: calc(100% + 12px); width: min(320px, calc(100vw - 24px)); transform: none;
+  }
+}
+@media (max-width: 760px) {
+  /* Phones: span the bar's width just below it (the bar is the containing block). */
+  :root:root:root .topbar .top-search-slot > .top-search:is(:focus-within, .has-text, .has-reference) { position: fixed; top: calc(100% + 8px); right: 12px; left: 12px; width: auto; }
+  /* The popover needs no room in the bar, so the title and account stay put while searching. */
+  :root:root:root .topbar:has(.top-search:focus-within) > .topbar-title { display: block; }
+  :root:root:root .topbar:has(.top-search:focus-within) .account-pop { display: block; }
+}
+@media (prefers-reduced-motion: reduce) { :root:root:root .topbar .top-search-slot > .top-search { transition: none; } }

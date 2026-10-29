@@ -3,13 +3,14 @@ import { Select } from '../ui/Select.tsx';
 // and system insights, or collapsed when there is nothing to say. An open task is a
 // full page in the canvas (TaskPage.tsx), never a side panel.
 // Docked beside the canvas on wide screens (the canvas reflows); a drawer otherwise.
-import { useEffect, useRef, useState } from 'react';
-import type { MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import type { Task } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
 import { dailySignal } from '../core/executive.ts';
 import type { Lens, RegistryQuery } from '../core/registry.ts';
-import { digest, dueOn, heatGrid, systemInsights, teamActivity } from '../core/dashboard.ts';
+import { DEFAULT_QUERY, completedQuery, queryTasks } from '../core/registry.ts';
+import { digest, dueOn, heatGrid, shiftCalendarDate, systemInsights, teamActivity } from '../core/dashboard.ts';
 import type { SystemInsight } from '../core/dashboard.ts';
 import { firstName, isOpen, isOverdue } from '../core/selectors.ts';
 import { localDate } from '../core/time.ts';
@@ -94,43 +95,48 @@ export function Signals({ quest, notifications, company, section, onSection, doc
 
 /** Shared right sidebar: existing calendar followed by authorized notification/activity projections. */
 /** The calendar quick view for the left pullout. The full-page calendar stays one click away. */
-export function CalendarPullout({ quest, company, onOpenTask, onExpandCalendar, onCreate }: {
+export function CalendarPullout({ quest, company, onOpenTask, onExpandCalendar, onCreate, dayList = true }: {
   quest: Quest; company: boolean; onOpenTask: (id: string) => void; onExpandCalendar: () => void; onCreate?: (due: string) => void;
+  /** False in the left sidebar: the chosen day's list is left out (hover and right-click still show a day's work). */
+  dayList?: boolean;
 }) {
   const [date, setDate] = useState(() => localDate(quest.now));
   return (
     <section className="pullout-calendar" aria-label="Calendar quick view">
-      <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={false} onExpand={onExpandCalendar} onCreate={onCreate} />
+      <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={false} onExpand={onExpandCalendar} onCreate={onCreate} dayList={dayList} />
     </section>
   );
 }
 
 /** Month or week of due dates, shaded by due-date load from records, with the chosen day's work below.
  * Hovering a day with work shows what's due; right-click (or the context-menu key) adds work to the day or moves what's due. */
-export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connected, variant = 'deck', onExpand, onCreate, day }: {
+export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connected, variant = 'deck', onExpand, onCreate, day, dayList = true, pick, filters, initialMode = 'month', onMode }: {
   quest: Quest; company: boolean; date: string; onDate: (date: string) => void; onOpenTask: (id: string) => void; connected: boolean;
   variant?: 'deck' | 'page'; onExpand?: () => void; onCreate?: (due: string) => void;
   /** Page only: the chosen day's list beside the calendar, shown on request. */
   day?: { open: boolean; setOpen: (open: boolean) => void };
+  /** False leaves out the chosen day's list below the calendar. */
+  dayList?: boolean;
+  /** Page only: a filtered task set (work-view filters) and the filter row shown under the header. */
+  pick?: Task[]; filters?: ReactNode;
+  initialMode?: 'month' | 'week'; onMode?: (mode: 'month' | 'week') => void;
 }) {
   const { state, actor, now } = quest;
-  const [mode, setMode] = useState<'month' | 'week'>('month');
+  const [mode, setModeState] = useState<'month' | 'week'>(initialMode);
+  const setMode = (next: 'month' | 'week') => { setModeState(next); onMode?.(next); };
   const [peek, setPeek] = useState<DayAt | null>(null);
   const [menu, setMenu] = useState<DayAt | null>(null);
   const today = localDate(now);
   const base = new Date(`${today}T12:00:00`), picked = new Date(`${date}T12:00:00`);
   const offset = (picked.getFullYear() - base.getFullYear()) * 12 + picked.getMonth() - base.getMonth();
-  const grid = heatGrid(state, actor, now, company, offset);
-  const shift = (dir: 1 | -1) => {
-    const next = new Date(picked);
-    if (mode === 'month') next.setMonth(next.getMonth() + dir, 1); else next.setDate(next.getDate() + dir * 7);
-    onDate(localDate(next.getTime()));
-  };
+  const grid = heatGrid(state, actor, now, company, offset, pick);
+  const shift = (dir: 1 | -1) => onDate(shiftCalendarDate(date, mode, dir));
   const monday = new Date(picked); monday.setDate(picked.getDate() - ((picked.getDay() + 6) % 7));
   const week = Array.from({ length: 7 }, (_, at) => { const day = new Date(monday); day.setDate(monday.getDate() + at); return localDate(day.getTime()); });
-  const due = (day: string) => dueOn(state, actor, now, company, day);
+  const due = (day: string) => dueOn(state, actor, now, company, day, pick);
   const dayTasks = due(date);
   const page = variant === 'page';
+  const periodTitle = mode === 'month' ? grid.label : `${dayLabel(week[0]!, { month: 'short', day: 'numeric' })} – ${dayLabel(week[6]!, { month: 'short', day: 'numeric', year: 'numeric' })}`;
   // `day` is also the week loop's variable below.
   const pickDay = day;
   const dayEvents = (day: string, count: number) => ({
@@ -145,6 +151,23 @@ export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connect
   });
   return <>
     <section className={`sig deck-cal ${page ? 'is-page' : ''}`}>
+      {page ? <>
+        {/* Full Calendar: the period as the heading; ‹ Month | Week › step by the active mode. */}
+        <header className="cal-head">
+          <h1 className="cal-title">{periodTitle}</h1>
+          <div className="cal-controls">
+            <button type="button" className="icon-btn cal-step" aria-label={mode === 'month' ? 'Previous month' : 'Previous week'} onClick={() => shift(-1)}><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button>
+            <div className="seg" role="group" aria-label="Calendar view">
+              <button type="button" aria-pressed={mode === 'month'} onClick={() => setMode('month')}>Month</button>
+              <button type="button" aria-pressed={mode === 'week'} onClick={() => setMode('week')}>Week</button>
+            </div>
+            <button type="button" className="icon-btn cal-step" aria-label={mode === 'month' ? 'Next month' : 'Next week'} onClick={() => shift(1)}><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></button>
+            {date !== today && <button type="button" className="link cal-today" onClick={() => onDate(today)}>Today</button>}
+            {day && <button type="button" className="btn btn-ghost btn-sm" aria-pressed={day.open} onClick={() => day.setOpen(!day.open)}>{day.open ? 'Hide day details' : 'Day details'}</button>}
+          </div>
+        </header>
+        {filters}
+      </> : <>
       <div className="deck-cal-bar">
         <button type="button" className="icon-btn" aria-label={mode === 'month' ? 'Previous month' : 'Previous week'} onClick={() => shift(-1)}>‹</button>
         <strong>{mode === 'month' ? grid.label : `${dayLabel(week[0]!, { month: 'short', day: 'numeric' })} – ${dayLabel(week[6]!, { month: 'short', day: 'numeric' })}`}</strong>
@@ -163,6 +186,7 @@ export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connect
           </button>}
         </span>
       </div>
+      </>}
       {mode === 'month'
         ? <div className="deck-cal-grid" role="grid" aria-label={grid.label}>
             {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => <div key={`d${index}`} className="dow" role="columnheader">{day}</div>)}
@@ -188,7 +212,7 @@ export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connect
           </ul>}
       <p className="deck-cal-key"><span><i className="h1" /><i className="h2" /><i className="h3" /><i className="h4" /></span>Due-date load: open work due that day (blocked counts twice). Not a measure of anyone’s performance.</p>
     </section>
-    {(!day || day.open) && <section className="sig deck-cal-day">
+    {dayList && (!day || day.open) && <section className="sig deck-cal-day">
       <h4 className="ctx-label">{date === today ? 'Due today' : dayLabel(date, { weekday: 'long', month: 'short', day: 'numeric' })} <span>{dayTasks.length}</span></h4>
       {dayTasks.length === 0 ? <p className="sig-note">Nothing {company ? '' : 'of yours '}is due this day.</p> : (
         <ul className="sig-list">{dayTasks.slice(0, page ? 30 : 8).map(task => (
@@ -204,22 +228,52 @@ export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connect
   </>;
 }
 
-/** The calendar as its own page: the same records and actions as the deck, with room for titles. */
-export function CalendarPage({ quest, company, onOpenTask, onCreate }: { quest: Quest; company: boolean; onOpenTask: (id: string) => void; onCreate?: (due: string) => void }) {
-  const [date, setDate] = useState(() => localDate(quest.now));
+/** Filter chips shown under the full Calendar's header, in this order; Projects opens the project list. */
+const CALENDAR_FILTERS = ['all', 'today', 'urgent', 'overdue', 'completed', 'watching'];
+const FILTER_ICONS: Record<string, string> = {
+  all: 'M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01',
+  today: 'M4 5h16v16H4zM4 10h16M8 3v4M16 3v4',
+  urgent: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8v5M12 16h.01',
+  overdue: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',
+  completed: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM8 12l3 3 5-6',
+  watching: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z',
+  projects: 'M3 6h6l2 2h10v11H3z',
+};
+const FilterIcon = ({ id }: { id: string }) => <svg className={`icon cal-filter-icon is-${id}`} viewBox="0 0 24 24" aria-hidden="true"><path d={FILTER_ICONS[id]} /></svg>;
+export interface CalendarFilter { id: string; label: string; count?: number; hot?: boolean }
+
+const remember = (key: string, value?: string) => { try { if (value === undefined) return sessionStorage.getItem(key); sessionStorage.setItem(key, value); } catch { /* storage unavailable */ } return null; };
+
+/** The calendar as its own page: the primary workspace for dated work, with the same records and actions as the deck.
+ * The chosen date and mode survive mode switches and leaving the page (session only). */
+export function CalendarPage({ quest, company, onOpenTask, onCreate, filters = [], projects = 0, onProjects }: {
+  quest: Quest; company: boolean; onOpenTask: (id: string) => void; onCreate?: (due: string) => void;
+  /** The existing work-view tabs (labels and counts); the calendar applies them as filters. */
+  filters?: CalendarFilter[]; projects?: number; onProjects?: () => void;
+}) {
+  const { state, actor, now } = quest;
+  const [date, setDateState] = useState(() => { const saved = remember('quest-calendar-date'); return saved && /^\d{4}-\d{2}-\d{2}$/.test(saved) ? saved : localDate(now); });
+  const setDate = (next: string) => { setDateState(next); remember('quest-calendar-date', next); };
+  const initialMode = remember('quest-calendar-mode') === 'week' ? 'week' : 'month';
+  const [filter, setFilter] = useState('all');
   const [dayOpen, setDayOpen] = useState(false);
-  const connected = dailySignal(quest.state, quest.now).sources.some(source => /calendar/i.test(source.label) && source.status === 'connected');
+  const connected = dailySignal(state, now).sources.some(source => /calendar/i.test(source.label) && source.status === 'connected');
+  const scope = company ? 'company' : 'mine';
+  const pick = useMemo(() => filter === 'all' ? undefined
+    : queryTasks(state, actor, now, filter === 'completed' ? completedQuery(scope) : { ...DEFAULT_QUERY, scope, lens: filter as Lens }),
+  [state, actor, now, filter, scope]);
+  const chips = CALENDAR_FILTERS.map(id => filters.find(item => item.id === id)).filter((item): item is CalendarFilter => !!item);
+  const row = chips.length > 0 && <div className="cal-filters" role="group" aria-label="Filter the calendar">
+    {chips.map(chip => <button key={chip.id} type="button" className="cal-filter" aria-pressed={filter === chip.id} onClick={() => setFilter(chip.id)}>
+      <FilterIcon id={chip.id} />{chip.id === 'all' ? 'All' : chip.label}{chip.count !== undefined && <b className={chip.hot ? 'is-hot' : ''}>{chip.count}</b>}
+    </button>)}
+    {onProjects && projects > 0 && <button type="button" className="cal-filter" onClick={onProjects}><FilterIcon id="projects" />Projects<b>{projects}</b></button>}
+  </div>;
   return (
     <div className="view calendar-page">
-      <header className="view-head">
-        <div>
-          <p className="eyebrow">{company ? 'Due dates across the company' : 'Due dates on your work'}</p>
-          <h1>Calendar</h1>
-        </div>
-        <p className="lede">Hover a day to see what’s due. Right-click a day to add work or move what’s due.</p>
-      </header>
       <div className={`calendar-layout ${dayOpen ? 'is-day-open' : ''}`}>
-        <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={connected} variant="page" onCreate={onCreate} day={{ open: dayOpen, setOpen: setDayOpen }} />
+        <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={connected} variant="page" onCreate={onCreate}
+          day={{ open: dayOpen, setOpen: setDayOpen }} pick={pick} filters={row || undefined} initialMode={initialMode} onMode={mode => remember('quest-calendar-mode', mode)} />
       </div>
     </div>
   );

@@ -9,7 +9,7 @@ import { channelReferenceScope } from '../core/inbox.ts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { STATUS_LABELS } from '../core/contract.ts';
-import { FUTURE_SOURCES, channelSource, channelsFor, linkTasks, postMessage, universalInbox, workspacesOf } from '../core/inbox.ts';
+import { FUTURE_SOURCES, QUEST_KIND_LABELS, channelSource, channelsFor, linkTasks, postMessage, universalInbox, workspacesOf } from '../core/inbox.ts';
 import type { InboxItem, InboxSource, MessagingState, WorkspaceRef } from '../core/inbox.ts';
 import { canCreateTask } from '../core/permissions.ts';
 import { firstName, taskById } from '../core/selectors.ts';
@@ -188,8 +188,9 @@ export function ChannelThread({ quest, messaging, store, channelId, current, onO
               : <>
                 <Avatar state={{ ...state, people: messaging.people }} id={message.author} size="md" />
                 <div className="msg-body">
-                  <p className="msg-meta"><b>{nameOf(message.author)}</b><time>{new Date(message.at).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</time></p>
+                  <p className="msg-meta"><b>{nameOf(message.author)}</b>{message.quest && <em className="msg-quest">New Quest · {QUEST_KIND_LABELS[message.quest]}</em>}<time>{new Date(message.at).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}</time></p>
                   <p className="msg-text"><ReferencedText text={message.text} document={message.references?.text} /></p>
+                  {message.attachments?.length ? <p className="msg-files">{message.attachments.map(file => <span key={file.id}>{file.name}</span>)}</p> : null}
                   {message.taskIds.length > 0 && (
                     <p className="msg-tasks">{message.taskIds.map(id => {
                       const task = here ? taskById(state, id) : undefined;

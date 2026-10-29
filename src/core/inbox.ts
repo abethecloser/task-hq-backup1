@@ -24,7 +24,16 @@ export interface Channel {
   purpose: string;
   /** Person ids. Membership decides who reads and posts. */
   members: string[];
+  /** A project's shared client channel: the client and the team members working with them. */
+  projectId?: string;
 }
+
+/** What a client is sending with New Quest. */
+export type QuestKind = 'question' | 'update' | 'document' | 'issue' | 'help';
+export const QUEST_KIND_LABELS: Record<QuestKind, string> = { question: 'Question', update: 'Update', document: 'Document or photo', issue: 'Issue', help: 'Request for help' };
+
+/** A file sent with a message. Bytes live in the media store; only the id and metadata are here. */
+export interface MessageAttachment { id: string; name: string; mime: string; bytes: number; mediaId: string }
 
 export interface Message {
   references?: ReferenceFields;
@@ -40,6 +49,9 @@ export interface Message {
   taskIds: string[];
   /** 'system' messages describe actions (a task was made); people write 'message'. */
   kind: 'message' | 'system';
+  /** Set when a client sent this with New Quest: a request for the team, not a task. */
+  quest?: QuestKind;
+  attachments?: MessageAttachment[];
 }
 
 export interface MessagingState {
@@ -132,10 +144,12 @@ export function channelSource(state: MessagingState, workspace: WorkspaceRef): I
         .map(message => {
           const channel = state.channels.find(item => item.id === message.channelId)!;
           const mentioned = message.mentions.includes(person);
+          const files = message.attachments?.length ? ` · ${message.attachments.length} file${message.attachments.length === 1 ? '' : 's'}` : '';
           return {
             id: `msg:${message.id}`, kind: mentioned ? 'mention' : 'message', workspace, channelId: channel.id, messageId: message.id,
             taskId: message.taskIds[0], at: message.at, from: message.author,
-            title: mentioned ? `Mentioned you in #${channel.name}` : `#${channel.name}`, detail: message.text, urgent: mentioned,
+            title: message.quest ? `New Quest · ${QUEST_KIND_LABELS[message.quest]} in #${channel.name}` : mentioned ? `Mentioned you in #${channel.name}` : `#${channel.name}`,
+            detail: message.text + files, urgent: mentioned || !!message.quest,
           } satisfies InboxItem;
         });
     },

@@ -59,7 +59,8 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title
       </nav>}
       <div className="topbar-right">
         {focused && <span className="focus-chip">Critical Focus</span>}
-        {search}
+        {/* A fixed slot: the field expands inside it (or as a popover on narrow bars), so nothing beside it moves. */}
+        <div className="top-search-slot">{search}</div>
         {!focused && <button type="button" className={`top-icon ${askOpen ? 'is-on' : ''}`} aria-label="Ask your tasks" title={askOpen ? 'Close Ask your tasks drawer' : 'Open Ask your tasks drawer'} aria-controls="right-edge-drawer" data-edge="ask" aria-expanded={askOpen} onClick={onAsk}><TopIcon d={SPARK} /></button>}
         <button type="button" className={`top-icon ${notifOpen ? 'is-on' : ''}`} title={notifOpen ? 'Close notifications drawer' : 'Open notifications drawer'} aria-controls="right-edge-drawer" data-edge="updates" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'} aria-expanded={notifOpen} onClick={onBell}>
           <TopIcon d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0" />
@@ -95,6 +96,7 @@ export function AccountMenu({ quest, close }: { quest: Quest; close: () => void 
         <button type="button" role="menuitem" onClick={() => { close(); live.onSignOut(); }}>Sign out</button>
       </>
     : <>
+        <button type="button" role="menuitem" onClick={() => { close(); location.hash = '#/client'; }}>Preview client workspace<small>What a client sees for Northside re-roof</small></button>
         <p className="menu-note">Working as (demo person)</p>
         {state.people.map(item => (
           <button key={item.id} type="button" role="menuitemradio" aria-checked={item.id === actor} className={item.id === actor ? 'is-on' : ''} onClick={() => { close(); setActor(item.id); }}>

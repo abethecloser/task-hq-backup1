@@ -1,0 +1,273 @@
+/* Home wallboard — V5/V6 materials over the live Home components.
+   One workspace surface (hairline-divided cells, not floating cards), compact Mission Control rows,
+   muted status badges and tracked micro-labels. Scoped to .home-dash; layout grids, data and actions
+   stay in home.css / shell.css / Home.tsx. The :root chain outranks the global side-edge reset in home.css (specificity 0,6,2). */
+:root:root:root:root:root .home-dash {
+  --wb-line: #e5e7eb; --wb-line-soft: #f0f1f3; --wb-tray: #fafafb; --wb-hover: #f6f7f8;
+  --wb-micro: #9ca3af; --wb-meta: #6b7280; --wb-radius: 12px; --wb-radius-sm: 8px;
+  --wb-shadow: 0 1px 2px rgb(17 24 39 / 4%);
+  gap: 14px;
+
+  /* Hero: the V5 white card — full hairline, modest radius, light greeting with a weighted accent. */
+  & .hd-hero { min-height: 140px; border: 1px solid var(--wb-line); border-radius: var(--wb-radius); box-shadow: var(--wb-shadow); }
+  & .hd-hero h1 { font-weight: 400; letter-spacing: -.025em; }
+  & .hd-hero h1 b { font-weight: 700; }
+  & .hd-hero-eyebrow { color: var(--wb-micro); font-size: 12px; letter-spacing: .16em; }
+  & .momentum-support { color: var(--wb-meta); font-size: 16px; font-style: italic; }
+  & .momentum-support b { font-style: normal; }
+
+  /* Workspace: one surface. The 1px grid gaps show the surface colour as dividers between cells. */
+  & .hd-workspace { display: grid; gap: 1px; overflow: hidden; border: 1px solid var(--wb-line); border-radius: var(--wb-radius); background: var(--wb-line); box-shadow: var(--wb-shadow); }
+  & .hd-workspace > :is(.hd-top, .hd-row3) { gap: 1px; align-items: stretch; background: var(--wb-line); }
+  & .hd-panel { gap: 12px; padding: 18px 20px; border: 0; border-radius: 0; background: var(--card, #fff); box-shadow: none; }
+
+  /* Panel heads: icon tile, title, tracked micro-label. */
+  & .hd-head { gap: 12px; }
+  & .hd-head h2 { font-size: 18px; font-weight: 700; letter-spacing: -.015em; }
+  & .hd-head small { margin-top: 2px; color: var(--wb-micro); font-size: 11.5px; letter-spacing: .18em; }
+  & .hd-tile { width: 36px; height: 36px; border-radius: 10px; }
+  & .hd-tile.tone-accent { background: #fff4ed; }
+  & .hd-tile.tone-stop { background: #fef2f2; }
+  & .hd-tile.tone-neutral { background: var(--wb-tray); box-shadow: inset 0 0 0 1px var(--wb-line-soft); }
+  & .hd-more { color: var(--wb-micro); font-size: 12.5px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+  & .hd-more:hover { background: var(--wb-hover); color: var(--accent-ink); }
+  & .hd-unread { font-size: 12.5px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+  & .hd-unread:not(.has-unseen) { color: var(--wb-micro); }
+  & .hd-unread.has-unseen { background: #fff4ed; }
+
+  /* Mission Control trays: Up next and At risk rows sit in one bordered list, divided by hairlines. */
+  & :is(.hd-queue, .hd-panel[aria-labelledby="hd-risk"] .hd-list) { gap: 0; overflow: hidden; border: 1px solid var(--wb-line-soft); border-radius: var(--wb-radius-sm); background: var(--wb-tray); }
+  & .hd-q { gap: 12px; min-height: 52px; padding: 8px 12px; border-top: 1px solid var(--wb-line-soft); background: transparent; transition: background .15s; }
+  & .hd-q:first-child, & .hd-panel[aria-labelledby="hd-risk"] .hd-row:first-child { border-top: 0; }
+  & .hd-q:hover { background: #fff; }
+  & .hd-row { min-height: 52px; padding: 8px 12px 8px 14px; border: 0; border-top: 1px solid var(--wb-line-soft); border-radius: 0; background-color: transparent; transition: background-color .15s; }
+  & .hd-row:hover { background-color: #fff; box-shadow: none; }
+  & .hd-row-main { gap: 3px; }
+  & .hd-row-main strong { font-size: 15.5px; font-weight: 650; }
+  & .hd-row-main small { color: var(--wb-meta); font-size: 14px; }
+  & .hd-row-main em { font-size: 11.5px; letter-spacing: .1em; }
+  & .hd-due { font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+  & .hd-due:not(.is-late, .is-today) { color: var(--wb-micro); }
+
+  /* Muted status badge (V5/V6 pill). */
+  & .hd-badge { display: inline-flex; align-items: center; flex: none; min-height: 18px; padding: 0 8px; border-radius: 999px; background: #fef2f2; color: var(--stop-ink, #b4231a); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+  & .hd-badge.is-ultra { background: #1f2023; color: #fff; }
+
+  /* Feeds (comments, activity): flat hairline rows. */
+  & .hd-act { padding: 10px 6px; border-top-color: var(--wb-line-soft); border-radius: 6px; font-size: 15px; }
+  & .hd-act .t small { color: var(--wb-meta); font-size: 14px; font-style: italic; }
+  & .hd-act time { color: var(--wb-micro); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  & button.hd-act:hover { background: var(--wb-hover); }
+
+  /* Empty and quiet states: soft tray instead of dashed boxes. */
+  & .hd-quiet { border: 1px dashed var(--wb-line); border-radius: var(--wb-radius-sm); background: var(--wb-tray); color: var(--wb-meta); font-size: 14.5px; font-style: italic; }
+  & .hd-empty { gap: 4px; padding: 26px 16px; border: 1px dashed var(--wb-line); border-radius: var(--wb-radius-sm); background: var(--wb-tray); }
+  & .hd-empty-mark { width: 44px; height: 44px; border-radius: 50%; background: #fff; color: var(--wb-micro); box-shadow: var(--wb-shadow), inset 0 0 0 1px var(--wb-line-soft); }
+  & .hd-empty h3 { font-size: 17px; font-weight: 700; }
+  & .hd-empty p { color: var(--wb-meta); font-size: 14.5px; font-style: italic; }
+
+  /* Projects & team (the graph slot): V5 micro-labels and quieter rows. */
+  & :is(.pt-label) { color: var(--wb-micro); font-size: 12px; letter-spacing: .18em; }
+  & .pt-ring-label small, & .pt-ring-sub { color: var(--wb-micro); font-size: 11.5px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; }
+  & .pt-ring-label b { font-weight: 800; }
+  & :is(.pt-row, .pt-mini button) { border-radius: var(--wb-radius-sm); }
+  & :is(.pt-row, .pt-mini button):hover { background: var(--wb-hover); }
+  & .pt-row.is-on { background: #fff4ed; }
+  & :is(.pt-row small, .pt-mini small) { color: var(--wb-meta); font-size: 13px; }
+  & .pt-mini strong { font-size: 15px; }
+  & :is(.pt-projects-done, .pt-actions) { border-top-color: var(--wb-line-soft); }
+
+  /* Quest Culture: V5 light material when nothing is published; media keeps the dark frame. */
+  & .hd-culture-tabs button { font-size: 12.5px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+  & .hd-culture-tabs button:not([aria-selected="true"]) { color: var(--wb-micro); }
+  & .hd-culture-tabs button[aria-selected="true"] { color: var(--ink); }
+  & .hd-culture-arrows .icon-btn { width: 28px; height: 28px; border-color: var(--wb-line-soft); }
+  & .hd-culture-frame { min-height: 220px; border-radius: var(--wb-radius-sm); }
+  & .hd-culture-frame.is-empty { background: linear-gradient(180deg, var(--wb-tray), #fff); color: var(--ink); box-shadow: inset 0 0 0 1px var(--wb-line-soft); }
+  & .hd-culture-frame.is-empty .hd-culture-mark { border-color: var(--wb-line-soft); background: #fff; color: var(--wb-micro); box-shadow: var(--wb-shadow); }
+  & .hd-culture-frame.is-empty .hd-culture-copy small { color: var(--wb-micro); letter-spacing: .32em; }
+  & .hd-culture-frame.is-empty .hd-culture-copy strong { font-size: 24px; letter-spacing: -.02em; }
+  & .hd-culture-frame.is-empty .hd-culture-copy :is(p, em) { color: var(--wb-meta); font-style: italic; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:root:root:root:root .home-dash :is(.hd-q, .hd-row) { transition: none; }
+}
+
+/* ── Bottom collaboration dock ──────────────────────────────────────────────────────────────
+   A flex item at the foot of the main column: a 44px rail when collapsed, opening upward. The
+   circular toggle matches the left/right seams and straddles the dock's top edge. */
+.collab-dock {
+  --dock-line: #e5e7eb; --dock-line-soft: #f0f1f3; --dock-micro: #9ca3af; --dock-meta: #6b7280; --dock-tray: #fafafb;
+  --dock-rail: 52px;
+  position: relative; z-index: 6; display: grid; grid-template-rows: var(--dock-rail) minmax(0, 1fr);
+  height: var(--dock-rail); border-top: 1px solid var(--dock-line); background: var(--card, #fff);
+  box-shadow: 0 -10px 30px rgb(17 24 39 / 5%); container: dock / inline-size;
+  transition: height .34s var(--sidebar-ease, cubic-bezier(.16, 1, .3, 1));
+}
+.collab-dock.is-dragging { transition: none; }
+.collab-dock.is-dragging, .collab-dock.is-dragging * { user-select: none; }
+.shell[data-resizing] .collab-dock { transition: none; }
+
+/* Resize handle: a full-width strip on the top edge (easy to grab), showing a small centered grip. */
+.dock-handle { position: absolute; top: -7px; right: 0; left: 0; z-index: 1; display: flex; justify-content: center; height: 16px; cursor: row-resize; touch-action: none; outline: none; }
+.dock-grip { width: 32px; height: 3px; margin-top: 4.5px; border-radius: 999px; background: #d1d5db; transition: width .15s ease, background-color .15s ease, box-shadow .15s ease; }
+.dock-handle:hover .dock-grip, .collab-dock.is-dragging .dock-grip { width: 48px; background: #9ca3af; }
+/* The grip shows focus; the wide hit strip itself draws no outline. */
+:root:root:root .collab-dock .dock-handle:focus-visible { outline: none; box-shadow: none; }
+.dock-handle:focus-visible .dock-grip { width: 48px; background: var(--accent); box-shadow: 0 0 0 3px #fff4ed; }
+/* The circular toggle sits just right of the grip so both stay visible on the edge. */
+.dock-toggle { position: absolute; top: 0; left: calc(50% + 46px); z-index: 2; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--hair-2); border-radius: 50%; background: var(--card, #fff); color: var(--ink-2); cursor: pointer; box-shadow: 0 2px 8px rgb(17 18 20 / 8%); transform: translate(-50%, -50%); }
+.dock-toggle:hover { background: var(--sunk); color: var(--ink); }
+.dock-toggle:focus-visible, .dock-rail-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dock-toggle .icon { width: 16px; height: 16px; }
+
+.dock-rail { display: flex; align-items: center; gap: 16px; min-width: 0; padding: 0 24px; }
+.dock-rail-main { display: flex; align-items: center; gap: 12px; min-width: 0; height: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.dock-mark { position: relative; display: grid; place-items: center; width: 22px; height: 22px; color: var(--dock-micro); }
+.dock-mark .icon { width: 16px; height: 16px; }
+.dock-mark.is-live::after { content: ""; position: absolute; top: 0; right: 0; width: 8px; height: 8px; border: 2px solid var(--card, #fff); border-radius: 50%; background: var(--accent); }
+.dock-label, .dock-count, .dock-latest { font-size: 12px; font-weight: 750; letter-spacing: .18em; text-transform: uppercase; white-space: nowrap; }
+.dock-label { color: var(--dock-micro); }
+.dock-sep { width: 1px; height: 14px; background: var(--dock-line); }
+.dock-count { color: var(--dock-meta); }
+.dock-count.is-hot { color: var(--accent-ink); }
+.dock-latest { color: var(--dock-micro); letter-spacing: .1em; }
+.dock-faces { display: flex; margin-left: auto; }
+.dock-faces .avatar { width: 24px; height: 24px; margin-left: -6px; border: 2px solid var(--card, #fff); font-size: 9px; }
+
+.dock-body { display: grid; grid-template-columns: minmax(300px, 1fr) minmax(0, 1.45fr); min-height: 0; overflow: hidden; border-top: 1px solid var(--dock-line-soft); }
+.dock-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.dock-col + .dock-col { border-left: 1px solid var(--dock-line-soft); }
+.dock-reader { background: var(--dock-tray); }
+
+/* List column: tab strip, then the active list. */
+.dock-tabs { display: flex; flex: none; gap: 2px; padding: 6px 10px 0; overflow-x: auto; border-bottom: 1px solid var(--dock-line-soft); scrollbar-width: none; }
+.dock-tabs button { position: relative; display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 34px; padding: 0 10px; border: 0; background: none; color: var(--dock-micro); font: inherit; font-size: 12px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
+.dock-tabs button:hover:not(.is-soon) { color: var(--ink); }
+.dock-tabs button.is-active { color: var(--ink); }
+.dock-tabs button.is-active::after { content: ""; position: absolute; right: 10px; bottom: -1px; left: 10px; height: 2px; border-radius: 2px; background: var(--accent); }
+.dock-tabs button.is-soon { cursor: default; opacity: .6; }
+.dock-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dock-tab-count { min-width: 16px; padding: 1px 5px; border-radius: 999px; background: #fff4ed; color: var(--accent-ink); font-size: 11px; letter-spacing: 0; text-align: center; }
+.dock-tab-short { display: none; }
+.dock-soon { padding: 1px 5px; border: 1px solid var(--dock-line); border-radius: 999px; font-size: 9.5px; letter-spacing: .08em; }
+.dock-list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 4px 0 6px; color: var(--dock-meta); font-size: 13px; }
+.dock-list-head > span:last-child { display: inline-flex; gap: 10px; }
+.dock-list-head .link { font-size: 13px; }
+.dock-new { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border: 1px solid var(--dock-line); border-radius: 8px; background: #fff; color: var(--ink-2); font: inherit; font-size: 12px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.dock-new:hover { border-color: #fed7aa; color: var(--accent-ink); }
+.dock-new .icon { width: 12px; height: 12px; color: var(--accent); }
+.dock-items { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.dock-item { display: grid; gap: 2px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.dock-item:hover { background: var(--dock-tray); }
+.dock-item.is-picked { background: #fff4ed; }
+.dock-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dock-item-kind { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--dock-micro); font-size: 11.5px; }
+.dock-item-kind b { color: var(--ink-2); font-size: 11.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.dock-item.is-channel .dock-item-kind b { font-size: 15px; letter-spacing: 0; text-transform: none; }
+.dock-item-kind em { overflow: hidden; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.dock-item-kind time { margin-left: auto; white-space: nowrap; }
+.dock-item-kind .dock-tab-count { margin-left: auto; }
+.dock-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--accent); }
+.dock-item strong { overflow: hidden; font-size: 15px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.dock-item:not(.is-unread) strong { font-weight: 600; }
+.dock-item small { overflow: hidden; color: var(--dock-meta); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.dock-note { margin: 6px 0 10px; color: var(--dock-meta); font-size: 14.5px; }
+
+/* Reader: the existing channel thread, fitted to the dock and scrolling inside it. */
+.dock-channel { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+.dock-channel .thread { display: flex; flex: 1 1 auto; flex-direction: column; gap: 0; min-height: 0; padding: 0; border: 0; background: none; }
+.dock-channel .thread-head { flex: none; padding: 8px 20px; border-bottom: 1px solid var(--dock-line-soft); }
+.dock-channel .thread-head > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+.dock-channel .thread-head .eyebrow { order: 2; margin: 0; font-size: 11.5px; }
+.dock-channel .thread-head h2 { order: 1; margin: 0; font-size: 15.5px; font-weight: 800; }
+.dock-channel .thread-head .muted { order: 3; overflow: hidden; flex: 1 1 100%; min-width: 0; margin: 0; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+/* The base composer wraps at a 240px textarea basis; in the dock it stays one row. */
+.collab-dock .dock-channel .thread-post { display: flex; flex-wrap: nowrap; align-items: flex-end; gap: 8px; }
+.collab-dock .dock-channel .thread-post textarea { flex: 1 1 0; min-width: 0; height: 34px; min-height: 34px; max-height: 72px; padding-block: 7px; resize: none; }
+.dock-channel .thread-post .btn { flex: none; }
+.dock-channel .thread-post .form-error { flex-basis: 100%; }
+.dock-channel .thread-list { flex: 1 1 auto; min-height: 0; margin: 0; padding: 8px 20px; overflow-y: auto; overscroll-behavior: contain; }
+.collab-dock .dock-channel .thread-post { position: static; flex: none; margin: 0; padding: 8px 16px; border: 0; border-top: 1px solid var(--dock-line-soft); border-radius: 0; background: var(--card, #fff); box-shadow: none; }
+.dock-channel .boundary { flex: none; overflow: hidden; margin: 0; padding: 4px 16px 6px; text-overflow: ellipsis; white-space: nowrap; background: var(--card, #fff); color: var(--dock-micro); font-size: 12px; }
+.dock-head { display: flex; flex: none; align-items: center; gap: 10px; min-height: 46px; padding: 6px 12px 6px 20px; border-bottom: 1px solid var(--dock-line-soft); }
+.dock-head h2 { overflow: hidden; margin: 0; color: var(--ink); font-size: 12.5px; font-weight: 800; letter-spacing: .16em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.dock-head :is(.hd-more, .hd-unread) { font-size: 12px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.dock-head .hd-more { color: var(--dock-micro); }
+.dock-scroll { flex: 1 1 auto; min-height: 0; padding: 6px 14px 12px; overflow-y: auto; overscroll-behavior: contain; }
+.dock-reply { flex: none; padding: 10px 16px 12px; border-top: 1px solid var(--dock-line-soft); background: var(--card, #fff); }
+.collab-dock .hd-act { padding: 9px 6px; border-top-color: var(--dock-line-soft); border-radius: 6px; font-size: 15px; }
+.collab-dock .hd-act.is-picked { background: #fff4ed; }
+.collab-dock .dock-scroll > .hd-quiet:first-child { margin-top: 10px; }
+.collab-dock .hd-act .t small { color: var(--dock-meta); font-size: 14px; font-style: italic; }
+.collab-dock .hd-act time { color: var(--dock-micro); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.collab-dock .hd-quiet { margin: 8px 0; border-color: var(--dock-line); background: var(--dock-tray); color: var(--dock-meta); font-size: 14.5px; font-style: italic; }
+.collab-dock .tp-feed { margin: 0; }
+
+/* Narrow center (both side panels open): columns keep a readable width and scroll sideways. */
+/* Narrow center (both side panels open): two even columns, short tab labels, tabs scroll with a fade. */
+@container dock (max-width: 760px) {
+  .dock-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); }
+  .dock-tabs { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  .dock-tabs button { padding: 0 8px; }
+  .dock-tab-full { display: none; }
+  .dock-tab-short { display: inline; }
+  .dock-channel .thread-head .muted { display: none; }
+  .dock-latest { display: none; }
+}
+@container dock (max-width: 560px) { .dock-label, .dock-sep { display: none; } }
+@media (prefers-reduced-motion: reduce) { .collab-dock { transition: none; } }
+
+/* Task thread with its context (status, owner, due, priority, project, who acts next) beside it. */
+.dock-reader { container: reader / inline-size; }
+.dock-task { display: grid; flex: 1 1 auto; grid-template-columns: minmax(0, 1fr) 248px; min-height: 0; }
+.dock-task-thread { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.dock-task-context { min-height: 0; padding: 14px 18px; overflow-y: auto; border-left: 1px solid var(--dock-line-soft); background: var(--card, #fff); }
+.dock-task-context dl { display: grid; gap: 10px; margin: 0; }
+.dock-task-context dl > div { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: baseline; gap: 8px; }
+.dock-task-context dt { color: var(--dock-micro); font-size: 11.5px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.dock-task-context dd { overflow: hidden; margin: 0; color: var(--ink); font-size: 14.5px; font-weight: 600; text-overflow: ellipsis; }
+.dock-task-context dd.is-late { color: var(--stop-ink, #b4231a); }
+.dock-task-next { display: grid; gap: 4px; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--dock-line-soft); color: var(--ink-2); font-size: 14px; line-height: 1.4; }
+.dock-task-next b { color: var(--dock-micro); font-size: 11.5px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+@container reader (max-width: 620px) {
+  .dock-task { grid-template-columns: minmax(0, 1fr); }
+  .dock-task-context { display: none; }
+}
+
+/* Your performance — compact strip under the hero, with the dashboard's Today | This week scope. */
+.home-dash .hd-perf { display: grid; gap: 10px; }
+.home-dash .hd-perf-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.home-dash .hd-perf-head h2 { margin: 0; color: #9ca3af; font-size: 12px; font-weight: 750; letter-spacing: .18em; text-transform: uppercase; }
+.home-dash .hd-period { flex: none; padding: 3px; border-radius: 10px; background: #f3f4f6; }
+.home-dash .hd-period button { min-height: 30px; padding: 0 12px; border-radius: 8px; color: #6b7280; font-size: 14px; font-weight: 650; }
+.home-dash .hd-period button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgb(17 24 39 / 10%); }
+.home-dash .hd-period button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.home-dash .hd-perf-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.home-dash .hd-perf-metric { display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 64px; padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; box-shadow: 0 1px 2px rgb(17 24 39 / 4%); transition: border-color .15s ease, background-color .15s ease; }
+.home-dash .hd-perf-metric:hover { border-color: #fed7aa; background: #fffaf6; }
+.home-dash .hd-perf-metric:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.home-dash .hd-perf-metric b { flex: none; min-width: 1.4ch; color: var(--ink); font: 800 28px/1 var(--display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.home-dash .hd-perf-metric span { display: grid; min-width: 0; color: #4b5563; font-size: 14px; font-weight: 650; line-height: 1.25; }
+.home-dash .hd-perf-metric small { color: #9ca3af; font-size: 12px; font-weight: 600; }
+.home-dash .hd-perf-metric.tone-ok.has-value b { color: #15803d; }
+.home-dash .hd-perf-metric.tone-accent.has-value b { color: var(--accent-ink); }
+.home-dash .hd-perf-metric.tone-stop.has-value b { color: var(--stop-ink, #b4231a); }
+@container home (max-width: 760px) { .home-dash .hd-perf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Compact dock (collapsed/default height, between the side panels): one primary view at a time. The tabs
+   choose the list; picking an item opens the reader, and Back returns to the list. Wider (above default)
+   the list and reader sit side by side, and the task context column joins them when the reader has room. */
+.dock-back { display: none; }
+.collab-dock.is-compact {
+  & .dock-body { grid-template-columns: minmax(0, 1fr); }
+  & .dock-col + .dock-col { border-left: 0; }
+  &[data-pane="list"] .dock-reader, &[data-pane="reader"] .dock-lists { display: none; }
+  & .dock-task { grid-template-columns: minmax(0, 1fr); }
+  & .dock-task-context { display: none; }
+  & .dock-back { display: inline-flex; flex: none; align-items: center; align-self: flex-start; gap: 4px; margin: 8px 12px 0; padding: 4px 8px 4px 4px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+  & .dock-back:hover { background: var(--sunk); color: var(--ink); }
+  & .dock-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  & .dock-back .icon { width: 16px; height: 16px; }
+}

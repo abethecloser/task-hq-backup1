@@ -13,7 +13,7 @@ import { LEGACY_LENSES, LENSES, LENS_LABELS, completedQuery, isCompletedQuery, l
 import { canCreateTask } from '../core/permissions.ts';
 import { insights, insightsFor } from '../core/rules.ts';
 import { activeGrant, activeLeads, inFocus, leadBucket, myTasks, person, taskById } from '../core/selectors.ts';
-import { LookSwitch, ModeChip, BrandMark, ToastBar } from '../ui/components.tsx';
+import { LookSwitch, ModeChip, BrandMark, ToastBar, CtaArrow } from '../ui/components.tsx';
 import { useQuest } from '../ui/useQuest.ts';
 import type { Quest } from '../ui/useQuest.ts';
 import { AllTasks, useRegistryPrefs } from './AllTasks.tsx';
@@ -25,10 +25,15 @@ import type { DeckSection } from './ContextPanel.tsx';
 import { localDate } from '../core/time.ts';
 import { EdgeDrawer } from '../ui/EdgeDrawer.tsx';
 import { WorkNavigator } from './WorkNavigator.tsx';
+import { ClientWorkspace } from './ClientWorkspace.tsx';
 import { CreateTask, discardCreateDraft, hasCreateDraft } from './CreateTask.tsx';
 import { ExecutiveDesk } from './ExecutiveDesk.tsx';
 import { Activity, Settings } from './Settings.tsx';
 import { Home } from './Home.tsx';
+import { CollabDock } from './CollabDock.tsx';
+import type { DockTab } from './CollabDock.tsx';
+import { DOCK_DEFAULT_PREF, loadDockPreference, saveDockPreference, withSnap } from '../ui/dock-size.ts';
+import type { DockPreference } from '../ui/dock-size.ts';
 import { AskTasks } from './AskTasks.tsx';
 import { AccountMark, AccountMenu, TopBar } from './TopBar.tsx';
 import { NeedsAttention } from './NeedsAttention.tsx';
@@ -103,10 +108,21 @@ function useViewportWidth() {
   return width;
 }
 
+/** The client workspace route. Demo only: live Task HQ has no client grants yet, so the route is ignored there. */
+function useClientRoute() {
+  const read = () => /^#\/client(\/|$)/.test(location.hash);
+  const [on, setOn] = useState(read);
+  useEffect(() => { const update = () => setOn(read()); window.addEventListener('hashchange', update); return () => window.removeEventListener('hashchange', update); }, []);
+  return on;
+}
+
 export default function App({ onExitDemo, backend }: { onExitDemo?: () => void; backend?: QuestBackend } = {}) {
   const quest = useQuest('app', backend);
+  const live = useLive();
+  const client = useClientRoute();
   if (quest.loadError) return <LoadError message={quest.loadError} />;
   if (!quest.state || !quest.actor) return <div className="boot"><BrandMark size={42} /><span>Opening Task-HQ…</span></div>;
+  if (client && !live) return <ClientWorkspace quest={quest as Quest} onExit={() => { location.hash = '#/home'; }} />;
   return <FeedbackProvider feedback={quest.feedback}><ReferenceProvider scope={referenceScope(quest.state, quest.actor)} drafts={quest.referenceDrafts}><Shell quest={quest as Quest} onExitDemo={onExitDemo} /></ReferenceProvider></FeedbackProvider>;
 }
 
@@ -139,6 +155,14 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const sidebar = useSidebar(actor);
   const collapseSidebar = sidebar.collapse;
   const width = useViewportWidth();
+  /** Bottom collaboration dock (Home). Remembered on this device, like the calendar pullout. */
+  // Bottom dock size preference (`quest-dock-height`); storage can be unavailable, so this degrades to this page only.
+  const [dock, setDock] = useState<DockPreference>(() => { try { return loadDockPreference(localStorage); } catch { return DOCK_DEFAULT_PREF; } });
+  useEffect(() => { try { saveDockPreference(localStorage, dock); } catch { /* storage unavailable */ } }, [dock]);
+  const dockOpen = dock.snap !== 'collapsed';
+  /** The task the dock is reading, focused in the overview's Living view until cleared. */
+  const [dockFocus, setDockFocus] = useState<string | null>(null);
+  const [dockTab, setDockTab] = useState<DockTab>('inbox');
   /** Notifications drawer (right). Session-only: it always starts closed. The calendar pullout (left) is `sidebar.open`. */
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -351,7 +375,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     return () => cancelAnimationFrame(frame);
   }, [edgePanelOpen]);
   // Calendar owns the persisted, clamped panel width; both right panes reuse it.
-  const rightPanelWidth = sidebar.width;
+  // V5/V6 proportions: a 320px right panel on wide screens; narrower below 1280px so both panels still fit beside the center.
+  const rightPanelWidth = width >= 1280 ? 320 : 272;
   const room: PulloutRoom = { viewport: width, mobile: sidebar.isMobile, calendarWidth: sidebar.width, notificationsWidth: rightPanelWidth, minCanvasBoth: MIN_CANVAS_BOTH, minCanvas: MIN_CANVAS };
   useEffect(() => {
     if (!sidebar.isMobile && rightPanelOpen && sidebar.open && !bothFit(room)) {
@@ -404,15 +429,20 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     setAskOpenLast(true);
   }
   const contextOffset = !sidebar.isMobile && rightPanelOpen ? rightPanelWidth : 0;
-  const leftReserved = pullouts.calendar ? sidebar.width : 0;
+  // The full Calendar is the page's primary workspace: the left quick view (a second grid) steps aside there.
+  const calendarPage = view === 'calendar' && !sidebar.isMobile;
+  const leftReserved = pullouts.calendar && !calendarPage ? sidebar.width : 0;
   const today = localDate(now);
   const dueToday = state.tasks.filter(task => task.status !== 'done' && task.due === today && (company || task.owner === actor)).length;
 
 
+  // Bottom dock: wide-screen Home only. The shell then holds the viewport and the center scrolls inside it.
+  const hasDock = view === 'home' && !(selected && contextAllowed) && !focused && !sidebar.isMobile;
+
   return (
-    <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'}`}
+    <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'} ${hasDock ? 'has-dock' : ''} ${calendarPage ? 'is-calendar-page' : ''}`}
       style={{ ...sidebar.shellStyle, ...(sidebar.isMobile ? {} : { ['--panel-offset' as string]: `${leftReserved}px` }), ['--context-offset' as string]: `${contextOffset}px` }}
-      data-sidebar={sidebar.isMobile ? undefined : sidebar.open ? 'open' : 'closed'} data-context={contextOffset ? 'open' : 'closed'} data-resizing={sidebar.resizing || undefined}>
+      data-sidebar={sidebar.isMobile ? undefined : sidebar.open ? 'open' : 'closed'} data-context={contextOffset ? 'open' : 'closed'} data-dock={hasDock ? (dockOpen ? 'open' : 'closed') : undefined} data-resizing={sidebar.resizing || undefined}>
       <Sidebar
         control={sidebar}
         notifications={notifications}
@@ -426,8 +456,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         account={{ label: me.name && !me.name.includes('@') ? me.name : live?.email ?? me.name, detail: live ? ROLE_LABELS[live.role] : me.title, mark: <AccountMark quest={quest} />, menu: close => <AccountMenu quest={quest} close={close} /> }}
         pulloutTitle={calendarAllowed ? 'Calendar' : 'Your work'}
         pullout={<div className="left-stack">
-          {calendarAllowed && <CalendarPullout quest={quest} company={company} onOpenTask={openTask} onExpandCalendar={() => go('calendar')} onCreate={canCreate ? due => createOn(due) : undefined} />}
-          <WorkNavigator lenses={taskTabs} projects={state.projects} onLens={id => { if (id === 'completed') openCompleted(); else openLens(id as Lens); }} onProjects={() => go('company-work')} />
+          {calendarAllowed && view !== 'calendar' && <CalendarPullout quest={quest} company={company} dayList={false} onOpenTask={openTask} onExpandCalendar={() => go('calendar')} onCreate={canCreate ? due => createOn(due) : undefined} />}
+          {view !== 'calendar' && <WorkNavigator lenses={taskTabs} projects={state.projects} onLens={id => { if (id === 'completed') openCompleted(); else openLens(id as Lens); }} onProjects={() => go('company-work')} />}
         </div>}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
         items={railItems.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: item.id === 'calendar' && !sidebar.isMobile ? pullouts.calendar : view === item.id, info: item.id === 'calendar' && !sidebar.isMobile ? 'Quick view · opens beside the page' : info[item.id] }))}
@@ -440,12 +470,12 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       <main className="main" inert={sidebar.isMobile && edgePanelOpen}>
         {!live && onExitDemo && <aside className="demo-access" aria-label="Task HQ demo">
           <div><strong>Task HQ Demo</strong><span>Sample data · changes stay on this device</span></div>
-          <button type="button" className="btn btn-primary" onClick={onExitDemo}>Sign in to Task HQ</button>
+          <button type="button" className="btn btn-primary cta-fill" onClick={onExitDemo}><span className="cta-fill-label">Sign in to Task HQ</span><CtaArrow /></button>
         </aside>}
         <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen} notifOpen={notifOpen}
           title={(VIEW_LABELS[view] ?? '').replace(' · Preview', '')}
           sections={topSections} onSection={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
-          onCreate={canCreate && !focused ? () => setCreating(true) : undefined}
+          // No New task in the header: creating lives in the right panel's Task action (and N, and the phone's + button).
           tabs={view === 'all-tasks' && !(selected && contextAllowed) ? taskTabs : undefined}
           onTab={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={toggleAsk} onBell={toggleNotifications}
           onMenu={() => {
@@ -472,11 +502,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
-                unseen={{ count: inboxUnread, latest: inbox.items.find(item => !sidebar.read.has(item.id))?.title }} onUnseen={() => { sidebar.setTab('inbox'); if (!notifOpen) toggleNotifications(); }}
-                mentions={mentions} read={sidebar.read}
                 onOpen={openTask} onOpenLead={openLead} onCreate={() => setCreating(true)}
-                onOpenMention={item => { sidebar.markRead([item.id]); location.hash = `#/inbox/${encodeURIComponent(item.channelId ?? '')}/${encodeURIComponent(item.messageId ?? '')}`; }}
-                onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} onActivity={() => go('activity')} />
+                onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} focusTaskId={dockFocus} onClearFocus={() => setDockFocus(null)} />
             : view === 'all-tasks' ? <AllTasks quest={quest} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} registry={registry} />
             : view === 'inbox' ? <Inbox quest={quest} data={inboxData} notes={notifications} read={sidebar.read} markRead={sidebar.markRead} onOpenTask={openTask} onOpenLead={openLead} />
             : view === 'workbook' ? <OperationsWorkbook key={`${state.workspace.tenantId}:${actor}`} />
@@ -484,7 +511,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             : view === 'executive' || view === 'reports' ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} />
             : view === 'relationships' ? <Relationships quest={quest} onOpen={openTask} />
             : view === 'people' ? <People quest={quest} />
-            : view === 'calendar' ? <CalendarPage quest={quest} company={company} onOpenTask={openTask} onCreate={canCreate ? createOn : undefined} />
+            : view === 'calendar' ? <CalendarPage quest={quest} company={company} onOpenTask={openTask} onCreate={canCreate ? createOn : undefined}
+                filters={taskTabs} projects={state.projects.length} onProjects={() => go('company-work')} />
             : view === 'feedback' ? <FeedbackInbox quest={quest} onOpen={id => { setFeedbackId(id); history.replaceState(null, '', `#/feedback/${id}`); }} />
             : view === 'company-work' ? <CompanyWork quest={quest} onOpen={openTask} />
             : view === 'needs-attention' ? <NeedsAttention quest={quest} onOpen={openTask} />
@@ -493,6 +521,12 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             : view === 'settings' ? <Settings quest={quest} onPeople={() => go('people')} />
             : <PagePreview title="Agent pilot" detail="This pilot is not connected to an agent service or workspace data. No tasks are sent and no outcomes are generated here." />}
         </section>
+
+        {/* Bottom collaboration dock: in the main column, so expanding it takes height from the center. */}
+        {hasDock && <CollabDock quest={quest} company={company} snap={dock.snap} onSnap={snap => setDock(current => withSnap(current, snap))}
+          onToggle={() => setDock(current => withSnap(current, current.snap === 'collapsed' ? current.last : 'collapsed'))} tab={dockTab} onTab={setDockTab}
+          inbox={inbox} data={inboxData} read={sidebar.read} markRead={sidebar.markRead} mentions={mentions}
+          onOpen={openTask} onOpenLead={openLead} onActivity={() => go('activity')} onOpenInboxPage={() => go('inbox')} onFocusTask={setDockFocus} />}
 
         <nav className="tabbar" aria-label="Task-HQ sections">
           {[
@@ -518,13 +552,18 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       {/* One right panel, under the top-right bell and Ask. Switching between them swaps the content in
           place (both stay mounted, so an open thread or an Ask conversation survives); only closing slides it away. */}
       <div className="notification-edge">
-        <EdgeDrawer id="right-edge-drawer" open={rightPanelOpen} label={askOpen && !focused ? 'Ask your tasks' : 'Notifications'} className="right-edge" onClose={closeRightPanel}>
+        <EdgeDrawer id="right-edge-drawer" open={rightPanelOpen} label={askOpen && !focused ? 'Ask your tasks' : 'Notifications'} className="right-edge" onClose={closeRightPanel} modal={sidebar.isMobile}>
           <div className="right-slot" hidden={askOpen && !focused}>
             <NotificationDrawer key={`${state.workspace.tenantId}:${actor}`} embedded quest={quest} control={sidebar} inbox={inbox} attention={awareAttention} data={inboxData} detailsAllowed={!focused || !!grant} open={notifOpen}
               threadAllowed={id => !focused || id === state.focus?.taskId || !!grant}
               onClose={closeRightPanel}
               onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
-              onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />
+              onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')}
+              context={sidebar.isMobile || focused ? undefined : {
+                company, onOpenProjects: () => go('company-work'), onOpenCalendar: calendarAllowed ? () => go('calendar') : undefined, onCreate: canCreate ? () => setCreating(true) : undefined,
+                onOpenAttention: () => go('needs-attention'), onOpenNextAll: () => openLens('all'), onOpenActivity: () => go('activity'),
+                onOpenTask: id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); },
+              }} />
           </div>
           {!focused && <div className="right-slot" hidden={!askOpen}>
             <AskTasks key={`ask:${state.workspace.tenantId}:${actor}`} embedded quest={quest} company={company} open={askOpen} onClose={closeRightPanel} />
@@ -533,11 +572,11 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       </div>
       {/* Edge toggles sit on each panel's inner border and stay visible when it's collapsed. */}
       {!sidebar.isMobile && <>
-        <button type="button" className="seam seam-left" aria-controls="quest-sidebar" aria-expanded={pullouts.calendar}
+        {!calendarPage && <button type="button" className="seam seam-left" aria-controls="quest-sidebar" aria-expanded={pullouts.calendar}
           aria-label={pullouts.calendar ? 'Close the calendar panel' : 'Open the calendar panel'}
           title={pullouts.calendar ? 'Close panel' : 'Calendar and your work'} onClick={toggleLeft}>
           <Icon d={pullouts.calendar ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} />
-        </button>
+        </button>}
         <button type="button" className="seam seam-right" aria-controls="right-edge-drawer" aria-expanded={rightPanelOpen}
           aria-label={rightPanelOpen ? 'Close the right panel' : 'Open notifications'} title={rightPanelOpen ? 'Close panel' : 'Notifications'}
           onClick={() => (rightPanelOpen ? closeRightPanel() : askOpenLast && !focused ? toggleAsk() : toggleNotifications())}>

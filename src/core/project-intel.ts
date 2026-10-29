@@ -10,8 +10,8 @@ export const NO_PROJECT = '';
 
 export interface IntelFilter { projectId?: string | null; person?: string | null }
 export interface Completion { done: number; total: number; percent: number }
-export interface ProjectRow extends Completion { id: string; name: string; open: number; overdue: number; blocked: number; complete: boolean }
-export interface PersonRow { person: string; name: string; open: number; overdue: number; blocked: number; byStatus: Record<Exclude<TaskStatus, 'done'>, number> }
+export interface ProjectRow extends Completion { id: string; name: string; open: number; overdue: number; blocked: number; waiting: number; complete: boolean }
+export interface PersonRow { person: string; name: string; open: number; overdue: number; blocked: number; waiting: number; byStatus: Record<Exclude<TaskStatus, 'done'>, number> }
 export interface AttentionRow { task: Task; reason: 'Overdue' | 'Blocked' | 'Waiting on a dependency' }
 export interface ProjectIntel {
   /** Tasks in the current selection (scope, then project and person filters). */
@@ -31,6 +31,9 @@ const completion = (tasks: Task[]): Completion => {
   return { done, total: tasks.length, percent: percentOf(done, tasks.length) };
 };
 const blockedOrWaiting = (state: QuestState, task: Task) => task.status === 'blocked' || (isOpen(task) && blockingDeps(state, task).length > 0);
+/** Two separate counts so a label and its number always agree: `blocked` is status Blocked; `waiting` is
+ * open work (not marked Blocked) held by an unfinished dependency. */
+const isWaiting = (state: QuestState, task: Task) => isOpen(task) && task.status !== 'blocked' && blockingDeps(state, task).length > 0;
 
 export function projectIntel(state: QuestState, actor: string, now: number, company: boolean, filter: IntelFilter = {}): ProjectIntel {
   // Scope: the whole company for people who may see it, otherwise the viewer's own work.
@@ -51,7 +54,7 @@ export function projectIntel(state: QuestState, actor: string, now: number, comp
     return {
       id, name: id === NO_PROJECT ? 'No project' : state.projects.find(item => item.id === id)?.name ?? 'Removed project',
       ...completion(tasks), open: open.length, overdue: open.filter(task => isOverdue(task, now)).length,
-      blocked: open.filter(task => blockedOrWaiting(state, task)).length, complete: tasks.length > 0 && open.length === 0,
+      blocked: open.filter(task => task.status === 'blocked').length, waiting: open.filter(task => isWaiting(state, task)).length, complete: tasks.length > 0 && open.length === 0,
     };
   }).sort((a, b) => b.open - a.open || a.name.localeCompare(b.name));
   const named = projects.filter(item => item.id !== NO_PROJECT);
@@ -62,7 +65,7 @@ export function projectIntel(state: QuestState, actor: string, now: number, comp
     const open = forPeople.filter(task => task.owner === item.id);
     const by = (status: TaskStatus) => open.filter(task => task.status === status).length;
     return { person: item.id, name: firstName(state, item.id), open: open.length, overdue: open.filter(task => isOverdue(task, now)).length,
-      blocked: open.filter(task => blockedOrWaiting(state, task)).length, byStatus: { ready: by('ready'), working: by('working'), review: by('review'), blocked: by('blocked') } };
+      blocked: by('blocked'), waiting: open.filter(task => isWaiting(state, task)).length, byStatus: { ready: by('ready'), working: by('working'), review: by('review'), blocked: by('blocked') } };
   }).filter(item => item.open > 0).sort((a, b) => b.open - a.open || b.overdue - a.overdue || a.name.localeCompare(b.name)) : [];
 
   const open = selected.filter(isOpen).sort(compareTasks(now));

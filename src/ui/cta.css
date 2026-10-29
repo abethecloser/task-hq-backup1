@@ -1,0 +1,35 @@
+/* Four refined CTAs only (no shared button defaults change):
+   · .cta-fill — "Sign in to Task HQ" and "Open next task": compact pill with a trailing arrow circle;
+     on hover or keyboard focus a dark fill grows out of the circle across the button (Arrow Fill pattern).
+   · .fab-create — compact utility "+" control, no fill. */
+:root:root:root .btn.cta-fill {
+  --cta-arrow: 26px;
+  position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: 10px;
+  min-height: 36px; height: 36px; padding: 0 5px 0 15px; overflow: hidden; border-radius: 999px; transition: color .3s ease, border-color .3s ease;
+}
+:root:root:root .btn.cta-fill::before {
+  content: ""; position: absolute; top: 50%; right: 5px; z-index: -1; width: var(--cta-arrow); height: var(--cta-arrow);
+  border-radius: 50%; background: #17181b; transform: translateY(-50%) scale(0); transition: transform .5s cubic-bezier(.22, 1, .36, 1);
+}
+.cta-fill-label { position: relative; white-space: nowrap; }
+.cta-fill-arrow { display: grid; flex: none; place-items: center; width: var(--cta-arrow, 26px); height: var(--cta-arrow, 26px); border-radius: 50%; background: #fff; color: var(--accent); transition: transform .4s cubic-bezier(.22, 1, .36, 1); }
+.cta-fill-arrow .icon { width: 14px; height: 14px; }
+:root:root:root .btn.cta-fill:is(:hover, :focus-visible):not(:disabled)::before { transform: translateY(-50%) scale(16); }
+:root:root:root .btn.cta-fill:is(:hover, :focus-visible):not(:disabled) { border-color: #17181b; color: #fff; }
+.btn.cta-fill:is(:hover, :focus-visible):not(:disabled) .cta-fill-arrow { transform: translateX(2px); }
+:root:root:root .btn.cta-fill:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* The phone demo bar hides its descriptive spans; the CTA's own label and arrow stay. */
+:root:root:root .demo-access .cta-fill .cta-fill-label { display: inline; color: inherit; font: inherit; }
+:root:root:root .demo-access .cta-fill .cta-fill-arrow { display: grid; color: var(--accent); }
+/* A light banner tone renders the hero CTA white; keep its arrow visible. */
+.hd-hero.has-tone.is-dark .cta-fill-arrow { background: var(--accent); color: #fff; }
+@media (pointer: coarse) { :root:root:root .btn.cta-fill { min-height: 40px; height: 40px; } }
+@media (prefers-reduced-motion: reduce) {
+  :root:root:root .btn.cta-fill, :root:root:root .btn.cta-fill::before, .cta-fill-arrow { transition: none; }
+}
+
+@media (max-width: 760px) {
+  /* Floating "+": smaller, same place and action. */
+  :root:root:root .fab-create { width: 48px; height: 48px; }
+  :root:root:root .fab-create .icon { width: 22px; height: 22px; }
+}

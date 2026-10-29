@@ -1,6 +1,6 @@
 .operations-workbook { min-width: 0; width: 100%; display: grid; gap: 18px; }
 .operations-workbook h1 { margin: 4px 0 12px; }
-.operations-workbook h2 { font-size: 18px; margin: 0 0 14px; }
+.operations-workbook h2 { font-size: 21.5px; margin: 0 0 14px; }
 .operations-workbook p { overflow-wrap: anywhere; }
 .workbook-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .workbook-viewer { display: flex; align-items: center; gap: 10px; min-height: 44px; }
@@ -12,9 +12,9 @@
 .workbook-scroll { overflow-x: auto; }
 .operations-workbook table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .operations-workbook th, .operations-workbook td { border: 1px solid var(--hair-2); text-align: left; vertical-align: top; }
-.operations-workbook th { padding: 12px 8px; font-size: 13px; font-weight: 650; }
+.operations-workbook th { padding: 12px 8px; font-size: 15.5px; font-weight: 650; }
 .operations-workbook th:first-child { width: 44px; }
-:root:root .operations-workbook textarea { width: 100%; min-height: 64px; padding: 10px; border: 0; background: transparent; resize: vertical; font-size: 16px; overflow-wrap: anywhere; }
+:root:root .operations-workbook textarea { width: 100%; min-height: 64px; padding: 10px; border: 0; background: transparent; resize: vertical; font-size: 19px; overflow-wrap: anywhere; }
 :root:root .operations-workbook button { min-height: 44px; min-width: 44px; }
 .workbook-print-value { display: none; }
 .task-page.status-done .tp-title { text-decoration: line-through; text-decoration-thickness: 1px; color: var(--muted); }
@@ -26,7 +26,7 @@
   .operations-workbook thead { display: none; }
   .operations-workbook tr { border-top: 1px solid var(--hair-2); margin-bottom: 20px; }
   .operations-workbook td { border: 0; border-bottom: 1px solid var(--hair); }
-  .operations-workbook td::before { content: attr(data-label); display: block; padding: 8px 10px 0; color: var(--muted); font-size: 12px; }
+  .operations-workbook td::before { content: attr(data-label); display: block; padding: 8px 10px 0; color: var(--muted); font-size: 14.5px; }
   .operations-workbook tbody th { display: block; width: 100%; border: 0; }
   .workbook-toolbar .btn { flex: 1 1 140px; }
 }
