@@ -359,20 +359,65 @@
   .shell.has-dock > .main > .content { flex: 1 1 auto; width: 100%; min-height: 0; max-width: none; margin: 0; padding-inline: max(var(--bleed), calc((100% - 1600px) / 2 + var(--bleed))); padding-bottom: 40px; overflow-y: auto; overscroll-behavior: contain; }
 }
 
-/* ── Full-width dock (Home, wide screens) ───────────────────────────────────────────────────
-   The dock spans beneath both side panels (the same negative margins the top bar uses); the panels
+/* ── Dock width by height (Home, wide screens) ──────────────────────────────────────────────
+   Collapsed and default: the dock stays in the center column and the side panels keep full height.
+   Above default (data-dock-wide, from CollabDock's height): the dock spans beneath both side panels (the same negative margins the top bar uses); the panels
    end at its live height (--dock-h, published by CollabDock) and keep their own scrolling. */
 @media (min-width: 761px) {
-  .shell.has-dock > .main > .collab-dock { margin-left: calc(-1 * var(--panel-offset, 0px)); margin-right: calc(-1 * var(--context-offset, 0px)); }
-  :root .shell.has-dock .workspace-panel, :root .shell.has-dock .notification-edge { bottom: var(--dock-h, 0px); }
+  :root[data-dock-wide] .shell.has-dock > .main > .collab-dock { margin-left: calc(-1 * var(--panel-offset, 0px)); margin-right: calc(-1 * var(--context-offset, 0px)); }
+  :root[data-dock-wide] .shell.has-dock .workspace-panel, :root[data-dock-wide] .shell.has-dock .notification-edge { bottom: var(--dock-h, 0px); }
   /* With the dock at half height or more, the shortened left panel scrolls as a whole (calendar, Work Views
      and account) so its footer can't crowd out the content. Lower, the footer stays anchored as usual. */
   :root[data-dock-tall] .shell.has-dock .workspace-panel { overflow-y: auto; overscroll-behavior: contain; }
   :root[data-dock-tall] .shell.has-dock .workspace-panel > .panel-scroll { flex: 1 0 auto; overflow: visible; }
   /* Edge toggles stay centered on the visible part of the panels. */
-  :root .shell.has-dock .seam { top: calc((var(--topbar-h, 60px) + 100dvh - var(--dock-h, 0px)) / 2); }
+  :root[data-dock-wide] .shell.has-dock .seam { top: calc((var(--topbar-h, 60px) + 100dvh - var(--dock-h, 0px)) / 2); }
   /* Full height: the dock takes the whole workspace under the header; the center and panels yield it. */
   :root[data-dock-full] .shell.has-dock .seam,
   :root[data-dock-full] .shell.has-dock :is(.workspace-panel, .notification-edge) { visibility: hidden; border-top-width: 0; }
   :root[data-dock-full] .shell.has-dock > .main > .content { flex: 0 0 0; height: 0; min-height: 0; padding-block: 0; overflow: hidden; visibility: hidden; }
 }
+
+/* Projects and Team Overview: Standard | Living switch, dock focus note, and the Living view. */
+.pt .hd-head .pt-head-end { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; margin-left: auto; }
+.pt-view button { min-height: 28px; padding: 0 12px; }
+.pt-focus { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--accent-pale, #fff1e7); font-size: 14px; }
+.pt-grid.is-living { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.pt-grid.is-living > .pt-living { grid-column: 1 / -1; container-type: inline-size; }
+.lv { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 16px; align-items: start; }
+@container (max-width: 640px) { .lv { grid-template-columns: minmax(0, 1fr); } }
+.lv-stage { display: block; width: 100%; height: auto; max-height: 400px; overflow: visible; }
+.lv-bubble { cursor: pointer; outline: none; transition: opacity .25s; }
+.lv-bubble.is-dim { opacity: .38; }
+.lv-skin { fill: color-mix(in srgb, var(--accent) 6%, transparent); stroke: color-mix(in srgb, var(--accent) 28%, var(--hair)); stroke-width: 1.2; transition: fill .2s, stroke .2s; }
+.lv-bubble:hover .lv-skin { fill: color-mix(in srgb, var(--accent) 11%, transparent); }
+.lv-bubble.is-on .lv-skin { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: var(--accent); stroke-width: 2; }
+.lv-bubble.is-focus .lv-skin { stroke-dasharray: 5 4; stroke: var(--accent); stroke-width: 2; }
+.lv-bubble:focus-visible .lv-skin { stroke: var(--ink); stroke-width: 2.5; }
+.lv-name { fill: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .04em; pointer-events: none; }
+.lv-dot { fill: #b9bcc3; stroke: var(--card, #fff); stroke-width: 1; cursor: pointer; transition: opacity .2s, r .2s; }
+.lv-dot.s-working { fill: var(--act); } .lv-dot.s-review { fill: #8b5cf6; } .lv-dot.s-blocked { fill: var(--stop); } .lv-dot.s-done { fill: var(--done, #16a34a); opacity: .45; }
+.lv-dot.is-late { stroke: var(--danger); stroke-width: 2.5; }
+.lv-dot.is-picked { stroke: var(--ink); stroke-width: 3; }
+.lv-dot.is-dim { opacity: .18; }
+.lv-dot.is-moving { animation: lv-pulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes lv-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+@media (prefers-reduced-motion: reduce) { .lv-dot.is-moving { animation: none; stroke: var(--act); stroke-width: 2.5; } .lv-bubble, .lv-skin, .lv-dot { transition: none; } }
+.lv-detail { display: grid; gap: 12px; min-width: 0; font-size: 14px; }
+.lv-detail header { display: grid; gap: 2px; }
+.lv-detail header strong { font-size: 16px; }
+.lv-detail header small, .lv-task small { color: var(--muted); }
+.lv-task { display: grid; gap: 3px; padding: 8px 10px; border: 1px solid var(--hair-2); border-radius: 10px; }
+.lv-task .link { justify-self: start; }
+.lv-group .pt-label { margin-bottom: 4px; }
+.lv-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.lv-list button { width: 100%; overflow: hidden; padding: 4px 8px; border: 0; border-radius: 7px; background: transparent; color: inherit; font: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.lv-list button:hover, .lv-list button.is-on { background: var(--sunk); }
+.lv-list button.is-hot { box-shadow: inset 2px 0 0 var(--danger); }
+.lv-people { display: flex; flex-wrap: wrap; gap: 6px; }
+.lv-person { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border: 1px solid var(--hair-2); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 13.5px; cursor: pointer; }
+.lv-person b { color: var(--muted); font-variant-numeric: tabular-nums; }
+.lv-person[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-pale, #fff1e7); }
+.lv-key { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; color: var(--muted); font-size: 12px; }
+.lv-key i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.lv-key i.s-done { background: var(--done, #16a34a); }

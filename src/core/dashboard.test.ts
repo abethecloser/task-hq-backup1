@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { QuestState, Task } from './contract.ts';
 import { answer } from './ask.ts';
-import { ago, atRisk, collaboration, commentsFor, digest, dueOn, heatGrid, homeMetrics, monthGrid, performance, periodEnd, periodStart, recentActivity, statusMix, systemInsights, teamActivity, teamWorkload, todayProgress } from './dashboard.ts';
+import { ago, atRisk, collaboration, commentsFor, digest, dueOn, heatGrid, homeMetrics, monthGrid, performance, periodEnd, periodStart, recentActivity, shiftCalendarDate, statusMix, systemInsights, teamActivity, teamWorkload, todayProgress } from './dashboard.ts';
 import type { QuestEvent } from './contract.ts';
 import { apply } from './engine.ts';
 import { seedState } from './seed.ts';
@@ -241,4 +241,23 @@ test('system insights are grounded in records', () => {
   const own = systemInsights(state, 'maya', NOW, false).map(item => item.id);
   assert.ok(!own.includes('concentrated') && !own.includes('unassigned'), 'team-wide observations need company access');
   assert.deepEqual(systemInsights(empty(), 'maya', NOW, true), []);
+});
+
+test('calendar steps follow the active mode', () => {
+  assert.equal(shiftCalendarDate('2026-10-18', 'month', 1), '2026-11-01');
+  assert.equal(shiftCalendarDate('2026-01-31', 'month', -1), '2025-12-01');
+  assert.equal(shiftCalendarDate('2026-10-18', 'week', 1), '2026-10-25');
+  assert.equal(shiftCalendarDate('2026-11-01', 'week', -1), '2026-10-25');
+});
+
+test('a calendar filter narrows the grid and day lists to the picked tasks', () => {
+  const state = seedState(NOW);
+  const actor = state.people[0]!.id;
+  const dated = state.tasks.filter(task => task.due && task.status !== 'done');
+  const one = dated[0]!;
+  const grid = heatGrid(state, actor, NOW, true, 0, [one]);
+  const total = grid.cells.reduce((sum, cell) => sum + (cell?.due ?? 0), 0);
+  assert.equal(total, one.due!.slice(0, 7) === localDate(NOW).slice(0, 7) ? 1 : 0);
+  assert.deepEqual(dueOn(state, actor, NOW, true, one.due!, [one]).map(task => task.id), [one.id]);
+  assert.deepEqual(dueOn(state, actor, NOW, true, one.due!, []), []);
 });

@@ -111,7 +111,7 @@
 
 /* Resize handle: a full-width strip on the top edge (easy to grab), showing a small centered grip. */
 .dock-handle { position: absolute; top: -7px; right: 0; left: 0; z-index: 1; display: flex; justify-content: center; height: 16px; cursor: row-resize; touch-action: none; outline: none; }
-.dock-grip { width: 40px; height: 4px; margin-top: 10px; border-radius: 999px; background: #d1d5db; transition: width .15s ease, background-color .15s ease, box-shadow .15s ease; }
+.dock-grip { width: 32px; height: 3px; margin-top: 4.5px; border-radius: 999px; background: #d1d5db; transition: width .15s ease, background-color .15s ease, box-shadow .15s ease; }
 .dock-handle:hover .dock-grip, .collab-dock.is-dragging .dock-grip { width: 48px; background: #9ca3af; }
 /* The grip shows focus; the wide hit strip itself draws no outline. */
 :root:root:root .collab-dock .dock-handle:focus-visible { outline: none; box-shadow: none; }
@@ -255,3 +255,19 @@
 .home-dash .hd-perf-metric.tone-accent.has-value b { color: var(--accent-ink); }
 .home-dash .hd-perf-metric.tone-stop.has-value b { color: var(--stop-ink, #b4231a); }
 @container home (max-width: 760px) { .home-dash .hd-perf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Compact dock (collapsed/default height, between the side panels): one primary view at a time. The tabs
+   choose the list; picking an item opens the reader, and Back returns to the list. Wider (above default)
+   the list and reader sit side by side, and the task context column joins them when the reader has room. */
+.dock-back { display: none; }
+.collab-dock.is-compact {
+  & .dock-body { grid-template-columns: minmax(0, 1fr); }
+  & .dock-col + .dock-col { border-left: 0; }
+  &[data-pane="list"] .dock-reader, &[data-pane="reader"] .dock-lists { display: none; }
+  & .dock-task { grid-template-columns: minmax(0, 1fr); }
+  & .dock-task-context { display: none; }
+  & .dock-back { display: inline-flex; flex: none; align-items: center; align-self: flex-start; gap: 4px; margin: 8px 12px 0; padding: 4px 8px 4px 4px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-2); font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
+  & .dock-back:hover { background: var(--sunk); color: var(--ink); }
+  & .dock-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  & .dock-back .icon { width: 16px; height: 16px; }
+}

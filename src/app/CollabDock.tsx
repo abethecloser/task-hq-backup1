@@ -33,7 +33,7 @@ const TABS: { id: DockTab; label: string; short?: string }[] = [
   { id: 'inbox', label: 'Inbox' }, { id: 'conversations', label: 'Conversations', short: 'Channels' }, { id: 'mentions', label: 'Comments & mentions', short: 'Mentions' }, { id: 'activity', label: 'Activity' },
 ];
 
-export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab, inbox, data, read, markRead, mentions, onOpen, onOpenLead, onActivity, onOpenInboxPage }: {
+export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab, inbox, data, read, markRead, mentions, onOpen, onOpenLead, onActivity, onOpenInboxPage, onFocusTask }: {
   quest: Quest; company: boolean;
   /** The saved snap position; the toggle collapses it or restores the last open position. */
   snap: DockSnap; onSnap: (snap: DockSnap) => void; onToggle: () => void;
@@ -43,6 +43,8 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
   /** Channel @mentions from the universal inbox. */
   mentions: MentionSource[];
   onOpen: (id: string) => void; onOpenLead: (id: string) => void; onActivity: () => void; onOpenInboxPage: () => void;
+  /** Picking a task thread (inbox item, comment or mention) focuses its project in the overview's Living view. */
+  onFocusTask?: (taskId: string) => void;
 }) {
   const { state, actor, now } = quest;
   const collab = useMemo(() => collaboration(state, actor, company, mentions, read, 20), [state, actor, company, mentions, read]);
@@ -53,7 +55,10 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
   const people = [...new Set(collab.map(item => item.from))].slice(0, 3);
 
   // The reader: what was picked, else the newest task conversation, else the task with the latest activity.
-  const [picked, setPicked] = useState<Reading>(null);
+  const [picked, setPickedState] = useState<Reading>(null);
+  // Compact (collapsed/default height, between the side panels): one view at a time, the list or the reader.
+  const [pane, setPane] = useState<'list' | 'reader'>('list');
+  const setPicked = (next: Reading) => { setPickedState(next); setPane('reader'); if (next?.kind === 'task') onFocusTask?.(next.id); };
   const fallback = collab.find(item => item.taskId && !item.channelId)?.taskId ?? activity.find(event => event.taskId && taskById(state, event.taskId))?.taskId;
   const reading: Reading = picked && !(picked.kind === 'task' && !taskById(state, picked.id)) && !(picked.kind === 'channel' && !channels.some(item => item.id === picked.id))
     ? picked : fallback ? { kind: 'task', id: fallback } : null;
@@ -100,13 +105,17 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
   // The shell lays the side panels out above the dock (they end at --dock-h) and hides the center at full height.
   const full = height >= heights.full - 2;
   const tall = height >= heights.half - 2;
+  // Width follows height: up to the default snap the dock sits in the center column between full-height side
+  // panels; above it the dock spans the app and the panels end at its edge. Derived, never stored.
+  const wide = height > heights.default + 8;
   useLayoutEffect(() => {
     const root = document.documentElement;
     root.style.setProperty('--dock-h', `${Math.round(height)}px`);
     root.toggleAttribute('data-dock-full', full);
     root.toggleAttribute('data-dock-tall', tall);
-  }, [height, full, tall]);
-  useLayoutEffect(() => () => { const root = document.documentElement; root.style.removeProperty('--dock-h'); root.removeAttribute('data-dock-full'); root.removeAttribute('data-dock-tall'); }, []);
+    root.toggleAttribute('data-dock-wide', wide);
+  }, [height, full, tall, wide]);
+  useLayoutEffect(() => () => { const root = document.documentElement; root.style.removeProperty('--dock-h'); for (const name of ['data-dock-full', 'data-dock-tall', 'data-dock-wide']) root.removeAttribute(name); }, []);
   function startDrag(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.button !== 0) return;
     event.preventDefault();
@@ -135,7 +144,7 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
 
   const toggleLabel = open ? 'Collapse the communications panel' : 'Expand the communications panel';
   return (
-    <section ref={dock} id="collab-dock" className={`collab-dock ${open ? 'is-open' : ''} ${drag ? 'is-dragging' : ''}`} style={{ height }} aria-label="Communications">
+    <section ref={dock} id="collab-dock" className={`collab-dock ${open ? 'is-open' : ''} ${drag ? 'is-dragging' : ''} ${wide ? 'is-wide' : 'is-compact'}`} data-pane={pane} style={{ height }} aria-label="Communications">
       <div className="dock-handle" role="separator" aria-orientation="horizontal" tabIndex={0} aria-controls="collab-dock"
         aria-label="Resize the communications panel" aria-valuemin={DOCK_RAIL} aria-valuemax={heights.expanded} aria-valuenow={Math.round(height)}
         aria-valuetext={drag ? `${Math.round(height)} pixels` : `${DOCK_SNAP_LABELS[snap]} height`} title="Drag to resize · ↑ ↓ to step"
@@ -235,6 +244,9 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
         </div>
 
         <div className="dock-col dock-reader" aria-live="polite">
+          {!wide && <button type="button" className="dock-back" onClick={() => setPane('list')}>
+            <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>Back to {TABS.find(item => item.id === tab)?.label ?? 'list'}
+          </button>}
           <Reader quest={quest} reading={reading} data={data} postable={postable} onPick={setPicked} onOpen={onOpen} onOpenInboxPage={onOpenInboxPage} />
         </div>
       </div>

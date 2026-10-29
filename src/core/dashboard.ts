@@ -317,13 +317,13 @@ export function calendarTasks(state: QuestState, actor: string, now: number, com
 }
 
 /** A month (offset from the current one), Monday first, with due-date load per day. */
-export function heatGrid(state: QuestState, actor: string, now: number, company: boolean, offset = 0): { label: string; cells: (HeatDay | null)[] } {
+export function heatGrid(state: QuestState, actor: string, now: number, company: boolean, offset = 0, pick?: Task[]): { label: string; cells: (HeatDay | null)[] } {
   const start = new Date(periodStart(now, 'month'));
   const first = new Date(start.getFullYear(), start.getMonth() + offset, 1, 12);
   const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
   const today = localDate(now);
   const byDate = new Map<string, Task[]>();
-  for (const task of calendarTasks(state, actor, now, company)) if (task.due) byDate.set(task.due, [...(byDate.get(task.due) ?? []), task]);
+  for (const task of pick ?? calendarTasks(state, actor, now, company)) if (task.due) byDate.set(task.due, [...(byDate.get(task.due) ?? []), task]);
   const cells: (HeatDay | null)[] = Array.from({ length: (first.getDay() + 6) % 7 }, () => null);
   for (let day = 1; day <= days; day++) {
     const date = localDate(new Date(first.getFullYear(), first.getMonth(), day, 12).getTime());
@@ -336,9 +336,17 @@ export function heatGrid(state: QuestState, actor: string, now: number, company:
   return { label: first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), cells };
 }
 
-/** Open tasks due on a date, in the calendar's scope and the usual task order. */
-export function dueOn(state: QuestState, actor: string, now: number, company: boolean, date: string): Task[] {
-  return calendarTasks(state, actor, now, company).filter(task => task.due === date);
+/** Open tasks due on a date, in the calendar's scope and the usual task order. `pick` narrows the
+ * calendar to a filtered set (the full Calendar's work-view filters); without it, the usual scope. */
+export function dueOn(state: QuestState, actor: string, now: number, company: boolean, date: string, pick?: Task[]): Task[] {
+  return (pick ?? calendarTasks(state, actor, now, company)).filter(task => task.due === date);
+}
+
+/** One calendar step from a date: a month (to the 1st of that month) or a week (the same weekday). */
+export function shiftCalendarDate(date: string, mode: 'month' | 'week', dir: 1 | -1): string {
+  const next = new Date(`${date}T12:00:00`);
+  if (mode === 'month') next.setMonth(next.getMonth() + dir, 1); else next.setDate(next.getDate() + dir * 7);
+  return localDate(next.getTime());
 }
 
 export interface SystemInsight {

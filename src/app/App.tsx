@@ -148,6 +148,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const [dock, setDock] = useState<DockPreference>(() => { try { return loadDockPreference(localStorage); } catch { return DOCK_DEFAULT_PREF; } });
   useEffect(() => { try { saveDockPreference(localStorage, dock); } catch { /* storage unavailable */ } }, [dock]);
   const dockOpen = dock.snap !== 'collapsed';
+  /** The task the dock is reading, focused in the overview's Living view until cleared. */
+  const [dockFocus, setDockFocus] = useState<string | null>(null);
   const [dockTab, setDockTab] = useState<DockTab>('inbox');
   /** Notifications drawer (right). Session-only: it always starts closed. The calendar pullout (left) is `sidebar.open`. */
   const [notifOpen, setNotifOpen] = useState(false);
@@ -415,7 +417,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     setAskOpenLast(true);
   }
   const contextOffset = !sidebar.isMobile && rightPanelOpen ? rightPanelWidth : 0;
-  const leftReserved = pullouts.calendar ? sidebar.width : 0;
+  // The full Calendar is the page's primary workspace: the left quick view (a second grid) steps aside there.
+  const calendarPage = view === 'calendar' && !sidebar.isMobile;
+  const leftReserved = pullouts.calendar && !calendarPage ? sidebar.width : 0;
   const today = localDate(now);
   const dueToday = state.tasks.filter(task => task.status !== 'done' && task.due === today && (company || task.owner === actor)).length;
 
@@ -424,7 +428,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const hasDock = view === 'home' && !(selected && contextAllowed) && !focused && !sidebar.isMobile;
 
   return (
-    <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'} ${hasDock ? 'has-dock' : ''}`}
+    <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'} ${hasDock ? 'has-dock' : ''} ${calendarPage ? 'is-calendar-page' : ''}`}
       style={{ ...sidebar.shellStyle, ...(sidebar.isMobile ? {} : { ['--panel-offset' as string]: `${leftReserved}px` }), ['--context-offset' as string]: `${contextOffset}px` }}
       data-sidebar={sidebar.isMobile ? undefined : sidebar.open ? 'open' : 'closed'} data-context={contextOffset ? 'open' : 'closed'} data-dock={hasDock ? (dockOpen ? 'open' : 'closed') : undefined} data-resizing={sidebar.resizing || undefined}>
       <Sidebar
@@ -440,8 +444,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         account={{ label: me.name && !me.name.includes('@') ? me.name : live?.email ?? me.name, detail: live ? ROLE_LABELS[live.role] : me.title, mark: <AccountMark quest={quest} />, menu: close => <AccountMenu quest={quest} close={close} /> }}
         pulloutTitle={calendarAllowed ? 'Calendar' : 'Your work'}
         pullout={<div className="left-stack">
-          {calendarAllowed && <CalendarPullout quest={quest} company={company} dayList={false} onOpenTask={openTask} onExpandCalendar={() => go('calendar')} onCreate={canCreate ? due => createOn(due) : undefined} />}
-          <WorkNavigator lenses={taskTabs} projects={state.projects} onLens={id => { if (id === 'completed') openCompleted(); else openLens(id as Lens); }} onProjects={() => go('company-work')} />
+          {calendarAllowed && view !== 'calendar' && <CalendarPullout quest={quest} company={company} dayList={false} onOpenTask={openTask} onExpandCalendar={() => go('calendar')} onCreate={canCreate ? due => createOn(due) : undefined} />}
+          {view !== 'calendar' && <WorkNavigator lenses={taskTabs} projects={state.projects} onLens={id => { if (id === 'completed') openCompleted(); else openLens(id as Lens); }} onProjects={() => go('company-work')} />}
         </div>}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
         items={railItems.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: item.id === 'calendar' && !sidebar.isMobile ? pullouts.calendar : view === item.id, info: item.id === 'calendar' && !sidebar.isMobile ? 'Quick view · opens beside the page' : info[item.id] }))}
@@ -487,7 +491,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             ? <CriticalFocus quest={quest} onOpen={openTask} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
                 onOpen={openTask} onOpenLead={openLead} onCreate={() => setCreating(true)}
-                onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} />
+                onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} focusTaskId={dockFocus} onClearFocus={() => setDockFocus(null)} />
             : view === 'all-tasks' ? <AllTasks quest={quest} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} registry={registry} />
             : view === 'inbox' ? <Inbox quest={quest} data={inboxData} notes={notifications} read={sidebar.read} markRead={sidebar.markRead} onOpenTask={openTask} onOpenLead={openLead} />
             : view === 'workbook' ? <OperationsWorkbook key={`${state.workspace.tenantId}:${actor}`} />
@@ -495,7 +499,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             : view === 'executive' || view === 'reports' ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} />
             : view === 'relationships' ? <Relationships quest={quest} onOpen={openTask} />
             : view === 'people' ? <People quest={quest} />
-            : view === 'calendar' ? <CalendarPage quest={quest} company={company} onOpenTask={openTask} onCreate={canCreate ? createOn : undefined} />
+            : view === 'calendar' ? <CalendarPage quest={quest} company={company} onOpenTask={openTask} onCreate={canCreate ? createOn : undefined}
+                filters={taskTabs} projects={state.projects.length} onProjects={() => go('company-work')} />
             : view === 'feedback' ? <FeedbackInbox quest={quest} onOpen={id => { setFeedbackId(id); history.replaceState(null, '', `#/feedback/${id}`); }} />
             : view === 'company-work' ? <CompanyWork quest={quest} onOpen={openTask} />
             : view === 'needs-attention' ? <NeedsAttention quest={quest} onOpen={openTask} />
@@ -509,7 +514,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         {hasDock && <CollabDock quest={quest} company={company} snap={dock.snap} onSnap={snap => setDock(current => withSnap(current, snap))}
           onToggle={() => setDock(current => withSnap(current, current.snap === 'collapsed' ? current.last : 'collapsed'))} tab={dockTab} onTab={setDockTab}
           inbox={inbox} data={inboxData} read={sidebar.read} markRead={sidebar.markRead} mentions={mentions}
-          onOpen={openTask} onOpenLead={openLead} onActivity={() => go('activity')} onOpenInboxPage={() => go('inbox')} />}
+          onOpen={openTask} onOpenLead={openLead} onActivity={() => go('activity')} onOpenInboxPage={() => go('inbox')} onFocusTask={setDockFocus} />}
 
         <nav className="tabbar" aria-label="Task-HQ sections">
           {[
@@ -555,11 +560,11 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       </div>
       {/* Edge toggles sit on each panel's inner border and stay visible when it's collapsed. */}
       {!sidebar.isMobile && <>
-        <button type="button" className="seam seam-left" aria-controls="quest-sidebar" aria-expanded={pullouts.calendar}
+        {!calendarPage && <button type="button" className="seam seam-left" aria-controls="quest-sidebar" aria-expanded={pullouts.calendar}
           aria-label={pullouts.calendar ? 'Close the calendar panel' : 'Open the calendar panel'}
           title={pullouts.calendar ? 'Close panel' : 'Calendar and your work'} onClick={toggleLeft}>
           <Icon d={pullouts.calendar ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} />
-        </button>
+        </button>}
         <button type="button" className="seam seam-right" aria-controls="right-edge-drawer" aria-expanded={rightPanelOpen}
           aria-label={rightPanelOpen ? 'Close the right panel' : 'Open notifications'} title={rightPanelOpen ? 'Close panel' : 'Notifications'}
           onClick={() => (rightPanelOpen ? closeRightPanel() : askOpenLast && !focused ? toggleAsk() : toggleNotifications())}>
