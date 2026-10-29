@@ -99,16 +99,25 @@
    circular toggle matches the left/right seams and straddles the dock's top edge. */
 .collab-dock {
   --dock-line: #e5e7eb; --dock-line-soft: #f0f1f3; --dock-micro: #9ca3af; --dock-meta: #6b7280; --dock-tray: #fafafb;
-  --dock-rail: 44px; --dock-open: clamp(240px, calc((100dvh - var(--topbar-h, 116px)) * .33), 380px);
+  --dock-rail: 52px;
   position: relative; z-index: 6; display: grid; grid-template-rows: var(--dock-rail) minmax(0, 1fr);
   height: var(--dock-rail); border-top: 1px solid var(--dock-line); background: var(--card, #fff);
   box-shadow: 0 -10px 30px rgb(17 24 39 / 5%); container: dock / inline-size;
   transition: height .34s var(--sidebar-ease, cubic-bezier(.16, 1, .3, 1));
 }
-.collab-dock.is-open { height: var(--dock-open); }
+.collab-dock.is-dragging { transition: none; }
+.collab-dock.is-dragging, .collab-dock.is-dragging * { user-select: none; }
 .shell[data-resizing] .collab-dock { transition: none; }
 
-.dock-toggle { position: absolute; top: 0; left: 50%; z-index: 2; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--hair-2); border-radius: 50%; background: var(--card, #fff); color: var(--ink-2); cursor: pointer; box-shadow: 0 2px 8px rgb(17 18 20 / 8%); transform: translate(-50%, -50%); }
+/* Resize handle: a full-width strip on the top edge (easy to grab), showing a small centered grip. */
+.dock-handle { position: absolute; top: -7px; right: 0; left: 0; z-index: 1; display: flex; justify-content: center; height: 16px; cursor: row-resize; touch-action: none; outline: none; }
+.dock-grip { width: 40px; height: 4px; margin-top: 10px; border-radius: 999px; background: #d1d5db; transition: width .15s ease, background-color .15s ease, box-shadow .15s ease; }
+.dock-handle:hover .dock-grip, .collab-dock.is-dragging .dock-grip { width: 48px; background: #9ca3af; }
+/* The grip shows focus; the wide hit strip itself draws no outline. */
+:root:root:root .collab-dock .dock-handle:focus-visible { outline: none; box-shadow: none; }
+.dock-handle:focus-visible .dock-grip { width: 48px; background: var(--accent); box-shadow: 0 0 0 3px #fff4ed; }
+/* The circular toggle sits just right of the grip so both stay visible on the edge. */
+.dock-toggle { position: absolute; top: 0; left: calc(50% + 46px); z-index: 2; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--hair-2); border-radius: 50%; background: var(--card, #fff); color: var(--ink-2); cursor: pointer; box-shadow: 0 2px 8px rgb(17 18 20 / 8%); transform: translate(-50%, -50%); }
 .dock-toggle:hover { background: var(--sunk); color: var(--ink); }
 .dock-toggle:focus-visible, .dock-rail-main:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .dock-toggle .icon { width: 16px; height: 16px; }

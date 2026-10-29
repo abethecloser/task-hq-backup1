@@ -64,14 +64,6 @@
   & .context-head .icon-btn { flex: none; margin-left: auto; }
   /* Left padding clears the circular edge toggle that straddles the panel's inner border. */
   & .notify-body.has-context { display: block; padding: 22px 22px 32px 28px; overflow-x: hidden; scrollbar-gutter: stable; }
-  & .cx-inbox { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 40px; padding: 0 12px 0 14px; border: 1px solid var(--px-line-soft); border-radius: 12px; background: #fff; color: #4b5563; font: inherit; font-size: 10px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
-  & .cx-inbox:hover { border-color: #fed7aa; }
-  & .cx-inbox span { display: inline-flex; align-items: center; gap: 8px; }
-  & .cx-inbox i { width: 6px; height: 6px; border-radius: 50%; background: var(--px-line); }
-  & .cx-inbox.has-unread i { background: #e86326; }
-  & .cx-inbox b { color: #e86326; font-weight: 800; }
-  & .cx-inbox em { display: inline-flex; align-items: center; gap: 2px; color: var(--px-micro); font-style: normal; }
-  & .cx-inbox em .icon { width: 12px; height: 12px; }
   & .cx-label-end { display: inline-flex; align-items: center; gap: 10px; }
   & .cx-more { padding: 0; border: 0; background: none; color: var(--px-micro); font: inherit; font-size: 9.5px; letter-spacing: .12em; cursor: pointer; }
   & .cx-more:hover { color: #e86326; }
@@ -87,11 +79,13 @@
   & .cx-workspace strong { display: block; color: var(--px-ink); font-size: 10px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
   & .cx-workspace small { display: block; margin-top: 2px; color: var(--px-micro); font-size: 10px; }
   & .cx-quick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  & .cx-quick button { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 40px; padding: 0 10px; white-space: nowrap; border: 1px solid var(--px-line-soft); border-radius: 12px; background: #fff; color: #4b5563; font: inherit; font-size: 10px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
-  & .cx-quick button:hover { border-color: #fed7aa; }
-  & .cx-quick button.is-cal:hover { border-color: #bfdbfe; }
-  & .cx-quick .icon { width: 12px; height: 12px; color: #e86326; }
-  & .cx-quick .is-cal .icon { color: #3b82f6; }
+  /* Task / Calendar: the Start work structure — white outlined pill, dark circle with the icon, bold label. */
+  & .cx-quick button { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 36px; padding: 0 14px 0 5px; border: 0; border-radius: 999px; background: #fff; box-shadow: inset 0 0 0 1px var(--line-2, #d6d6db); color: var(--graphite, #2a2c31); font: inherit; font-size: 12.5px; font-weight: 750; white-space: nowrap; cursor: pointer; transition: background-color .15s ease; }
+  & .cx-quick button:hover { background: #f6f7f8; }
+  & .cx-quick button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  & .cx-quick-icon { display: grid; flex: none; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--graphite, #2a2c31); color: #fff; transition: transform .2s ease; }
+  & .cx-quick button:hover .cx-quick-icon { transform: translateX(2px); }
+  & .cx-quick-icon .icon { width: 13px; height: 13px; stroke-width: 2.4; }
 
   /* Compact black segmented Inbox / Attention / Activity. */
   & .aware-tabs { gap: 4px; margin-bottom: 26px; padding: 4px; border: 0; border-radius: 12px; background: #f3f4f6; }

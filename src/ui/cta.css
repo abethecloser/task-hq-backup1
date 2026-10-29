@@ -1,7 +1,7 @@
 /* Four refined CTAs only (no shared button defaults change):
    · .cta-fill — "Sign in to Task HQ" and "Open next task": compact pill with a trailing arrow circle;
      on hover or keyboard focus a dark fill grows out of the circle across the button (Arrow Fill pattern).
-   · .topbar .top-create (icon-only state) and .fab-create — compact utility "+" controls, no fill. */
+   · .fab-create — compact utility "+" control, no fill. */
 :root:root:root .btn.cta-fill {
   --cta-arrow: 26px;
   position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: 10px;
@@ -28,12 +28,7 @@
   :root:root:root .btn.cta-fill, :root:root:root .btn.cta-fill::before, .cta-fill-arrow { transition: none; }
 }
 
-/* Square "+" (New task when the top bar shows its icon only). */
-@container topbar (max-width: 900px) {
-  :root:root:root .topbar .top-create { width: 38px; min-height: 38px; height: 38px; padding: 0; justify-content: center; border-radius: 10px; }
-}
 @media (max-width: 760px) {
-  :root:root:root .topbar .top-create { width: 38px; min-height: 38px; height: 38px; padding: 0; justify-content: center; border-radius: 10px; }
   /* Floating "+": smaller, same place and action. */
   :root:root:root .fab-create { width: 48px; height: 48px; }
   :root:root:root .fab-create .icon { width: 22px; height: 22px; }

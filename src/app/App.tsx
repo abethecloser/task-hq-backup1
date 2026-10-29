@@ -31,6 +31,8 @@ import { Activity, Settings } from './Settings.tsx';
 import { Home } from './Home.tsx';
 import { CollabDock } from './CollabDock.tsx';
 import type { DockTab } from './CollabDock.tsx';
+import { DOCK_DEFAULT_PREF, loadDockPreference, saveDockPreference, withSnap } from '../ui/dock-size.ts';
+import type { DockPreference } from '../ui/dock-size.ts';
 import { AskTasks } from './AskTasks.tsx';
 import { AccountMark, AccountMenu, TopBar } from './TopBar.tsx';
 import { NeedsAttention } from './NeedsAttention.tsx';
@@ -82,8 +84,6 @@ const SIGNAL_VIEWS: View[] = ['home', 'all-tasks', 'company-work', 'needs-attent
 const MIN_CANVAS = 600;
 /** With the left panel open too, the canvas may narrow further before the right panel overlays. */
 const MIN_CANVAS_BOTH = 480;
-/** Bottom collaboration dock open state on this device. */
-const DOCK_KEY = 'taskhq.collab-dock';
 
 function parseHash(): { view: View; taskId: string | null; leadId: string | null; feedbackId: string | null; lens: { lens: Lens; changes?: Partial<RegistryQuery> } | null } {
   const [, first = '', second = ''] = location.hash.split('?')[0]!.split('/');
@@ -144,8 +144,10 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const collapseSidebar = sidebar.collapse;
   const width = useViewportWidth();
   /** Bottom collaboration dock (Home). Remembered on this device, like the calendar pullout. */
-  const [dockOpen, setDockOpen] = useState(() => { try { return localStorage.getItem(DOCK_KEY) === 'open'; } catch { return false; } });
-  useEffect(() => { try { localStorage.setItem(DOCK_KEY, dockOpen ? 'open' : 'closed'); } catch { /* storage unavailable: this page only */ } }, [dockOpen]);
+  // Bottom dock size preference (`quest-dock-height`); storage can be unavailable, so this degrades to this page only.
+  const [dock, setDock] = useState<DockPreference>(() => { try { return loadDockPreference(localStorage); } catch { return DOCK_DEFAULT_PREF; } });
+  useEffect(() => { try { saveDockPreference(localStorage, dock); } catch { /* storage unavailable */ } }, [dock]);
+  const dockOpen = dock.snap !== 'collapsed';
   const [dockTab, setDockTab] = useState<DockTab>('inbox');
   /** Notifications drawer (right). Session-only: it always starts closed. The calendar pullout (left) is `sidebar.open`. */
   const [notifOpen, setNotifOpen] = useState(false);
@@ -457,7 +459,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen} notifOpen={notifOpen}
           title={(VIEW_LABELS[view] ?? '').replace(' · Preview', '')}
           sections={topSections} onSection={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
-          onCreate={canCreate && !focused ? () => setCreating(true) : undefined}
+          // No New task in the header: creating lives in the right panel's Task action (and N, and the phone's + button).
           tabs={view === 'all-tasks' && !(selected && contextAllowed) ? taskTabs : undefined}
           onTab={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={toggleAsk} onBell={toggleNotifications}
           onMenu={() => {
@@ -504,7 +506,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         </section>
 
         {/* Bottom collaboration dock: in the main column, so expanding it takes height from the center. */}
-        {hasDock && <CollabDock quest={quest} company={company} open={dockOpen} onToggle={() => setDockOpen(value => !value)} tab={dockTab} onTab={setDockTab}
+        {hasDock && <CollabDock quest={quest} company={company} snap={dock.snap} onSnap={snap => setDock(current => withSnap(current, snap))}
+          onToggle={() => setDock(current => withSnap(current, current.snap === 'collapsed' ? current.last : 'collapsed'))} tab={dockTab} onTab={setDockTab}
           inbox={inbox} data={inboxData} read={sidebar.read} markRead={sidebar.markRead} mentions={mentions}
           onOpen={openTask} onOpenLead={openLead} onActivity={() => go('activity')} onOpenInboxPage={() => go('inbox')} />}
 
@@ -541,9 +544,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
               onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')}
               context={sidebar.isMobile || focused ? undefined : {
                 company, onOpenProjects: () => go('company-work'), onOpenCalendar: calendarAllowed ? () => go('calendar') : undefined, onCreate: canCreate ? () => setCreating(true) : undefined,
-                inboxUnread, onOpenAttention: () => go('needs-attention'),
-                // The inbox lives in the bottom dock on Home; elsewhere the Inbox page holds it.
-                onOpenInbox: () => { if (hasDock) { setDockTab('inbox'); setDockOpen(true); } else go('inbox'); },
+                onOpenAttention: () => go('needs-attention'),
                 onOpenTask: id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); },
               }} />
           </div>

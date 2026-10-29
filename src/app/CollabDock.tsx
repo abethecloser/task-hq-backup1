@@ -6,7 +6,12 @@
 // Right: the reader — a channel thread with its composer (ChannelThread, demo channels only until a
 // messaging backend exists) or a task's comment thread with its `task/comment` reply (live).
 // Nothing here keeps its own copy of inbox or messaging state.
-import { useEffect, useMemo, useState } from 'react';
+// Height: four snap positions (src/ui/dock-size.ts). The top-edge handle drags it like a window edge and
+// snaps on release; arrow keys step between positions. The shell gives the dock's height to the center.
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
+import { DOCK_RAIL, DOCK_SNAP_LABELS, clampDock, nearestSnap, snapHeights, stepSnap } from '../ui/dock-size.ts';
+import type { DockSnap } from '../ui/dock-size.ts';
 import { collaboration, teamActivity, ago } from '../core/dashboard.ts';
 import type { MentionSource } from '../core/dashboard.ts';
 import { channelsFor } from '../core/inbox.ts';
@@ -25,8 +30,10 @@ const TABS: { id: DockTab; label: string; short?: string }[] = [
   { id: 'inbox', label: 'Inbox' }, { id: 'conversations', label: 'Conversations', short: 'Channels' }, { id: 'mentions', label: 'Comments & mentions', short: 'Mentions' }, { id: 'activity', label: 'Activity' },
 ];
 
-export function CollabDock({ quest, company, open, onToggle, tab, onTab, inbox, data, read, markRead, mentions, onOpen, onOpenLead, onActivity, onOpenInboxPage }: {
-  quest: Quest; company: boolean; open: boolean; onToggle: () => void;
+export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab, inbox, data, read, markRead, mentions, onOpen, onOpenLead, onActivity, onOpenInboxPage }: {
+  quest: Quest; company: boolean;
+  /** The saved snap position; the toggle collapses it or restores the last open position. */
+  snap: DockSnap; onSnap: (snap: DockSnap) => void; onToggle: () => void;
   tab: DockTab; onTab: (tab: DockTab) => void;
   /** The universal inbox and its read state, shared with the bell and the Inbox page. */
   inbox: UniversalInbox; data: InboxData; read: Set<string>; markRead: (ids: string[]) => void;
@@ -50,11 +57,12 @@ export function CollabDock({ quest, company, open, onToggle, tab, onTab, inbox, 
 
   // Reading a channel reads its inbox items, as on the Inbox page.
   const channelId = reading?.kind === 'channel' ? reading.id : null;
+  const shown = snap !== 'collapsed';
   useEffect(() => {
-    if (!channelId || !open) return;
+    if (!channelId || !shown) return;
     const ids = inbox.items.filter(item => item.channelId === channelId && !read.has(item.id)).map(item => item.id);
     if (ids.length) markRead(ids);
-  }, [channelId, open, inbox.items, read, markRead]);
+  }, [channelId, shown, inbox.items, read, markRead]);
 
   function openItem(item: InboxItem) {
     markRead([item.id]);
@@ -65,9 +73,62 @@ export function CollabDock({ quest, company, open, onToggle, tab, onTab, inbox, 
   }
   const isReading = (kind: 'task' | 'channel', id?: string) => !!id && reading?.kind === kind && reading.id === id;
 
+  // ── Size ──
+  const dock = useRef<HTMLElement>(null);
+  const measure = () => {
+    const node = dock.current, content = node?.parentElement?.querySelector<HTMLElement>(':scope > .content');
+    return content ? Math.max(DOCK_RAIL + 120, window.innerHeight - content.getBoundingClientRect().top) : window.innerHeight - 120;
+  };
+  const [avail, setAvail] = useState(() => window.innerHeight - 120);
+  useLayoutEffect(() => {
+    const update = () => setAvail(measure());
+    update();
+    window.addEventListener('resize', update);
+    // Bars above the center (a saved-change notice, the demo banner) move its top edge: keep the snaps honest.
+    const content = dock.current?.parentElement?.querySelector<HTMLElement>(':scope > .content');
+    const observer = content ? new ResizeObserver(update) : null;
+    if (content) observer!.observe(content);
+    return () => { window.removeEventListener('resize', update); observer?.disconnect(); };
+  }, []);
+  const heights = snapHeights(avail);
+  const [drag, setDrag] = useState<{ startY: number; startH: number; height: number; moved: boolean } | null>(null);
+  const height = drag ? drag.height : heights[snap];
+  const open = snap !== 'collapsed' || (!!drag && drag.height > DOCK_RAIL + 8);
+  function startDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const fresh = measure(); setAvail(fresh);
+    setDrag({ startY: event.clientY, startH: snapHeights(fresh)[snap], height: snapHeights(fresh)[snap], moved: false });
+  }
+  function moveDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!drag) return;
+    const delta = drag.startY - event.clientY;
+    setDrag({ ...drag, height: clampDock(drag.startH + delta, avail), moved: drag.moved || Math.abs(delta) > 3 });
+  }
+  function endDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!drag) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (drag.moved) onSnap(nearestSnap(drag.height, avail));
+    setDrag(null);
+  }
+  function stepKey(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const to = event.key === 'ArrowUp' || event.key === 'PageUp' ? stepSnap(snap, 1) : event.key === 'ArrowDown' || event.key === 'PageDown' ? stepSnap(snap, -1)
+      : event.key === 'Home' ? 'collapsed' : event.key === 'End' ? 'expanded' : null;
+    if (!to) return;
+    event.preventDefault();
+    onSnap(to);
+  }
+
   const toggleLabel = open ? 'Collapse the communications panel' : 'Expand the communications panel';
   return (
-    <section id="collab-dock" className={`collab-dock ${open ? 'is-open' : ''}`} aria-label="Communications">
+    <section ref={dock} id="collab-dock" className={`collab-dock ${open ? 'is-open' : ''} ${drag ? 'is-dragging' : ''}`} style={{ height }} aria-label="Communications">
+      <div className="dock-handle" role="separator" aria-orientation="horizontal" tabIndex={0} aria-controls="collab-dock"
+        aria-label="Resize the communications panel" aria-valuemin={DOCK_RAIL} aria-valuemax={heights.expanded} aria-valuenow={Math.round(height)}
+        aria-valuetext={drag ? `${Math.round(height)} pixels` : `${DOCK_SNAP_LABELS[snap]} height`} title="Drag to resize · ↑ ↓ to step"
+        onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onKeyDown={stepKey}>
+        <span className="dock-grip" aria-hidden="true" />
+      </div>
       <button type="button" className="dock-toggle" aria-controls="collab-dock-body" aria-expanded={open} aria-label={toggleLabel} title={open ? 'Collapse' : 'Inbox, conversations & activity'} onClick={onToggle}>
         <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={open ? 'M6 9l6 6 6-6' : 'M6 15l6-6 6 6'} /></svg>
       </button>

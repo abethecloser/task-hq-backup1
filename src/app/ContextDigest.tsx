@@ -16,8 +16,6 @@ export interface DigestActions {
   onOpenProjects: () => void;
   onOpenCalendar?: () => void;
   onCreate?: () => void;
-  /** Inbox awareness: the unread count (same as the bell) and where the inbox opens. */
-  inboxUnread: number; onOpenInbox: () => void;
   onOpenAttention: () => void;
 }
 
@@ -38,13 +36,9 @@ export function WorkspaceSummary({ quest, actions }: { quest: Quest; actions: Di
         <span><strong>{actions.company ? 'Active workspace' : 'Your work'}</strong><small>{intel.tasks.done} of {intel.tasks.total} tasks complete</small></span>
       </button>
       {(actions.onCreate || actions.onOpenCalendar) && <div className="cx-quick">
-        {actions.onCreate && <button type="button" onClick={actions.onCreate}><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>Task</button>}
-        {actions.onOpenCalendar && <button type="button" className="is-cal" onClick={actions.onOpenCalendar}><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4" /></svg>Calendar</button>}
+        {actions.onCreate && <button type="button" onClick={actions.onCreate}><span className="cx-quick-icon" aria-hidden="true"><svg className="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></span>Task</button>}
+        {actions.onOpenCalendar && <button type="button" className="is-cal" onClick={actions.onOpenCalendar}><span className="cx-quick-icon" aria-hidden="true"><svg className="icon" viewBox="0 0 24 24"><path d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4" /></svg></span>Calendar</button>}
       </div>}
-      <button type="button" className={`cx-inbox ${actions.inboxUnread ? 'has-unread' : ''}`} onClick={actions.onOpenInbox}>
-        <span><i aria-hidden="true" />Inbox · {actions.inboxUnread ? <b>{actions.inboxUnread > 99 ? '99+' : actions.inboxUnread} unread</b> : 'caught up'}</span>
-        <em>Open<svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 7l5 5-5 5" /></svg></em>
-      </button>
     </div>
   );
 }
