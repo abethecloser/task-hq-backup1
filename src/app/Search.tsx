@@ -84,7 +84,7 @@ export function TopSearch({ quest, data, tools, onOpen }: { quest: Quest; data: 
     onOpen(result);
   }
   return (
-    <form ref={root} className={`search-field top-search ${label ? 'has-reference' : ''}`} role="search"
+    <form ref={root} className={`search-field top-search ${label ? 'has-reference' : ''} ${text ? 'has-text' : ''}`} role="search"
       onSubmit={event => { event.preventDefault(); pick(flat[active] ?? flat[0]); }}>
       <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 16l5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0" /></svg>
       {label && <button type="button" className="top-search-ref" aria-label={`Remove ${label}`} onClick={() => { setReference({}); input.current?.focus(); }}>{label} <span aria-hidden="true">×</span></button>}
@@ -94,7 +94,7 @@ export function TopSearch({ quest, data, tools, onOpen }: { quest: Quest; data: 
         onReferencesChange={setDocument} onFocus={() => setShown(true)}
         onChange={event => { setText(event.target.value); setShown(true); setActive(0); }}
         onKeyDown={event => {
-          if (event.key === 'Escape') { if (shown && searching) { event.preventDefault(); close(); } else input.current?.blur(); }
+          if (event.key === 'Escape') { if (shown && searching) { event.preventDefault(); close(); } else { setText(''); input.current?.blur(); } }
           else if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && flat.length) { event.preventDefault(); setShown(true); setActive(current => (current + (event.key === 'ArrowDown' ? 1 : flat.length - 1)) % flat.length); }
           else if (event.key === 'Backspace' && !text && label) setReference({});
         }} />

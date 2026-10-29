@@ -532,7 +532,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       {/* One right panel, under the top-right bell and Ask. Switching between them swaps the content in
           place (both stay mounted, so an open thread or an Ask conversation survives); only closing slides it away. */}
       <div className="notification-edge">
-        <EdgeDrawer id="right-edge-drawer" open={rightPanelOpen} label={askOpen && !focused ? 'Ask your tasks' : 'Notifications'} className="right-edge" onClose={closeRightPanel}>
+        <EdgeDrawer id="right-edge-drawer" open={rightPanelOpen} label={askOpen && !focused ? 'Ask your tasks' : 'Notifications'} className="right-edge" onClose={closeRightPanel} modal={sidebar.isMobile}>
           <div className="right-slot" hidden={askOpen && !focused}>
             <NotificationDrawer key={`${state.workspace.tenantId}:${actor}`} embedded quest={quest} control={sidebar} inbox={inbox} attention={awareAttention} data={inboxData} detailsAllowed={!focused || !!grant} open={notifOpen}
               threadAllowed={id => !focused || id === state.focus?.taskId || !!grant}
