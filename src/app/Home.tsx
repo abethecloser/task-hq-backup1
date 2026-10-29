@@ -63,7 +63,8 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
         {next && <button type="button" className="btn btn-primary btn-sm" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}>{nextLabel}</button>}
       </Hero>
 
-      {/* What to do next and who is talking to you. */}
+      {/* One workspace surface: queue and conversation, risk and activity, then intel and culture. */}
+      <div className="hd-workspace">
       <div className="hd-top">
         <section className="hd-panel" aria-labelledby="hd-next">
           <PanelHead id="hd-next" title="Up next" sub="Your queue · by priority & due date" tone="accent" icon={<path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5" />}
@@ -130,7 +131,7 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
                     <button type="button" className="hd-row-main" onClick={() => onOpen(task.id)}>
                       <strong>{task.title}</strong><small>{firstName(state, task.owner)} · {reasons.join(' · ')}</small>
                     </button>
-                    <span className="tag tag-overdue">{task.ultra ? 'ultra' : 'at risk'}</span>
+                    <span className={`hd-badge ${task.ultra ? 'is-ultra' : ''}`}>{task.ultra ? 'ultra' : 'at risk'}</span>
                   </li>
                 ))}
               </ul>}
@@ -149,9 +150,8 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
 
       <div className="hd-row3 is-bottom is-intel">
         <ProjectTeam quest={quest} company={company} onOpen={onOpen} />
-
-
         <CultureSpotlight items={culture} />
+      </div>
       </div>
     </div>
   );

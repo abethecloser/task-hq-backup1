@@ -18,6 +18,7 @@ import './ui/feedback.css';
 import './ui/home.css';
 import './ui/brutalist.css';
 import './ui/shell.css';
+import './ui/wallboard.css';
 import { applyLook } from './ui/look.ts';
 
 // Entry: real sign-in by default on the web; the synthetic demo is a separate,
