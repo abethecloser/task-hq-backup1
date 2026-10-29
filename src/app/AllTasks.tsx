@@ -128,7 +128,9 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
           </div>
           <p className="lede">{completed ? `${query.scope === 'mine' ? 'Your completed work' : 'Completed work visible in this company'} · ${query.sort === 'urgency' ? 'newest completions first' : SORT_LABELS[query.sort].toLowerCase()}. Open a task for comments, history, Reopen or Archive.` : query.lens === 'watching' ? LENS_HINTS.watching : `${query.scope === 'mine' ? 'Your work' : 'The whole company'} · ${LENS_HINTS[query.lens]}`}</p>
         </div>
-        {/* New task is the top bar's quick action. */}
+        {canCreate && <button type="button" className="btn btn-primary registry-new" onClick={onCreate}>
+          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>New task
+        </button>}
       </header>
 
 
@@ -221,7 +223,7 @@ function Table({ quest, tasks, selectedId, onSelect }: { quest: Quest; tasks: Ta
   );
 }
 
-function Board({ quest, tasks, selectedId, onSelect }: { quest: Quest; tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void }) {
+export function Board({ quest, tasks, selectedId, onSelect }: { quest: Quest; tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void }) {
   const { state, now } = quest;
   const today = localDate(now);
   const columns = boardColumns(tasks).filter(column => column.tasks.length > 0 || column.status !== 'done');

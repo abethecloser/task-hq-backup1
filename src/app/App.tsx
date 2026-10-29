@@ -28,6 +28,7 @@ import { WorkNavigator } from './WorkNavigator.tsx';
 import { ClientWorkspace } from './ClientWorkspace.tsx';
 import { CreateProject, canCreateProject } from './CreateProject.tsx';
 import { Reports } from './Reports.tsx';
+import { ProjectRoom } from './ProjectRoom.tsx';
 import { CreateTask, discardCreateDraft, hasCreateDraft } from './CreateTask.tsx';
 import { ExecutiveDesk } from './ExecutiveDesk.tsx';
 import { Activity, Settings } from './Settings.tsx';
@@ -64,7 +65,7 @@ import { OperationsWorkbook } from './OperationsWorkbook.tsx';
 import { CompanySignals } from './CompanySignals.tsx';
 import { notificationsFor } from './notifications.ts';
 import { PREVIEW_VIEWS, PreviewNotice } from './PreviewNotice.tsx';
-import { canonicalPage, pageStatus } from '../core/navigation.ts';
+import { ARCHIVED_PAGES, canonicalPage, pageStatus } from '../core/navigation.ts';
 import type { AppPageId } from '../core/navigation.ts';
 import { bothFit, closeTemporaryRight, openTemporaryRight, togglePullout } from '../core/layout.ts';
 import type { PulloutRoom, Pullouts } from '../core/layout.ts';
@@ -82,19 +83,22 @@ const VIEW_LABELS: Record<View, string> = {
 };
 
 /** Views where the Instrument Deck (signals, calendar, insights) is useful beside the canvas. */
+/** Primary routes that keep the collaboration dock. */
+const DOCK_VIEWS: View[] = ['home', 'all-tasks', 'company-work', 'calendar', 'reports', 'inbox'];
 const SIGNAL_VIEWS: View[] = ['home', 'all-tasks', 'company-work', 'needs-attention'];
 /** The canvas never gets narrower than this because of a docked panel. */
 const MIN_CANVAS = 600;
 /** With the left panel open too, the canvas may narrow further before the right panel overlays. */
 const MIN_CANVAS_BOTH = 480;
 
-function parseHash(): { view: View; taskId: string | null; leadId: string | null; feedbackId: string | null; lens: { lens: Lens; changes?: Partial<RegistryQuery> } | null } {
+function parseHash(): { view: View; taskId: string | null; leadId: string | null; roomId: string | null; feedbackId: string | null; lens: { lens: Lens; changes?: Partial<RegistryQuery> } | null } {
   const [, first = '', second = ''] = location.hash.split('?')[0]!.split('/');
-  if (first === 'task' && second) return { view: 'all-tasks', taskId: decodeURIComponent(second), leadId: null, feedbackId: null, lens: null };
+  if (first === 'task' && second) return { view: 'all-tasks', taskId: decodeURIComponent(second), leadId: null, roomId: null, feedbackId: null, lens: null };
   const views = Object.keys(VIEW_LABELS) as View[];
   return {
     view: views.includes(first as View) ? canonicalPage(first as View) : 'home', taskId: null,
     leadId: first === 'leads' && second ? decodeURIComponent(second) : null,
+    roomId: first === 'company-work' && second ? decodeURIComponent(second) : null,
     feedbackId: first === 'feedback' && second ? decodeURIComponent(second) : null,
     lens: first !== 'all-tasks' ? null : LENSES.includes(second as Lens) ? { lens: second as Lens } : LEGACY_LENSES[second] ? { lens: LEGACY_LENSES[second]!.lens ?? 'all', changes: LEGACY_LENSES[second] } : null,
   };
@@ -136,6 +140,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const [requested, setRequested] = useState<View>(initial.view);
   const [taskId, setTaskId] = useState<string | null>(initial.taskId);
   const [leadId, setLeadId] = useState<string | null>(initial.leadId);
+  // Project room open on Projects (#/company-work/<projectId>).
+  const [roomId, setRoomId] = useState<string | null>(initial.roomId);
   // A draft left open before a reload reopens the dialog where it was.
   const [creating, setCreating] = useState(() => hasCreateDraft(state.workspace.tenantId, actor));
   const [creatingProject, setCreatingProject] = useState(false);
@@ -177,6 +183,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       if (!next.taskId) setRequested(next.view);
       setTaskId(next.taskId);
       if (next.leadId) setLeadId(next.leadId);
+      setRoomId(next.roomId);
       if (next.feedbackId) setFeedbackId(next.feedbackId);
       if (next.view === 'all-tasks') setPreset(current => ({ ...(next.lens ?? { lens: 'all' as Lens }), keep: !next.lens?.changes, nonce: (current?.nonce ?? 0) + 1 }));
     };
@@ -237,6 +244,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     next = canonicalPage(next) as View;
     setRequested(next);
     setTaskId(null);
+    setRoomId(null);
     history.pushState(null, '', next === 'leads' && leadId ? `#/leads/${leadId}` : `#/${next}`);
   }
   function openTask(id: string) {
@@ -338,6 +346,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     { id: 'agents' as View, label: 'Agent pilot', icon: <Icon d="M12 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM5 21a7 7 0 0 1 14 0" /> },
   ];
   for (const item of navigation) if (pageStatus(item.id) === 'preview') item.preview = true;
+  // Archived modules leave navigation; their routes and data stay (see ARCHIVED_PAGES).
+  for (let i = navigation.length - 1; i >= 0; i--) if (ARCHIVED_PAGES.includes(navigation[i]!.id as AppPageId)) navigation.splice(i, 1);
 
   const selected = taskId ? taskById(state, taskId) : undefined;
   const contextAllowed = selected && (!focused || selected.id === state.focus?.taskId || !!grant);
@@ -438,8 +448,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const dueToday = state.tasks.filter(task => task.status !== 'done' && task.due === today && (company || task.owner === actor)).length;
 
 
-  // Bottom dock: wide-screen Home only. The shell then holds the viewport and the center scrolls inside it.
-  const hasDock = view === 'home' && !(selected && contextAllowed) && !focused && !sidebar.isMobile;
+  // Bottom dock: on every primary route (wide screens). The shell then holds the viewport and the center scrolls inside it.
+  const hasDock = DOCK_VIEWS.includes(view) && !focused && !sidebar.isMobile;
 
   return (
     <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'} ${hasDock ? 'has-dock' : ''} ${calendarPage ? 'is-calendar-page' : ''}`}
@@ -517,7 +527,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             : view === 'calendar' ? <CalendarPage quest={quest} company={company} onOpenTask={openTask} onCreate={canCreate ? createOn : undefined}
                 filters={taskTabs} projects={state.projects.length} onProjects={() => go('company-work')} />
             : view === 'feedback' ? <FeedbackInbox quest={quest} onOpen={id => { setFeedbackId(id); history.replaceState(null, '', `#/feedback/${id}`); }} />
-            : view === 'company-work' ? <CompanyWork quest={quest} onOpen={openTask}
+            : view === 'company-work' && roomId ? <ProjectRoom quest={quest} projectId={roomId} company={company} onBack={() => { location.hash = '#/company-work'; }} onOpenTask={openTask}
+                onAddTask={canCreate ? projectId => { setCreateProjectId(projectId); setCreating(true); } : undefined} />
+            : view === 'company-work' ? <CompanyWork quest={quest} onOpen={openTask} onOpenRoom={id => { location.hash = `#/company-work/${encodeURIComponent(id)}`; }}
                 onCreateProject={canCreateProject(state, actor) ? () => setCreatingProject(true) : undefined}
                 onAddTask={canCreate ? projectId => { setCreateProjectId(projectId); setCreating(true); } : undefined} />
             : view === 'needs-attention' ? <NeedsAttention quest={quest} onOpen={openTask} />

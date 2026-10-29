@@ -640,3 +640,39 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 :root .tp-quick .offer-form .field { display: grid; gap: 4px; }
 :root .tp-quick .offer-form .muted { margin: 0; }
 :root .tp-quick .offer-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Task detail: details (left) · conversation (center) · actions, people and handoffs (right). */
+.tp-grid.is-three { grid-template-columns: minmax(220px, 1fr) minmax(0, 1.6fr) minmax(220px, 1fr); gap: 24px; }
+.tp-side .ctx-deps ul { margin: 0; padding: 0; list-style: none; }
+.tp-side .tp-quick-list { grid-template-columns: minmax(0, 1fr); }
+.tp-side .tp-people { display: grid; gap: 10px; margin: 0; }
+.tp-side .tp-people > div { display: grid; gap: 4px; }
+.tp-side .tp-people dt { color: var(--muted); font-size: 12.5px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.tp-side .tp-people dd { margin: 0; }
+@container (max-width: 1180px) { .tp-grid.is-three { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); } .tp-grid.is-three > .tp-side { grid-column: 1 / -1; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); align-items: start; } }
+@container (max-width: 980px) { .tp-grid.is-three { grid-template-columns: minmax(0, 1fr); } }
+
+/* Project room: overview, task board (center), conversation and activity (side). */
+.project-room { display: grid; gap: 16px; container: room / inline-size; }
+.pr-overview { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; padding: 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card, #fff); }
+.pr-stat { display: grid; gap: 2px; min-width: 70px; }
+.pr-stat b { font: 850 24px/1.1 var(--display); font-variant-numeric: tabular-nums; }
+.pr-stat span { color: var(--muted); font-size: 13px; font-weight: 650; }
+.pr-stat.is-hot b { color: var(--accent-ink); }
+.pr-meter { display: block; width: 120px; height: 6px; margin-top: 4px; border-radius: 999px; background: var(--sunk); overflow: hidden; }
+.pr-meter > i { display: block; height: 100%; background: #12a150; }
+.pr-people { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.pr-person { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 13.5px; }
+.pr-person b { color: var(--muted); }
+.pr-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); gap: 20px; align-items: start; }
+.pr-board { display: grid; gap: 10px; min-width: 0; overflow-x: auto; }
+.pr-side { display: grid; gap: 12px; min-width: 0; }
+.pr-reply { display: grid; gap: 8px; }
+.pr-reply select { width: 100%; }
+.pr-note { margin: 0; font-size: 13px; }
+.group-room { margin-left: 12px; font-size: 14px; }
+@container room (max-width: 900px) { .pr-grid { grid-template-columns: minmax(0, 1fr); } .pr-people { margin-left: 0; } }
+.pr-board .board { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); overflow-x: visible; }
+/* In the left column the "who acts next" story reads at panel scale, not page-headline scale. */
+:root .tp-details .tp-story h2 { font-size: 24px; line-height: 1.15; }
+:root .tp-details .tp-story .tp-story-action { font-size: 18px; line-height: 1.35; }

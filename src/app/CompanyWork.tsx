@@ -6,8 +6,10 @@ import { compareTasks } from '../core/selectors.ts';
 import { Empty, TaskRow } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 
-export function CompanyWork({ quest, onOpen, onCreateProject, onAddTask }: {
+export function CompanyWork({ quest, onOpen, onCreateProject, onAddTask, onOpenRoom }: {
   quest: Quest; onOpen: (id: string) => void;
+  /** Opens the project's room (overview, board, conversation, activity). */
+  onOpenRoom?: (projectId: string) => void;
   /** Present when this viewer may create projects (supervisor, admin, owner). */
   onCreateProject?: () => void;
   /** Opens New task with the project chosen. */
@@ -62,7 +64,8 @@ export function CompanyWork({ quest, onOpen, onCreateProject, onAddTask }: {
           .map(item => `${item.count} ${item.label.toLowerCase()}`).join(' · ');
         return (
         <section key={group.id || 'none'} className="group">
-          <h3 className="group-title">{group.name} <span>{group.tasks.length} {group.tasks.length === 1 ? 'task' : 'tasks'}</span></h3>
+          <h3 className="group-title">{group.name} <span>{group.tasks.length} {group.tasks.length === 1 ? 'task' : 'tasks'}</span>
+            {group.id && onOpenRoom && <button type="button" className="hd-more group-room" onClick={() => onOpenRoom(group.id)}>Open project room →</button>}</h3>
           <p className="muted">{summary}{project || who || status !== 'open' ? ' · filtered view' : ''}</p>
           {group.tasks.length === 0
             ? <p className="muted">No tasks yet.{onAddTask && <> <button type="button" className="link" onClick={() => onAddTask(group.id)}>Add the first task</button></>}</p>

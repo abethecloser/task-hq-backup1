@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { APP_PAGE_IDS, EVERYDAY_PAGES, PAGE_ALIASES, PAGE_STATUS, PREVIEW_PAGES, canonicalPage, pageStatus } from './navigation.ts';
+import { APP_PAGE_IDS, ARCHIVED_PAGES, EVERYDAY_PAGES, PAGE_ALIASES, PAGE_STATUS, PREVIEW_PAGES, canonicalPage, pageStatus } from './navigation.ts';
 
 test('every existing application page remains a destination with an explicit live or preview state', () => {
   const expected = ['home', 'reports', 'all-tasks', 'inbox', 'tools', 'company-work', 'needs-attention', 'leads', 'executive', 'people', 'feedback', 'activity', 'settings', 'agents', 'relationships', 'calendar', 'workbook'];
@@ -23,9 +23,19 @@ test('Reports is an alias of the owner overview: old links still open one destin
   assert.ok(EVERYDAY_PAGES.includes('reports'), 'Reports is an everyday page with its own view');
 });
 
-test('everyday and preview navigation together cover every page exactly once, aliases aside', () => {
-  const grouped = [...EVERYDAY_PAGES, ...PREVIEW_PAGES];
-  assert.equal(new Set(grouped).size, grouped.length, 'no page is in both groups');
+test('everyday, preview and archived pages together cover every page exactly once, aliases aside', () => {
+  const grouped = [...EVERYDAY_PAGES, ...PREVIEW_PAGES, ...ARCHIVED_PAGES];
+  assert.equal(new Set(grouped).size, grouped.length, 'no page is in two groups');
   assert.deepEqual([...grouped].sort(), APP_PAGE_IDS.filter(id => !PAGE_ALIASES[id]).sort());
-  assert.deepEqual([...PREVIEW_PAGES].sort(), ['agents', 'feedback', 'leads', 'relationships', 'tools', 'workbook']);
+  assert.deepEqual([...PREVIEW_PAGES].sort(), ['feedback', 'tools', 'workbook']);
+});
+
+test('archived modules leave navigation but stay valid destinations', async () => {
+  const { ARCHIVED_PAGES, PREVIEW_PAGES, APP_PAGE_IDS, canonicalPage } = await import('./navigation.ts');
+  for (const id of ['leads', 'relationships', 'agents'] as const) {
+    assert.ok(ARCHIVED_PAGES.includes(id));
+    assert.ok(!PREVIEW_PAGES.includes(id), `${id} is not listed`);
+    assert.ok(APP_PAGE_IDS.includes(id), `${id} still opens by address`);
+    assert.equal(canonicalPage(id), id);
+  }
 });
