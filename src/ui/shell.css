@@ -346,3 +346,14 @@
   .home-dash .hd-q { grid-template-columns: auto minmax(0, 1fr); }
   .home-dash .hd-q .hd-due { grid-column: 2; }
 }
+
+/* ── Bottom collaboration dock (Home, wide screens) ─────────────────────────────────────────
+   The shell holds the viewport; the main column stacks bar · content · dock, and the content
+   scrolls inside it. Expanding the dock takes height from the content, never the document. */
+@media (min-width: 761px) {
+  .shell.has-dock { height: 100dvh; min-height: 0; overflow: hidden; }
+  /* No overflow clip on .main: the top bar deliberately spans over both side panels. */
+  .shell.has-dock > .main { display: flex; flex-direction: column; height: 100dvh; min-height: 0; }
+  .shell.has-dock > .main > :not(.content) { flex: none; }
+  .shell.has-dock > .main > .content { flex: 1 1 auto; width: 100%; min-height: 0; max-width: none; margin: 0; padding-inline: max(var(--bleed), calc((100% - 1600px) / 2 + var(--bleed))); padding-bottom: 40px; overflow-y: auto; overscroll-behavior: contain; }
+}

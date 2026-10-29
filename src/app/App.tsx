@@ -29,6 +29,7 @@ import { CreateTask, discardCreateDraft, hasCreateDraft } from './CreateTask.tsx
 import { ExecutiveDesk } from './ExecutiveDesk.tsx';
 import { Activity, Settings } from './Settings.tsx';
 import { Home } from './Home.tsx';
+import { CollabDock } from './CollabDock.tsx';
 import { AskTasks } from './AskTasks.tsx';
 import { AccountMark, AccountMenu, TopBar } from './TopBar.tsx';
 import { NeedsAttention } from './NeedsAttention.tsx';
@@ -80,6 +81,8 @@ const SIGNAL_VIEWS: View[] = ['home', 'all-tasks', 'company-work', 'needs-attent
 const MIN_CANVAS = 600;
 /** With the left panel open too, the canvas may narrow further before the right panel overlays. */
 const MIN_CANVAS_BOTH = 480;
+/** Bottom collaboration dock open state on this device. */
+const DOCK_KEY = 'taskhq.collab-dock';
 
 function parseHash(): { view: View; taskId: string | null; leadId: string | null; feedbackId: string | null; lens: { lens: Lens; changes?: Partial<RegistryQuery> } | null } {
   const [, first = '', second = ''] = location.hash.split('?')[0]!.split('/');
@@ -139,6 +142,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const sidebar = useSidebar(actor);
   const collapseSidebar = sidebar.collapse;
   const width = useViewportWidth();
+  /** Bottom collaboration dock (Home). Remembered on this device, like the calendar pullout. */
+  const [dockOpen, setDockOpen] = useState(() => { try { return localStorage.getItem(DOCK_KEY) === 'open'; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem(DOCK_KEY, dockOpen ? 'open' : 'closed'); } catch { /* storage unavailable: this page only */ } }, [dockOpen]);
   /** Notifications drawer (right). Session-only: it always starts closed. The calendar pullout (left) is `sidebar.open`. */
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -409,10 +415,13 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const dueToday = state.tasks.filter(task => task.status !== 'done' && task.due === today && (company || task.owner === actor)).length;
 
 
+  // Bottom dock: wide-screen Home only. The shell then holds the viewport and the center scrolls inside it.
+  const hasDock = view === 'home' && !(selected && contextAllowed) && !focused && !sidebar.isMobile;
+
   return (
-    <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'}`}
+    <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'} ${hasDock ? 'has-dock' : ''}`}
       style={{ ...sidebar.shellStyle, ...(sidebar.isMobile ? {} : { ['--panel-offset' as string]: `${leftReserved}px` }), ['--context-offset' as string]: `${contextOffset}px` }}
-      data-sidebar={sidebar.isMobile ? undefined : sidebar.open ? 'open' : 'closed'} data-context={contextOffset ? 'open' : 'closed'} data-resizing={sidebar.resizing || undefined}>
+      data-sidebar={sidebar.isMobile ? undefined : sidebar.open ? 'open' : 'closed'} data-context={contextOffset ? 'open' : 'closed'} data-dock={hasDock ? (dockOpen ? 'open' : 'closed') : undefined} data-resizing={sidebar.resizing || undefined}>
       <Sidebar
         control={sidebar}
         notifications={notifications}
@@ -472,11 +481,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
-                unseen={{ count: inboxUnread, latest: inbox.items.find(item => !sidebar.read.has(item.id))?.title }} onUnseen={() => { sidebar.setTab('inbox'); if (!notifOpen) toggleNotifications(); }}
-                mentions={mentions} read={sidebar.read}
                 onOpen={openTask} onOpenLead={openLead} onCreate={() => setCreating(true)}
-                onOpenMention={item => { sidebar.markRead([item.id]); location.hash = `#/inbox/${encodeURIComponent(item.channelId ?? '')}/${encodeURIComponent(item.messageId ?? '')}`; }}
-                onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} onActivity={() => go('activity')} />
+                onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} />
             : view === 'all-tasks' ? <AllTasks quest={quest} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} registry={registry} />
             : view === 'inbox' ? <Inbox quest={quest} data={inboxData} notes={notifications} read={sidebar.read} markRead={sidebar.markRead} onOpenTask={openTask} onOpenLead={openLead} />
             : view === 'workbook' ? <OperationsWorkbook key={`${state.workspace.tenantId}:${actor}`} />
@@ -493,6 +499,13 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             : view === 'settings' ? <Settings quest={quest} onPeople={() => go('people')} />
             : <PagePreview title="Agent pilot" detail="This pilot is not connected to an agent service or workspace data. No tasks are sent and no outcomes are generated here." />}
         </section>
+
+        {/* Bottom collaboration dock: in the main column, so expanding it takes height from the center. */}
+        {hasDock && <CollabDock quest={quest} company={company} open={dockOpen} onToggle={() => setDockOpen(value => !value)}
+          mentions={mentions} read={sidebar.read}
+          unseen={{ count: inboxUnread, latest: inbox.items.find(item => !sidebar.read.has(item.id))?.title }} onUnseen={() => { sidebar.setTab('inbox'); if (!notifOpen) toggleNotifications(); }}
+          onOpen={openTask} onOpenMention={item => { sidebar.markRead([item.id]); location.hash = `#/inbox/${encodeURIComponent(item.channelId ?? '')}/${encodeURIComponent(item.messageId ?? '')}`; }}
+          onActivity={() => go('activity')} />}
 
         <nav className="tabbar" aria-label="Task-HQ sections">
           {[

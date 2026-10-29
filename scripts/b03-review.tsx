@@ -40,9 +40,9 @@ function Review() {
     <p>Synthetic B03 component review · {actor}</p>
     <output aria-live="polite">{opened}</output>
     {params.get('view') === 'projects' ? <CompanyWork quest={quest} onOpen={onOpen} /> :
-      <Home quest={quest} company={company} canCreate={company} canDeck={false} unseen={{ count: 0 }} mentions={[]} read={new Set()}
+      <Home quest={quest} company={company} canCreate={company} canDeck={false}
         onOpen={onOpen} onOpenLead={id => setOpened(`Opened lead: ${id}`)} onCreate={() => setOpened('Create task')}
-        onUnseen={noop} onOpenMention={noop} onRegistry={noop} onDeck={noop} onTeam={noop} onActivity={noop} />}
+        onRegistry={noop} onDeck={noop} onTeam={noop} />}
   </main>;
 }
 createRoot(document.getElementById('root')!).render(<Review />);

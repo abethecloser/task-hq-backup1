@@ -3,8 +3,8 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { QuestEvent, QuestState } from '../core/contract.ts';
 import { compose } from '../core/compose.ts';
-import { ago, atRisk, collaboration, homeMetrics, teamActivity } from '../core/dashboard.ts';
-import type { CollabItem, MentionSource } from '../core/dashboard.ts';
+import { ago, atRisk, homeMetrics } from '../core/dashboard.ts';
+import type { CollabItem } from '../core/dashboard.ts';
 import { CULTURE_CONTENT, CULTURE_SLOTS } from '../core/culture.ts';
 import type { CultureItem, CultureSlot } from '../core/culture.ts';
 import type { Lens, RegistryQuery } from '../core/registry.ts';
@@ -17,21 +17,16 @@ import { BannerAdjust, BannerEditor, bannerLook, useBanner } from './HeroBanner.
 import type { Quest } from '../ui/useQuest.ts';
 import type { DeckSection } from './ContextPanel.tsx';
 
-// Home: the day at a glance. Momentum greeting; plate tiles · Up next · Comments & mentions;
-// At risk · Team activity; Projects & team · Culture. The calendar lives in the left panel.
+// Home: the day at a glance. Momentum greeting; Up next · At risk; Projects & team · Culture.
+// The calendar lives in the left panel; comments, mentions and activity in the bottom dock (CollabDock).
 // Everything is read from records; team-wide panels need the same access as Company Work.
-export function Home({ quest, company, canCreate, canDeck, unseen, mentions, read, onUnseen, onOpen, onOpenLead, onOpenMention, onCreate, onRegistry, onDeck, onTeam, onActivity, culture = CULTURE_CONTENT }: {
+export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, onCreate, onRegistry, onDeck, onTeam, culture = CULTURE_CONTENT }: {
   quest: Quest; company: boolean; canCreate: boolean;
   /** Whether the Instrument Deck (calendar, insights) is available to this viewer here. */
   canDeck: boolean;
-  /** Updates in the person's inbox they haven't opened yet (the same read set as the bell). */
-  unseen: { count: number; latest?: string };
-  /** Channel @mentions from the universal inbox, and its read set. */
-  mentions: MentionSource[]; read: Set<string>;
-  onUnseen: () => void;
-  onOpen: (id: string) => void; onOpenLead: (id: string) => void; onOpenMention: (item: CollabItem) => void; onCreate: () => void;
+  onOpen: (id: string) => void; onOpenLead: (id: string) => void; onCreate: () => void;
   onRegistry: (lens: Lens, changes?: Partial<RegistryQuery>) => void;
-  onDeck: (section: DeckSection) => void; onTeam: () => void; onActivity: () => void;
+  onDeck: (section: DeckSection) => void; onTeam: () => void;
   culture?: CultureItem[];
 }) {
   const { state, actor, now } = quest;
@@ -42,8 +37,6 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
   const queue = useMemo(() => { const { primary, queue: rest } = compose(state, actor, minute); return [primary, ...rest].filter(item => item.taskId || item.leadId); }, [state, actor, minute]);
   const metrics = homeMetrics(state, actor, minute);
   const risks = atRisk(state, actor, minute, company);
-  const collab = collaboration(state, actor, company, mentions, read, 4);
-  const activity = teamActivity(state, actor, company, 5);
   const greeting = useMomentum(quest, company);
   const today = localDate(minute);
   const next = queue[0];
@@ -63,7 +56,7 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
         {next && <button type="button" className="btn btn-primary btn-sm" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}>{nextLabel}</button>}
       </Hero>
 
-      {/* One workspace surface: queue and conversation, risk and activity, then intel and culture. */}
+      {/* One workspace surface: queue and risk, then intel and culture. Conversation and activity live in the bottom collaboration dock. */}
       <div className="hd-workspace">
       <div className="hd-top">
         <section className="hd-panel" aria-labelledby="hd-next">
@@ -92,34 +85,6 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
                 })}
               </ul>}
         </section>
-        <section className="hd-panel hd-collab" aria-labelledby="hd-comments">
-          <div className="hd-head">
-            <Tile tone="accent"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z" /></Tile>
-            <div><h2 id="hd-comments">Comments &amp; mentions</h2><small>On your work</small></div>
-            <button type="button" className={`hd-unread ${unseen.count ? 'has-unseen' : ''}`} onClick={onUnseen}
-              aria-label={unseen.count ? `Inbox: ${unseen.count} unread across all updates — open inbox` : 'Inbox: all caught up — open inbox'} title={unseen.latest ? `Latest in your inbox: ${unseen.latest}` : 'Open inbox'}>
-              {unseen.count ? <>Inbox · <b>{unseen.count > 99 ? '99+' : unseen.count}</b> unread</> : 'Inbox · caught up'}
-              <Chevron />
-            </button>
-          </div>
-          {collab.length === 0
-            ? <p className="hd-quiet">No comments or mentions on your work yet. Comments on tasks you’re part of and @mentions of you land here.</p>
-            : <ul className="hd-list hd-feed">
-                {collab.map(item => (
-                  <li key={item.id}>
-                    <button type="button" className={`hd-act ${item.unread ? 'is-unread' : ''}`} onClick={() => (item.channelId ? onOpenMention(item) : item.taskId && onOpen(item.taskId))}>
-                      <Initial state={state} id={item.from} />
-                      <span className="t"><b>{firstName(state, item.from, 'Someone')}</b> {COLLAB_VERB[item.kind]} <span className="q">{item.context.replace(/^Mentioned you in /, '')}</span><small>{item.text}</small></span>
-                      <time dateTime={new Date(item.at).toISOString()}>{ago(item.at, now)}</time>
-                    </button>
-                  </li>
-                ))}
-              </ul>}
-        </section>
-      </div>
-
-      <div className="hd-row3 is-pair">
-
         <section className="hd-panel" aria-labelledby="hd-risk">
           <PanelHead id="hd-risk" title="At risk" sub="Needs attention" tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />}
             more={risks.length > 4 ? { label: allRisks ? 'Show fewer' : `View all (${risks.length})`, onClick: () => setAllRisks(value => !value) } : undefined} />
@@ -136,16 +101,6 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
                 ))}
               </ul>}
         </section>
-
-        <section className="hd-panel" aria-labelledby="hd-activity">
-          <PanelHead id="hd-activity" title="Team activity" sub={company ? 'Recent · all work you can see' : 'Recent · your work'} tone="neutral" icon={<path d="M3 12h4l3-8 4 16 3-8h4" />}
-            more={{ label: 'View all', onClick: onActivity }} />
-          {activity.length === 0
-            ? <p className="hd-quiet">No activity yet. Task changes, handoffs and comments appear here as they happen.</p>
-            : <ul className="hd-list hd-feed">
-                {activity.map(event => <li key={event.id}><Recent event={event} quest={quest} onOpen={onOpen} /></li>)}
-              </ul>}
-        </section>
       </div>
 
       <div className="hd-row3 is-bottom is-intel">
@@ -157,7 +112,7 @@ export function Home({ quest, company, canCreate, canDeck, unseen, mentions, rea
   );
 }
 
-const COLLAB_VERB: Record<CollabItem['kind'], string> = { comment: 'commented on', mention: 'mentioned you in', reply: 'replied on' };
+export const COLLAB_VERB: Record<CollabItem['kind'], string> = { comment: 'commented on', mention: 'mentioned you in', reply: 'replied on' };
 
 /** Momentum greeting with the architectural treatment, kept to a compact height. */
 function Hero({ eyebrow, primary, support, banner, children }: { eyebrow: string; primary: string; support: string; banner: ReturnType<typeof useBanner>; children: ReactNode }) {
@@ -257,7 +212,7 @@ function CultureSpotlight({ items }: { items: CultureItem[] }) {
   );
 }
 
-function Chevron({ left = false }: { left?: boolean }) {
+export function Chevron({ left = false }: { left?: boolean }) {
   return <svg className="icon icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path d={left ? 'M14 7l-5 5 5 5' : 'M10 7l5 5-5 5'} /></svg>;
 }
 
@@ -266,7 +221,7 @@ function Tile({ tone, children }: { tone: 'accent' | 'stop' | 'act' | 'neutral';
 }
 
 const TINTS = ['t-accent', 't-ok', 't-act'];
-function Initial({ state, id }: { state: QuestState; id: string }) {
+export function Initial({ state, id }: { state: QuestState; id: string }) {
   const tint = TINTS[[...id].reduce((sum, char) => sum + char.charCodeAt(0), 0) % TINTS.length];
   const name = state.people.find(item => item.id === id)?.name ?? firstName(state, id, '?');
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]!.toUpperCase()).join('');
@@ -274,7 +229,7 @@ function Initial({ state, id }: { state: QuestState; id: string }) {
 }
 
 /** Event text with quoted task titles set apart, like "Maya started · Order shingles". */
-function Recent({ event, quest, onOpen }: { event: QuestEvent; quest: Quest; onOpen: (id: string) => void }) {
+export function Recent({ event, quest, onOpen }: { event: QuestEvent; quest: Quest; onOpen: (id: string) => void }) {
   const parts = event.text.split(/(“[^”]*”)/);
   const task = event.taskId ? taskById(quest.state, event.taskId) : undefined;
   const where = task ? projectName(quest.state, task.projectId) : '';
