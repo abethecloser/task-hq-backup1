@@ -1,3 +1,5 @@
+import { TaskFilters } from './TopBar.tsx';
+import type { TopTab } from './TopBar.tsx';
 import { Select } from '../ui/Select.tsx';
 import { feedbackAttributes } from '../ui/Feedback.tsx';
 // All Tasks: the operational center. One registry, a scope switch (My work / Company)
@@ -58,10 +60,12 @@ export function useRegistryPrefs(tenant: string, actor: string) {
  *  `keep` (the top-bar view tabs) changes only the lens and leaves every filter, job and search as they are. */
 export interface RegistryPreset { lens: Lens; changes?: Partial<RegistryQuery>; keep?: boolean; nonce: number }
 
-export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, preset, onPresetApplied, registry }: {
+export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, preset, onPresetApplied, registry, lenses, onLens }: {
   quest: Quest; selectedId: string | null; onSelect: (id: string) => void; onCreate: () => void; canCreate: boolean;
   preset?: RegistryPreset | null; onPresetApplied?: () => void;
   registry: ReturnType<typeof useRegistryPrefs>;
+  /** Lens filters (All · Today · Overdue · Urgent · More), shown beside the scope switch. */
+  lenses?: TopTab[]; onLens?: (id: string) => void;
 }) {
   const { state, actor, now } = quest;
   const { prefs, setPrefs } = registry;
@@ -120,6 +124,7 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
                 <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" /></svg>Company
               </button>
             </div>
+            {lenses && onLens && <div className="registry-lenses"><TaskFilters tabs={lenses} onTab={onLens} /></div>}
           </div>
           <p className="lede">{completed ? `${query.scope === 'mine' ? 'Your completed work' : 'Completed work visible in this company'} · ${query.sort === 'urgency' ? 'newest completions first' : SORT_LABELS[query.sort].toLowerCase()}. Open a task for comments, history, Reopen or Archive.` : query.lens === 'watching' ? LENS_HINTS.watching : `${query.scope === 'mine' ? 'Your work' : 'The whole company'} · ${LENS_HINTS[query.lens]}`}</p>
         </div>

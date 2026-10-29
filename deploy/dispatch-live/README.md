@@ -22,3 +22,15 @@ To roll back, redeploy the `v3-original/` files as `dispatch` (same layout, veri
 - `v5-parity.test.ts` (part of `npm test`) runs every action type through v4 and v5 for owner, admin, supervisor, a member titled "manager", a member and a reviewer. Shared actions must match in verdict and stored facts; the added actions are checked against the org-role matrix. It also checks that v4 still loads and acts on state written by v5.
 - Deploy: the 11 files in `v5/` as `dispatch`, verify_jwt true. Read them back after deploying. Roll back by redeploying `v4/`. Once deployed, freeze `v5/` (remove it from `sync-functions.mjs`) and start any further change as `v6/`.
 - The repository `supabase/functions/dispatch` does not advertise a contract yet; add `contract: 5` (or later) to its replies before it replaces v5.
+
+## v7 candidate (not deployed)
+
+- `v7/`: v6's `index.ts`/`logic.ts` with `CONTRACT = 7` and the current engine (`v7/core` must equal `src/core`; `v7.test.ts` checks it).
+- Adds `project/create` `{ name }`.
+  - Supervisors, admins and owners can create projects. Members and reviewers are refused.
+  - Names must be non-empty, at most 80 characters, and unique (case-insensitive), with up to 200 projects.
+  - No migration or new database function. The project is stored in `workspace_state.projects` like the seeded "General" project.
+- The app sends `project/create` only after a reply advertises contract 7. Before that it refuses without sending ("needs the server update (dispatch v7)").
+- Deploy: the files in `v7/` as `dispatch`, verify_jwt true. Read them back after deploying.
+- Roll back: redeploy `v6/`. v6 refuses `project/create` and leaves stored projects untouched.
+- After deploying, freeze `v7/` and start further changes as `v8/`.

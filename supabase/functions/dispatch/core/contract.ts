@@ -378,6 +378,7 @@ export type ActionBody =
   | { type: 'grant/revoke'; id: string }
   | { type: 'lead/receive'; lead: SimulatedLeadInput }
   | { type: 'roles/label'; personId?: string; label: string }
+  | { type: 'project/create'; name: string }
   | { type: 'lead/tags'; id: string; tags: string[] }
   | { type: 'lead/claim'; id: string }
   | { type: 'lead/assign'; id: string; to: string }

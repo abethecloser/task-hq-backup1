@@ -18,8 +18,8 @@ export function pageStatus(view: string): PageStatus {
   return APP_PAGE_IDS.includes(view as AppPageId) ? PAGE_STATUS[view as AppPageId] : 'preview';
 }
 
-/** Retired page ids that open another page, so saved `#/reports` links keep working. */
-export const PAGE_ALIASES: Readonly<Partial<Record<AppPageId, AppPageId>>> = { reports: 'executive' };
+/** Retired page ids that open another page. Reports is its own page again (company reports), so none today. */
+export const PAGE_ALIASES: Readonly<Partial<Record<AppPageId, AppPageId>>> = {};
 
 export function canonicalPage<T extends string>(view: T): T | AppPageId {
   return PAGE_ALIASES[view as AppPageId] ?? view;

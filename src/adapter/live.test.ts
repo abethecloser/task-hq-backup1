@@ -119,7 +119,7 @@ test('a v5 server opens the gated features; a later reply without a contract clo
  t.mock.method(globalThis,'fetch',async(_url:unknown,init:{body:string})=>{bodies.push(JSON.parse(init.body));return new Response(JSON.stringify({ok:true,state,rev:bodies.length,...(contract?{contract}:{})}));});
  assert.equal(f.backend.supports?.taskTaxonomy,false,'closed until the server says otherwise');
  await f.backend.load();
- assert.deepEqual(f.backend.supports,{taskTaxonomy:true,taskReopen:true,leadOwnership:true,workLabels:true,structuredReferences:true,taskArchive:false});
+ assert.deepEqual(f.backend.supports,{taskTaxonomy:true,taskReopen:true,leadOwnership:true,workLabels:true,structuredReferences:true,taskArchive:false,projectCreate:false});
  const drafts=[{text:'@Synthetic owner',spans:[{kind:'person',id:'actor',workspaceId:'synthetic',start:0,end:16,label:'@Synthetic owner'}]}];
  for(const action of [{type:'task/reopen',id:'t',note:'Leak returned'},{type:'task/update',id:'t',changes:{tags:['permits'],dueTime:'09:00'}},{type:'task/comment',id:'t',note:'@Synthetic owner',referenceDrafts:drafts}] as unknown as import('../core/contract.ts').Action[]){
   const result=await f.backend.dispatch(action,'actor');assert.equal(result.ok,true,action.type);assert.deepEqual(bodies.at(-1)!.action,action,'sent unchanged');
@@ -144,4 +144,18 @@ test('archiving opens only on a v6 server and is refused before sending otherwis
  const refused=await f.backend.dispatch({type:'task/archive',id:'t'},'actor');assert.equal(refused.ok,false);assert.equal(bodies.length,1,'nothing sent');
  contract=6;await f.backend.load();assert.equal(f.backend.supports?.taskArchive,true);
  const sent=await f.backend.dispatch({type:'task/archive',id:'t'},'actor');assert.equal(sent.ok,true);assert.deepEqual(bodies.at(-1)!.action,{type:'task/archive',id:'t'});
+});
+
+test('creating projects opens only on a v7 server and is refused before sending otherwise',async t=>{
+ const f=fixture();const bodies:Record<string,unknown>[]=[];let contract=6;
+ t.mock.method(globalThis,'fetch',async(_url:unknown,init:{body:string})=>{bodies.push(JSON.parse(init.body));return new Response(JSON.stringify({ok:true,state,rev:bodies.length,contract}));});
+ await f.backend.load();
+ assert.equal(f.backend.supports?.projectCreate,false);
+ const sentBefore=bodies.length;
+ const refused=await f.backend.dispatch({type:'project/create',name:'Smith Residence'},'actor');
+ assert.equal(refused.ok,false);assert.match(refused.ok?'':refused.error,/dispatch v7/);assert.equal(bodies.length,sentBefore,'nothing sent');
+ contract=7;await f.backend.load();
+ assert.equal(f.backend.supports?.projectCreate,true);
+ const sent=await f.backend.dispatch({type:'project/create',name:'Smith Residence'},'actor');
+ assert.equal(sent.ok,true);assert.deepEqual(bodies.at(-1)!.action,{type:'project/create',name:'Smith Residence'});
 });

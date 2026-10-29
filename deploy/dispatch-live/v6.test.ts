@@ -52,12 +52,7 @@ test('the v5 rollback refuses archive and leaves the work untouched', () => {
   assert.equal(s.tasks.find(t => t.id === taskId)!.archivedAt ?? null, null);
 });
 
-test('v6 core is the current engine, byte for byte', async () => {
-  const { readFileSync, readdirSync } = await import('node:fs');
-  const dir = new URL('./v6/core/', import.meta.url);
-  for (const file of readdirSync(dir)) assert.equal(readFileSync(new URL(file, dir), 'utf8'), readFileSync(new URL(`../../src/core/${file}`, import.meta.url), 'utf8'), `${file} drifted; run npm run sync:functions`);
-});
-
+// v6 is frozen as the rollback target for v7; v7.test.ts checks the current engine.
 test('v6 clears due fields across JSON reload without leaving an orphaned time', () => {
   let s = v6.emptyState(ORG, members, T0);
   s = ok(v6.runAction(s, ORG, members, OWNER, { type: 'task/create', task: { title: 'Inspect flashing', owner: MEMBER, due: '2026-10-28', dueTime: '09:00' } }, T0));

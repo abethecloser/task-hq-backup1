@@ -16,6 +16,7 @@ import type { Quest } from '../ui/useQuest.ts';
 import { AssigneeSelect, DueInput, PrioritySelect, StatusMenu } from './TaskControls.tsx';
 import { TaskSituation } from './WorkSurface.tsx';
 import { CommentReply, EventFeed, isComment } from './TaskComments.tsx';
+import { useWorkday } from '../shifts/Workday.tsx';
 
 const when = (at: number) => new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const isFormField = (target: EventTarget) => target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable="true"]');
@@ -179,6 +180,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
         </div>
 
         <aside className="tp-col tp-conversation" aria-label="Conversation">
+          {!reviewer && <QuickActions quest={quest} task={task} />}
           <section className="tp-card tp-talk" aria-label="Comments and activity">
             <div className="tp-tabs" role="tablist" aria-label="Comments, activity and history" onKeyDown={event => {
               const tabs = ['comments', 'activity', 'history'] as const;
@@ -204,6 +206,44 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
     </article>
   );
 }
+
+/** Quick actions, always visible: ask a person for help, report being stuck to the team, nudge the
+ * assignee, clear a blocker, or clock in. Each is an engine action, so the usual permissions apply. */
+function QuickActions({ quest, task }: { quest: Quest; task: Task }) {
+  const { state, actor, dispatch } = quest;
+  const workday = useWorkday();
+  const [form, setForm] = useState<'help' | 'stuck' | null>(null);
+  const [note, setNote] = useState('');
+  const [helper, setHelper] = useState('');
+  const [error, setError] = useState('');
+  const open = task.status !== 'done';
+  const owner = task.owner && task.owner !== actor ? task.owner : '';
+  const run = async (action: Parameters<typeof dispatch>[0]) => {
+    const result = await dispatch(action);
+    if (result.ok) { setForm(null); setNote(''); setHelper(''); setError(''); } else setError(result.error);
+  };
+  if (!open && !workday) return null;
+  return (
+    <section className="tp-card tp-quick" aria-labelledby="tp-quick-title">
+      <h2 id="tp-quick-title" className="ctx-label">Quick actions</h2>
+      <div className="tp-quick-list">
+        {workday && <button type="button" className="tp-quick-btn" onClick={workday.open}><QIcon d="M8 5v14l11-7z" />{workday.shift ? 'On shift · open workday' : 'Clock in on this task'}</button>}
+        {open && owner && <button type="button" className="tp-quick-btn" onClick={() => void run({ type: 'task/comment', id: task.id, note: `Nudge for ${firstName(state, owner)}: checking in on this. Where does it stand?` })}><QIcon d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 21h4" />Nudge {firstName(state, owner)}</button>}
+        {open && task.status !== 'blocked' && <button type="button" className="tp-quick-btn" aria-expanded={form === 'help'} onClick={() => setForm(form === 'help' ? null : 'help')}><QIcon d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8v.01M9 9.5a3 3 0 1 1 4.5 2.6c-.9.5-1.5 1.1-1.5 2.1" />Request help</button>}
+        {open && task.status !== 'blocked' && <button type="button" className="tp-quick-btn" aria-expanded={form === 'stuck'} onClick={() => setForm(form === 'stuck' ? null : 'stuck')}><QIcon d="M12 4 21 20H3zM12 10v4M12 17v.5" />I’m stuck</button>}
+        {open && task.status === 'blocked' && <button type="button" className="tp-quick-btn" onClick={() => void run({ type: 'task/resolve', id: task.id })}><QIcon d="M5 12l5 5L20 7" />Mark unblocked</button>}
+      </div>
+      {form && <form className="offer-form" onSubmit={event => { event.preventDefault(); void run({ type: 'task/request-help', id: task.id, note, ...(form === 'help' && helper ? { helper } : {}) }); }}>
+        {form === 'help' && <label className="field"><span>Ask</span><PersonSelect state={{ ...state, people: state.people.filter(item => item.id !== actor && item.role !== 'reviewer') }} label="Ask for help" value={helper} emptyLabel="Anyone on the team" onChange={setHelper} /></label>}
+        <label className="field"><span>{form === 'help' ? 'What do you need?' : 'What’s blocking you?'}</span><input autoFocus required maxLength={200} value={note} onChange={event => setNote(event.target.value)} /></label>
+        <p className="muted">This marks the task Blocked and tells {form === 'help' && helper ? firstName(state, helper) : 'the team'}.</p>
+        <span className="offer-form-actions"><button type="button" className="btn btn-ghost btn-sm" onClick={() => setForm(null)}>Cancel</button><button className="btn btn-primary btn-sm" disabled={!note.trim()}>{form === 'help' ? 'Ask for help' : 'Report blocker'}</button></span>
+      </form>}
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </section>
+  );
+}
+const QIcon = ({ d }: { d: string }) => <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={d} /></svg>;
 
 /** Completed work: who finished it, and the authorized way to reopen it. */
 function Completed({ quest, task }: { quest: Quest; task: Task }) {

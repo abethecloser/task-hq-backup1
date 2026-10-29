@@ -51,6 +51,8 @@ export interface BackendSupports {
   workLabels: boolean;
   /** Mention/tag link ids travel with an action and are stored with its text. */
   structuredReferences: boolean;
+  /** `project/create`. */
+  projectCreate: boolean;
 }
 
 export interface QuestBackend {
