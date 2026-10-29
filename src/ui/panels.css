@@ -1,0 +1,125 @@
+/* Side panels — V2 left calendar sidebar and V5/V6 right "Notifications & context" panel.
+   Presentation only: the calendar, Work Views, inbox, attention and activity keep their components
+   and actions. Scoped to the desktop panels (#quest-sidebar, .notify-drawer). */
+:root:root:root :is(#quest-sidebar, .notify-drawer) {
+  --px-line: #e5e7eb; --px-line-soft: #f0f1f3; --px-tray: #f9fafb; --px-hover: #f6f7f8;
+  --px-micro: #9ca3af; --px-meta: #6b7280; --px-ink: #1f2937; --px-red: #ef4444; --px-red-soft: #fef2f2;
+}
+
+/* ── Left: V2 calendar sidebar ───────────────────────────────────────────── */
+:root:root:root #quest-sidebar {
+  & .panel-head { height: 64px; padding-inline: 24px 14px; border-bottom: 0; }
+  & .panel-title { font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
+  & .panel-scroll { gap: 0; padding: 0 20px 16px; }
+  & .left-stack { gap: 0; }
+
+  /* Calendar sits directly on the sidebar: no card, no rules. */
+  & .pullout-calendar { padding: 0 0 4px; }
+  & .deck-cal { gap: 12px; padding: 0; border: 0; background: none; box-shadow: none; }
+  & .deck-cal-bar strong { font-size: 13.5px; font-weight: 650; }
+  & .deck-cal-bar .icon-btn { width: 26px; height: 24px; border: 1px solid var(--px-line); border-radius: 6px; color: var(--px-micro); font-size: 14px; }
+  & .deck-cal-bar .icon-btn:hover { background: var(--px-hover); color: var(--px-ink); }
+  /* Month/Week centered under the heading; Today and the full-calendar action stay at the right. */
+  & .deck-cal-modes { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; }
+  & .deck-cal-modes::before { content: ""; }
+  & .deck-cal-modes .seg { grid-column: 2; padding: 2px; border-radius: 8px; background: transparent; }
+  & .deck-cal-modes .seg button { min-height: 24px; padding: 0 12px; border-radius: 6px; color: var(--px-meta); font-size: 12px; font-weight: 550; }
+  & .deck-cal-modes .seg button[aria-pressed="true"] { background: #f3f4f6; color: #374151; }
+  & .deck-cal-actions { grid-column: 3; justify-self: end; gap: 6px; }
+  & .deck-cal-actions .link { font-size: 11px; }
+  & .deck-cal-expand { width: 24px; height: 24px; border: 0; color: var(--px-micro); }
+  & .deck-cal-expand:hover { color: var(--px-ink); }
+  & .deck-cal-grid { gap: 4px 2px; }
+  & .deck-cal-grid .dow { color: var(--px-micro); font-size: 10px; font-weight: 550; letter-spacing: 0; }
+  & .deck-cal-grid button { border-radius: 6px; font-size: 12px; }
+  & .deck-cal-grid button.is-today { background: #111827; color: #fff; box-shadow: none; font-weight: 700; }
+  & .deck-cal-grid button.is-today[aria-selected="true"] { box-shadow: 0 0 0 2px #fff4ed; }
+  & .deck-cal-grid button.has-late::after { top: auto; right: auto; bottom: 1px; left: 50%; width: 4px; height: 4px; background: #e86326; transform: translateX(-50%); }
+  & .deck-cal-key { color: var(--px-micro); font-size: 9.5px; line-height: 1.35; }
+  & .deck-cal-key i { width: 8px; height: 8px; }
+
+  /* Work Views: All across, then a compact two-column grid with live counts. */
+  & .left-stack > .work-nav { gap: 0; margin-top: 18px; padding: 0 0 8px; border-top: 0; }
+  & .work-nav .work-nav-label { margin: 0 0 10px 2px; color: var(--px-micro); font-size: 10px; font-weight: 750; letter-spacing: .15em; text-align: left; }
+  & .work-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 6px; }
+  & .work-list > :first-child { grid-column: 1 / -1; }
+  & .work-list .work-nav-item { min-height: 36px; padding: 7px 10px; border-radius: 8px; color: var(--px-ink); font-size: 13.5px; font-weight: 700; }
+  & .work-list .work-nav-item:hover { background: var(--px-hover); color: #e86326; }
+  & .work-list .work-nav-item.is-active { background: #fff4ed; color: var(--accent-ink); }
+  & .work-list .work-nav-item b { min-width: 0; padding: 0; background: transparent; color: var(--px-meta); font-size: 13.5px; font-weight: 700; }
+  & .work-list .work-nav-item b.is-hot { color: #e86326; }
+
+  /* Account / workspace anchored at the bottom. */
+  & .panel-foot { padding: 16px 24px 18px; border-top: 1px solid var(--px-line-soft); background: #fff; }
+  & .panel-foot .mode-chip { color: var(--px-ink); font-size: 12px; font-weight: 750; }
+  & .panel-foot p { margin-top: 6px; color: var(--px-micro); font-size: 10.5px; line-height: 1.4; }
+  & .panel-foot .exit-demo { margin-top: 10px; color: #e86326; font-size: 12px; font-weight: 750; }
+}
+
+/* ── Right: V5/V6 notifications & context ────────────────────────────────── */
+:root:root:root .notify-drawer {
+  & .context-head { min-height: 58px; padding: 0 14px 0 22px; border-bottom: 1px solid var(--px-line-soft); }
+  & .context-head .context-label { color: var(--px-micro); font-size: 10.5px; font-weight: 750; letter-spacing: .2em; }
+  & .notify-body.has-context { padding: 20px 20px 32px; }
+
+  & .cx-summary { display: grid; gap: 10px; margin-bottom: 20px; }
+  & .notify-body.has-context > .aware { gap: 0; padding-top: 0; }
+  & .cx-workspace { display: flex; align-items: center; gap: 16px; width: 100%; padding: 14px 16px; border: 1px solid var(--px-line-soft); border-radius: 16px; background: color-mix(in srgb, var(--px-tray) 60%, #fff); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background .15s; }
+  & .cx-workspace:hover { background: #fff; }
+  & .cx-ring { position: relative; display: grid; flex: none; place-items: center; width: 48px; height: 48px; }
+  & .cx-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  & .cx-ring-track { fill: none; stroke: var(--px-line); stroke-width: 8; }
+  & .cx-ring-value { fill: none; stroke: #22c55e; stroke-width: 8; stroke-linecap: round; }
+  & .cx-ring b { position: relative; font-size: 10px; font-weight: 750; }
+  & .cx-workspace strong { display: block; color: var(--px-ink); font-size: 10px; font-weight: 750; letter-spacing: .14em; text-transform: uppercase; }
+  & .cx-workspace small { display: block; margin-top: 2px; color: var(--px-micro); font-size: 10px; }
+  & .cx-quick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  & .cx-quick button { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; border: 1px solid var(--px-line-soft); border-radius: 12px; background: #fff; color: #4b5563; font: inherit; font-size: 10px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+  & .cx-quick button:hover { border-color: #fed7aa; }
+  & .cx-quick button.is-cal:hover { border-color: #bfdbfe; }
+  & .cx-quick .icon { width: 12px; height: 12px; color: #e86326; }
+  & .cx-quick .is-cal .icon { color: #3b82f6; }
+
+  /* Compact black segmented Inbox / Attention / Activity. */
+  & .aware-tabs { gap: 4px; margin-bottom: 26px; padding: 4px; border: 0; border-radius: 12px; background: #f3f4f6; }
+  & .aware-tabs button { min-height: 34px; border-radius: 9px; color: var(--px-meta); font-size: 9.5px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+  & .aware-tabs button:hover:not(.is-active) { background: #e5e7eb; }
+  & .aware-tabs button.is-active { background: #000; color: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 12%); }
+  & .aware-count { font-size: 9px; letter-spacing: 0; }
+
+  & .cx-section { margin-bottom: 30px; }
+  & .cx-label { display: flex; align-items: center; justify-content: space-between; margin: 0 0 14px; color: var(--px-micro); font-size: 10.5px; font-weight: 750; letter-spacing: .2em; text-transform: uppercase; }
+  & .cx-count { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--px-red-soft); color: var(--px-red); font-size: 10px; letter-spacing: 0; }
+  & .cx-empty { margin: 0; color: var(--px-micro); font-size: 11.5px; font-style: italic; }
+  & .cx-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  & .cx-card { display: grid; gap: 7px; width: 100%; padding: 14px 16px; border: 1px solid var(--px-line-soft); border-radius: 12px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background .15s, border-color .15s; }
+  & .cx-card:hover { background: var(--px-tray); }
+  & .cx-card.is-hand { background: var(--px-tray); }
+  & .cx-card.is-hand:hover { border-color: #fee2e2; }
+  & .cx-card strong { overflow: hidden; color: var(--px-ink); font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+  & .cx-card:hover strong { color: #e86326; }
+  & .cx-card.is-hand:hover strong { color: var(--px-red); }
+  & .cx-card small { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; color: var(--px-micro); font-size: 10px; font-style: italic; white-space: nowrap; }
+  & .cx-card small span { overflow: hidden; text-overflow: ellipsis; }
+  & .cx-card small span { padding-right: 2px; }
+  & .cx-card small span:first-child { flex: none; max-width: 70%; }
+  & .cx-card small i { color: #d1d5db; font-style: normal; }
+  & .cx-card small span i { margin-right: 6px; }
+  & .cx-card em { display: inline-flex; flex: none; align-items: center; gap: 5px; font-size: 10px; font-style: normal; font-weight: 750; letter-spacing: .02em; text-transform: uppercase; }
+  & .cx-card em.is-late { color: var(--px-red); }
+  & .cx-card em.is-blocked { color: #e86326; }
+  & .cx-card em .icon { width: 11px; height: 11px; }
+
+  /* Inbox list under its own label; quieter rows that match the cards. */
+  & .aware-head { margin-bottom: 10px; color: var(--px-meta); font-size: 11px; }
+  & .aware-list { margin-bottom: 30px; }
+
+  /* Recent activity: initials in soft orange, time in micro caps. */
+  & .cx-activity { gap: 14px; }
+  & .cx-activity .hd-act { align-items: flex-start; padding: 0; border: 0; background: none; font-size: 12px; font-weight: 500; }
+  & .cx-activity .hd-act:hover { background: none; }
+  & .cx-activity .avatar { width: 32px; height: 32px; background: #fff4ed; color: #e86326; font-size: 11px; box-shadow: 0 0 0 2px #fff; }
+  & .cx-activity .hd-act .t { font-weight: 500; line-height: 1.55; color: #374151; }
+  & .cx-activity .hd-act .t .q { color: #4b5563; font-style: italic; font-weight: 500; }
+  & .cx-activity .hd-act time { color: var(--px-micro); font-size: 9.5px; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+}

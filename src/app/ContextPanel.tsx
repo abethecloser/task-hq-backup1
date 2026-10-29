@@ -94,24 +94,28 @@ export function Signals({ quest, notifications, company, section, onSection, doc
 
 /** Shared right sidebar: existing calendar followed by authorized notification/activity projections. */
 /** The calendar quick view for the left pullout. The full-page calendar stays one click away. */
-export function CalendarPullout({ quest, company, onOpenTask, onExpandCalendar, onCreate }: {
+export function CalendarPullout({ quest, company, onOpenTask, onExpandCalendar, onCreate, dayList = true }: {
   quest: Quest; company: boolean; onOpenTask: (id: string) => void; onExpandCalendar: () => void; onCreate?: (due: string) => void;
+  /** False in the left sidebar: the chosen day's list is left out (hover and right-click still show a day's work). */
+  dayList?: boolean;
 }) {
   const [date, setDate] = useState(() => localDate(quest.now));
   return (
     <section className="pullout-calendar" aria-label="Calendar quick view">
-      <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={false} onExpand={onExpandCalendar} onCreate={onCreate} />
+      <DeckCalendar quest={quest} company={company} date={date} onDate={setDate} onOpenTask={onOpenTask} connected={false} onExpand={onExpandCalendar} onCreate={onCreate} dayList={dayList} />
     </section>
   );
 }
 
 /** Month or week of due dates, shaded by due-date load from records, with the chosen day's work below.
  * Hovering a day with work shows what's due; right-click (or the context-menu key) adds work to the day or moves what's due. */
-export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connected, variant = 'deck', onExpand, onCreate, day }: {
+export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connected, variant = 'deck', onExpand, onCreate, day, dayList = true }: {
   quest: Quest; company: boolean; date: string; onDate: (date: string) => void; onOpenTask: (id: string) => void; connected: boolean;
   variant?: 'deck' | 'page'; onExpand?: () => void; onCreate?: (due: string) => void;
   /** Page only: the chosen day's list beside the calendar, shown on request. */
   day?: { open: boolean; setOpen: (open: boolean) => void };
+  /** False leaves out the chosen day's list below the calendar. */
+  dayList?: boolean;
 }) {
   const { state, actor, now } = quest;
   const [mode, setMode] = useState<'month' | 'week'>('month');
@@ -188,7 +192,7 @@ export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connect
           </ul>}
       <p className="deck-cal-key"><span><i className="h1" /><i className="h2" /><i className="h3" /><i className="h4" /></span>Due-date load: open work due that day (blocked counts twice). Not a measure of anyone’s performance.</p>
     </section>
-    {(!day || day.open) && <section className="sig deck-cal-day">
+    {dayList && (!day || day.open) && <section className="sig deck-cal-day">
       <h4 className="ctx-label">{date === today ? 'Due today' : dayLabel(date, { weekday: 'long', month: 'short', day: 'numeric' })} <span>{dayTasks.length}</span></h4>
       {dayTasks.length === 0 ? <p className="sig-note">Nothing {company ? '' : 'of yours '}is due this day.</p> : (
         <ul className="sig-list">{dayTasks.slice(0, page ? 30 : 8).map(task => (

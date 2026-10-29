@@ -82,7 +82,8 @@
 /* Home gives the queue and conversation equal space, then stacks with the canvas. */
 .home-dash { container: home / inline-size; }
 .home-dash .hd-top, .home-dash .hd-row3.is-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-@container home (max-width: 680px) {
+/* Stacks once both side panels leave the center too narrow for two queue columns. */
+@container home (max-width: 760px) {
   .home-dash .hd-top, .home-dash .hd-row3.is-pair { grid-template-columns: minmax(0, 1fr); }
 }
 

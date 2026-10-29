@@ -15,9 +15,9 @@ import { useDropdown } from '../ui/useDropdown.tsx';
 const MOBILE_QUERY = '(max-width: 760px)';
 export const PANEL_MIN = 220;
 export const PANEL_MAX = 315;
-export const PANEL_DEFAULT = 240;
-/** The earlier default; a width still at it moves to the new default (it was never chosen by hand). */
-const OLD_DEFAULT = 320;
+export const PANEL_DEFAULT = 288;
+/** Earlier defaults; a width still at one moves to the current default (it was never chosen by hand). */
+const OLD_DEFAULTS = [320, 240];
 const READ_LIMIT = 300;
 const storageKey = (actor: string) => `quest.sidebar.v1.${actor}`;
 
@@ -34,7 +34,7 @@ function loadPrefs(actor: string): Prefs {
     return {
       // The calendar pullout always starts closed; width, read items, snoozes and the tab are what persist.
       open: false,
-      width: typeof raw.width === 'number' && raw.width !== OLD_DEFAULT ? clampWidth(raw.width) : PANEL_DEFAULT,
+      width: typeof raw.width === 'number' && !OLD_DEFAULTS.includes(raw.width) ? clampWidth(raw.width) : PANEL_DEFAULT,
       read: Array.isArray(raw.read) ? raw.read.filter((id: unknown): id is string => typeof id === 'string') : [],
       tab: TABS.includes(raw.tab) ? raw.tab : 'inbox',
       snoozes: Array.isArray(raw.snoozes) ? raw.snoozes.filter((item: unknown): item is Snooze => !!item && typeof (item as Snooze).id === 'string' && typeof (item as Snooze).until === 'number').slice(-100) : [],

@@ -357,7 +357,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     return () => cancelAnimationFrame(frame);
   }, [edgePanelOpen]);
   // Calendar owns the persisted, clamped panel width; both right panes reuse it.
-  const rightPanelWidth = sidebar.width;
+  // V5/V6 proportions: a 320px right panel on wide screens; narrower below 1280px so both panels still fit beside the center.
+  const rightPanelWidth = width >= 1280 ? 320 : 272;
   const room: PulloutRoom = { viewport: width, mobile: sidebar.isMobile, calendarWidth: sidebar.width, notificationsWidth: rightPanelWidth, minCanvasBoth: MIN_CANVAS_BOTH, minCanvas: MIN_CANVAS };
   useEffect(() => {
     if (!sidebar.isMobile && rightPanelOpen && sidebar.open && !bothFit(room)) {
@@ -435,7 +436,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         account={{ label: me.name && !me.name.includes('@') ? me.name : live?.email ?? me.name, detail: live ? ROLE_LABELS[live.role] : me.title, mark: <AccountMark quest={quest} />, menu: close => <AccountMenu quest={quest} close={close} /> }}
         pulloutTitle={calendarAllowed ? 'Calendar' : 'Your work'}
         pullout={<div className="left-stack">
-          {calendarAllowed && <CalendarPullout quest={quest} company={company} onOpenTask={openTask} onExpandCalendar={() => go('calendar')} onCreate={canCreate ? due => createOn(due) : undefined} />}
+          {calendarAllowed && <CalendarPullout quest={quest} company={company} dayList={false} onOpenTask={openTask} onExpandCalendar={() => go('calendar')} onCreate={canCreate ? due => createOn(due) : undefined} />}
           <WorkNavigator lenses={taskTabs} projects={state.projects} onLens={id => { if (id === 'completed') openCompleted(); else openLens(id as Lens); }} onProjects={() => go('company-work')} />
         </div>}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
@@ -537,7 +538,11 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
               threadAllowed={id => !focused || id === state.focus?.taskId || !!grant}
               onClose={closeRightPanel}
               onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}
-              onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')} />
+              onOpenLead={openLead} onOpenInbox={() => go('inbox')} onOpenAttention={() => go('needs-attention')} onOpenActivity={() => go('activity')}
+              context={sidebar.isMobile || focused ? undefined : {
+                company, onOpenProjects: () => go('company-work'), onOpenCalendar: calendarAllowed ? () => go('calendar') : undefined, onCreate: canCreate ? () => setCreating(true) : undefined,
+                onOpenTask: id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); },
+              }} />
           </div>
           {!focused && <div className="right-slot" hidden={!askOpen}>
             <AskTasks key={`ask:${state.workspace.tenantId}:${actor}`} embedded quest={quest} company={company} open={askOpen} onClose={closeRightPanel} />

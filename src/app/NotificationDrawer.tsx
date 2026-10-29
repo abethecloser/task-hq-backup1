@@ -18,13 +18,17 @@ import type { Quest } from '../ui/useQuest.ts';
 import { Awareness } from './Awareness.tsx';
 import type { SidebarControl } from './Sidebar.tsx';
 import { CommentReply, EventFeed, canReply, isComment, taskEvents } from './TaskComments.tsx';
+import { DigestLead, DigestTail, WorkspaceSummary } from './ContextDigest.tsx';
+import type { DigestActions } from './ContextDigest.tsx';
 
-export function NotificationDrawer({ quest, control, inbox, attention, data, detailsAllowed = true, open: visible, threadAllowed, onClose, onOpenTask, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity, embedded = false }: {
+export function NotificationDrawer({ quest, control, inbox, attention, data, detailsAllowed = true, open: visible, threadAllowed, onClose, onOpenTask, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity, embedded = false, context }: {
   quest: Quest; control: SidebarControl; inbox: UniversalInbox; attention: Attention; data?: InboxData; detailsAllowed?: boolean; open: boolean;
   /** False for a task outside the person's Critical Focus: its thread is not shown. */
   threadAllowed: (taskId: string) => boolean;
   onClose: () => void; onOpenTask: (id: string) => void; onOpenLead: (id: string) => void; onOpenInbox: () => void; onOpenAttention: () => void; onOpenActivity: () => void;
   /** Rendered inside the shared right panel (App owns the drawer), not as its own drawer. */ embedded?: boolean;
+  /** Wide-screen context around the lists (workspace progress, Needs a hand, Next actions, Recent activity). */
+  context?: DigestActions;
 }) {
   const [thread, setThread] = useState<string | null>(null);
   const [item, setItem] = useState<InboxItem | null>(null);
@@ -50,9 +54,11 @@ export function NotificationDrawer({ quest, control, inbox, attention, data, det
       thread
         ? <Thread quest={quest} taskId={thread} allowed={threadAllowed(thread)} onBack={() => setThread(null)} onClose={onClose} onOpenTask={id => { onOpenTask(id); if (control.isMobile) onClose(); }} />
         : <>
-            <header className="context-head"><span className="context-label">Notifications</span><button type="button" className="icon-btn" aria-label="Close notifications" onClick={onClose}>×</button></header>
-            <div className="context-body notify-body">
+            <header className="context-head"><span className="context-label">{context ? 'Notifications & context' : 'Notifications'}</span><button type="button" className="icon-btn" aria-label="Close notifications" onClick={onClose}>×</button></header>
+            <div className={`context-body notify-body ${context ? 'has-context' : ''}`}>
+              {context && <WorkspaceSummary quest={quest} actions={context} />}
               <Awareness quest={quest} control={sheet} inbox={inbox} attention={attention}
+                inboxLead={context && <DigestLead quest={quest} actions={context} />} inboxTail={context && <DigestTail quest={quest} actions={context} />}
                 onOpenTask={selectTask} onOpenThread={selectTask} onOpenLead={selectLead}
                 onOpenItem={entry => { if (entry.channelId) { back(); setItem(entry); } else if (entry.taskId) selectTask(entry.taskId); else if (entry.leadId) selectLead(entry.leadId); else { back(); setItem(entry); } }}
                 onOpenInbox={() => { onOpenInbox(); onClose(); }} onOpenAttention={() => { onOpenAttention(); onClose(); }} onOpenActivity={() => { onOpenActivity(); onClose(); }} />

@@ -6,6 +6,7 @@ import { FEEDBACK } from '../core/feedback.ts';
 // Rows say what happened, who/what it concerns, when, why it matters and the authorized
 // next step. Quick actions are the engine-accepted ones only (see core/awareness.ts).
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import type { Attention, AttentionItem } from '../core/awareness.ts';
 import { activityFor } from '../core/awareness.ts';
 import type { InboxItem } from '../core/inbox.ts';
@@ -19,11 +20,13 @@ import type { AwarenessTab, SidebarControl } from './Sidebar.tsx';
 
 const SHOWN = 8;
 
-export function Awareness({ quest, control, inbox, attention, onOpenTask, onOpenThread, onOpenItem, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity }: {
+export function Awareness({ quest, control, inbox, attention, onOpenTask, onOpenThread, onOpenItem, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity, inboxLead, inboxTail }: {
   quest: Quest; control: SidebarControl; inbox: UniversalInbox; attention: Attention;
   onOpenTask: (id: string) => void;
   /** Inbox task notifications open their conversation here instead of the task page. */
   onOpenThread?: (id: string) => void; onOpenItem?: (item: InboxItem) => void; onOpenLead: (id: string) => void; onOpenInbox: () => void; onOpenAttention: () => void; onOpenActivity: () => void;
+  /** Optional context around the inbox list (the right panel's Needs a hand · Next actions, then Recent activity). */
+  inboxLead?: ReactNode; inboxTail?: ReactNode;
 }) {
   const { state, now } = quest;
   const tab = control.tab;
@@ -43,7 +46,7 @@ export function Awareness({ quest, control, inbox, attention, onOpenTask, onOpen
         ))}
       </div>
       <div className="aware-panel" role="tabpanel" id={`aware-panel-${tab}`} aria-labelledby={`aware-tab-${tab}`}>
-        {tab === 'inbox' && <InboxTab quest={quest} control={control} inbox={inbox} onOpenTask={id => go(() => onOpenTask(id))} onOpenThread={onOpenThread} onOpenItem={onOpenItem} onOpenLead={id => go(() => onOpenLead(id))} onOpenInbox={() => go(onOpenInbox)} />}
+        {tab === 'inbox' && <>{inboxLead}{inboxLead && <h3 className="cx-label">Inbox</h3>}<InboxTab quest={quest} control={control} inbox={inbox} onOpenTask={id => go(() => onOpenTask(id))} onOpenThread={onOpenThread} onOpenItem={onOpenItem} onOpenLead={id => go(() => onOpenLead(id))} onOpenInbox={() => go(onOpenInbox)} />{inboxTail}</>}
         {tab === 'attention' && <AttentionTab quest={quest} control={control} attention={attention} onOpenTask={id => go(() => onOpenTask(id))} onOpenLead={id => go(() => onOpenLead(id))} onOpenAll={() => go(onOpenAttention)} />}
         {tab === 'activity' && <ActivityTab quest={quest} onOpenTask={id => go(() => onOpenTask(id))} onOpenAll={() => go(onOpenActivity)} />}
       </div>
