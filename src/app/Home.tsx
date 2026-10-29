@@ -23,7 +23,7 @@ import type { DeckSection } from './ContextPanel.tsx';
 // Home: the day at a glance. Momentum greeting; Up next · At risk; Projects & team · Culture.
 // The calendar lives in the left panel; comments, mentions and activity in the bottom dock (CollabDock).
 // Everything is read from records; team-wide panels need the same access as Company Work.
-export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, onCreate, onRegistry, onDeck, onTeam, culture = CULTURE_CONTENT, focusTaskId, onClearFocus }: {
+export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, onCreate, onRegistry, onDeck, onTeam, culture = CULTURE_CONTENT, focusTaskId, onClearFocus, onReports }: {
   quest: Quest; company: boolean; canCreate: boolean;
   /** Whether the Instrument Deck (calendar, insights) is available to this viewer here. */
   canDeck: boolean;
@@ -32,6 +32,7 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
   onDeck: (section: DeckSection) => void; onTeam: () => void;
   /** The task the dock is reading, focused in the overview's Living view. */
   focusTaskId?: string | null; onClearFocus?: () => void;
+  onReports?: () => void;
   culture?: CultureItem[];
 }) {
   const { state, actor, now } = quest;
@@ -138,7 +139,7 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
       </div>
 
       <div className="hd-row3 is-bottom is-intel">
-        <ProjectTeam quest={quest} company={company} onOpen={onOpen} focusTaskId={focusTaskId} onClearFocus={onClearFocus} />
+        <ProjectTeam quest={quest} company={company} onOpen={onOpen} focusTaskId={focusTaskId} onClearFocus={onClearFocus} onReports={onReports} />
         <CultureSpotlight items={culture} />
       </div>
       </div>

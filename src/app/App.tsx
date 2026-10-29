@@ -26,6 +26,8 @@ import { localDate } from '../core/time.ts';
 import { EdgeDrawer } from '../ui/EdgeDrawer.tsx';
 import { WorkNavigator } from './WorkNavigator.tsx';
 import { ClientWorkspace } from './ClientWorkspace.tsx';
+import { CreateProject, canCreateProject } from './CreateProject.tsx';
+import { Reports } from './Reports.tsx';
 import { CreateTask, discardCreateDraft, hasCreateDraft } from './CreateTask.tsx';
 import { ExecutiveDesk } from './ExecutiveDesk.tsx';
 import { Activity, Settings } from './Settings.tsx';
@@ -75,7 +77,7 @@ const FEEDBACK_ON = false;
 export type View = AppPageId;
 
 const VIEW_LABELS: Record<View, string> = {
-  workbook: 'Operations Workbook · Preview', home: 'Home', calendar: 'Calendar', reports: 'Owner overview', relationships: 'Relationship Vault', 'all-tasks': 'Tasks', inbox: 'Inbox', tools: 'Estimates & Proposals', 'company-work': 'Projects', 'needs-attention': 'Needs Attention', leads: 'First Response',
+  workbook: 'Operations Workbook · Preview', home: 'Home', calendar: 'Calendar', reports: 'Reports', relationships: 'Relationship Vault', 'all-tasks': 'Tasks', inbox: 'Inbox', tools: 'Estimates & Proposals', 'company-work': 'Projects', 'needs-attention': 'Needs Attention', leads: 'First Response',
   executive: 'Owner overview', people: 'People & Access', feedback: 'Feedback', activity: 'Activity', settings: 'Settings', agents: 'Agent pilot',
 };
 
@@ -136,6 +138,9 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const [leadId, setLeadId] = useState<string | null>(initial.leadId);
   // A draft left open before a reload reopens the dialog where it was.
   const [creating, setCreating] = useState(() => hasCreateDraft(state.workspace.tenantId, actor));
+  const [creatingProject, setCreatingProject] = useState(false);
+  // A project chosen for the next task created (from Projects → Add the first task).
+  const [createProjectId, setCreateProjectId] = useState<string | undefined>();
   const [attendanceDemo, setAttendanceDemo] = useState(false);
   // A due date chosen from the calendar, for the next task created.
   const [createDue, setCreateDue] = useState<string | undefined>();
@@ -175,12 +180,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
       if (next.feedbackId) setFeedbackId(next.feedbackId);
       if (next.view === 'all-tasks') setPreset(current => ({ ...(next.lens ?? { lens: 'all' as Lens }), keep: !next.lens?.changes, nonce: (current?.nonce ?? 0) + 1 }));
     };
-    // Saved #/reports links open the owner overview; show its current address.
-    const tidy = () => { if (/^#\/reports(\/|\?|$)/.test(location.hash)) history.replaceState(null, '', '#/executive'); };
-    tidy();
-    const onChange = () => { tidy(); onHash(); };
-    window.addEventListener('hashchange', onChange);
-    return () => window.removeEventListener('hashchange', onChange);
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
   useEffect(() => {
@@ -315,11 +316,12 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   }
 
   const navigation: { id: View; label: string; count?: number; countLabel?: string; hot?: boolean; preview?: boolean; icon: ReactNode }[] = [
-    // Everyday work. Reports and Executive Desk were the same page; they are one "Owner overview".
+    // Everyday work. Reports (company measures) and Owner overview (decisions) are separate pages.
     { id: 'home', label: 'Home', icon: <Icon d="M3 11l9-8 9 8M5 10v11h14V10M10 21v-7h4v7" /> },
     { id: 'calendar', label: 'Calendar', icon: <Icon d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4" /> },
     { id: 'all-tasks', label: 'Tasks', count: counts.all, countLabel: 'open tasks', icon: <Icon d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v2H4z" /> },
     { id: 'inbox', label: 'Inbox', count: inboxUnread, countLabel: 'unread updates', hot: inboxUnread > 0, icon: <Icon d="M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z" /> },
+    { id: 'reports', label: 'Reports', icon: <Icon d="M4 20V10M10 20V4M16 20v-7M22 20H2" /> },
     { id: 'needs-attention', label: 'Needs Attention', count: attention.length, countLabel: 'conditions', hot: myAttention > 0, icon: <Icon d="M12 4 21 20H3zM12 10v4M12 17v.5" /> },
     { id: 'company-work', label: 'Projects', count: openCompany.length, countLabel: 'open tasks', icon: <Icon d="M3 8h18v12H3zM8 8V5h8v3M3 13h18" /> },
     { id: 'people', label: 'People & Access', count: state.people.length, countLabel: 'people', icon: <Icon d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" /> },
@@ -341,7 +343,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const contextAllowed = selected && (!focused || selected.id === state.focus?.taskId || !!grant);
   // The everyday sections sit in the top navigation on wide screens; the rail keeps the rest.
   // Phones keep the full list in the menu (the top navigation is hidden there).
-  const topSections = (['home', 'all-tasks', 'company-work', 'calendar', 'inbox'] as View[])
+  const topSections = (['home', 'all-tasks', 'company-work', 'calendar', 'reports', 'inbox'] as View[])
     .map(id => navigation.find(item => item.id === id)).filter(item => !!item)
     .map(item => ({ id: item.id, label: item.id === 'all-tasks' ? 'Tasks' : item.label, count: item.id === 'inbox' ? item.count : undefined, hot: item.hot, active: view === item.id && !(selected && contextAllowed) }));
   // Calendar stays in the rail on wide screens as the calendar quick view (the top bar's Calendar is the full page).
@@ -476,8 +478,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           title={(VIEW_LABELS[view] ?? '').replace(' · Preview', '')}
           sections={topSections} onSection={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
           // No New task in the header: creating lives in the right panel's Task action (and N, and the phone's + button).
-          tabs={view === 'all-tasks' && !(selected && contextAllowed) ? taskTabs : undefined}
-          onTab={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} search={<TopSearch quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={toggleAsk} onBell={toggleNotifications}
+          search={<TopSearch quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={toggleAsk} onBell={toggleNotifications}
           onMenu={() => {
             restoreCalendar.current = false; setMobileCalendarOpen(false);
             // Wide screens: the menu button opens and closes the left "Your work" panel.
@@ -503,18 +504,22 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             ? <CriticalFocus quest={quest} onOpen={openTask} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
                 onOpen={openTask} onOpenLead={openLead} onCreate={() => setCreating(true)}
-                onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} focusTaskId={dockFocus} onClearFocus={() => setDockFocus(null)} />
-            : view === 'all-tasks' ? <AllTasks quest={quest} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} registry={registry} />
+                onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} focusTaskId={dockFocus} onClearFocus={() => setDockFocus(null)} onReports={() => go('reports')} />
+            : view === 'all-tasks' ? <AllTasks quest={quest} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} registry={registry}
+                lenses={taskTabs} onLens={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} />
             : view === 'inbox' ? <Inbox quest={quest} data={inboxData} notes={notifications} read={sidebar.read} markRead={sidebar.markRead} onOpenTask={openTask} onOpenLead={openLead} />
             : view === 'workbook' ? <OperationsWorkbook key={`${state.workspace.tenantId}:${actor}`} />
             : view === 'tools' ? <Tools quest={quest} store={toolsStore} tools={tools} onOpenTask={openTask} />
-            : view === 'executive' || view === 'reports' ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} />
+            : view === 'reports' ? <Reports quest={quest} company={company} onOpenTask={openTask} onLens={lens => openLens(lens)} onCompleted={() => openCompleted('company')} />
+            : view === 'executive' ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} />
             : view === 'relationships' ? <Relationships quest={quest} onOpen={openTask} />
             : view === 'people' ? <People quest={quest} />
             : view === 'calendar' ? <CalendarPage quest={quest} company={company} onOpenTask={openTask} onCreate={canCreate ? createOn : undefined}
                 filters={taskTabs} projects={state.projects.length} onProjects={() => go('company-work')} />
             : view === 'feedback' ? <FeedbackInbox quest={quest} onOpen={id => { setFeedbackId(id); history.replaceState(null, '', `#/feedback/${id}`); }} />
-            : view === 'company-work' ? <CompanyWork quest={quest} onOpen={openTask} />
+            : view === 'company-work' ? <CompanyWork quest={quest} onOpen={openTask}
+                onCreateProject={canCreateProject(state, actor) ? () => setCreatingProject(true) : undefined}
+                onAddTask={canCreate ? projectId => { setCreateProjectId(projectId); setCreating(true); } : undefined} />
             : view === 'needs-attention' ? <NeedsAttention quest={quest} onOpen={openTask} />
             : view === 'leads' ? <SpeedToLead quest={quest} onOpen={openTask} selectedLead={leadId} onSelectLead={id => { setLeadId(id); history.replaceState(null, '', id ? `#/leads/${id}` : '#/leads'); }} />
             : view === 'activity' ? <Activity quest={quest} onOpen={openTask} />
@@ -591,7 +596,11 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         </EdgeDrawer>
       </div>}
       {canCreate && !focused && !creating && <button type="button" className="fab-create" aria-label="New task" title="New task" onClick={() => setCreating(true)}><Icon d="M12 5v14M5 12h14" /></button>}
-      {creating && canCreate && <CreateTask quest={quest} due={createDue} onClose={() => { setCreating(false); setCreateDue(undefined); }} onCreated={id => { setCreating(false); setCreateDue(undefined); openTask(id); }} />}
+      {creating && canCreate && <CreateTask quest={quest} due={createDue} projectId={createProjectId} onClose={() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); }} onCreated={id => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); openTask(id); }} />}
+      {creatingProject && <CreateProject quest={quest} onClose={() => setCreatingProject(false)} onCreated={(projectId, addTask) => {
+        setCreatingProject(false);
+        if (addTask && canCreate) { setCreateProjectId(projectId); setCreating(true); }
+      }} />}
       {feedbackOn && <ReviewLayer quest={quest} openRequest={reviewRequest}
         screen={{ view: VIEW_LABELS[view], route: `#/${view}${view === 'leads' && leadId ? `/${leadId}` : ''}`, taskId: selected?.id ?? '', leadId: view === 'leads' && leadId ? leadId : '', deck: view === 'leads' && leadId ? 'lead' : selected ? 'task' : '' }}
         itemId={feedbackId} onItem={id => { setFeedbackId(id); if (!id && location.hash.startsWith('#/feedback/')) history.replaceState(null, '', '#/feedback'); }}

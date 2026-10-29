@@ -6,7 +6,13 @@ import { compareTasks } from '../core/selectors.ts';
 import { Empty, TaskRow } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 
-export function CompanyWork({ quest, onOpen }: { quest: Quest; onOpen: (id: string) => void }) {
+export function CompanyWork({ quest, onOpen, onCreateProject, onAddTask }: {
+  quest: Quest; onOpen: (id: string) => void;
+  /** Present when this viewer may create projects (supervisor, admin, owner). */
+  onCreateProject?: () => void;
+  /** Opens New task with the project chosen. */
+  onAddTask?: (projectId: string) => void;
+}) {
   const { state, now } = quest;
   const [project, setProject] = useState('');
   const [who, setWho] = useState('');
@@ -18,7 +24,8 @@ export function CompanyWork({ quest, onOpen }: { quest: Quest; onOpen: (id: stri
     .sort(compareTasks(now));
   const byProject = [...state.projects, { id: '', name: 'No project' }]
     .map(item => ({ ...item, tasks: tasks.filter(task => task.projectId === item.id) }))
-    .filter(item => item.tasks.length);
+    // Unfiltered, every project shows (a new one has no tasks yet); filtered, only matching ones.
+    .filter(item => item.tasks.length || (item.id && !project && !who && status === 'open') || (item.id && item.id === project));
 
   return (
     <div className="view">
@@ -28,6 +35,7 @@ export function CompanyWork({ quest, onOpen }: { quest: Quest; onOpen: (id: stri
           <h1>Projects</h1>
           <p className="lede">Coordinate daily work by project. Scan status, then open a task to see who acts next.</p>
         </div>
+        {onCreateProject && <button type="button" className="btn btn-primary view-head-action" onClick={onCreateProject}>+ New project</button>}
       </header>
       <div className="filters" role="group" aria-label="Filters">
         <Select value={status} onChange={event => setStatus(event.target.value as typeof status)} aria-label="Status">
@@ -56,7 +64,9 @@ export function CompanyWork({ quest, onOpen }: { quest: Quest; onOpen: (id: stri
         <section key={group.id || 'none'} className="group">
           <h3 className="group-title">{group.name} <span>{group.tasks.length} {group.tasks.length === 1 ? 'task' : 'tasks'}</span></h3>
           <p className="muted">{summary}{project || who || status !== 'open' ? ' · filtered view' : ''}</p>
-          <div className="rows">{group.tasks.map(task => <TaskRow key={task.id} quest={quest} task={task} priority={task.id === next?.id} onOpen={onOpen} />)}</div>
+          {group.tasks.length === 0
+            ? <p className="muted">No tasks yet.{onAddTask && <> <button type="button" className="link" onClick={() => onAddTask(group.id)}>Add the first task</button></>}</p>
+            : <div className="rows">{group.tasks.map(task => <TaskRow key={task.id} quest={quest} task={task} priority={task.id === next?.id} onOpen={onOpen} />)}</div>}
         </section>
       ); })}
     </div>

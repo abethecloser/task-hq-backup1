@@ -14,10 +14,12 @@ const STAGES = [['working', 'In progress'], ['review', 'In review'], ['blocked',
 /** Projects and Team Overview: task completion for a selection, the projects and people behind it, and what needs a hand next.
  * Standard (ring and lists) is the default; Living shows the same records as packed project bubbles. Both share one selection:
  * pick a project or person, pick another to switch, pick it again to clear. */
-export function ProjectTeam({ quest, company, onOpen, focusTaskId = null, onClearFocus }: {
+export function ProjectTeam({ quest, company, onOpen, focusTaskId = null, onClearFocus, onReports }: {
   quest: Quest; company: boolean; onOpen: (taskId: string) => void;
   /** A task the dock is reading; its project is focused in Living until cleared. */
   focusTaskId?: string | null; onClearFocus?: () => void;
+  /** Opens the full Reports page. */
+  onReports?: () => void;
 }) {
   const { state, actor, now } = quest;
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -127,6 +129,7 @@ export function ProjectTeam({ quest, company, onOpen, focusTaskId = null, onClea
           </ul>}
         </div>
       </div>
+      {onReports && <footer className="pt-foot"><button type="button" className="hd-more pt-reports" onClick={onReports}>View reports<svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></button></footer>}
     </section>
   );
 }

@@ -523,6 +523,15 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       if (action.personId) d.s.workLabels = { ...state.workLabels, [action.personId]: label };
       return commit(d, ctx, newId, { kind: 'policy', text: `${me.name} saved work label “${label}”. Permissions unchanged.`, message: 'Work label saved; permissions unchanged.' });
     }
+    case 'project/create': {
+      if (!managerish) return fail(input, 'Only a supervisor, admin or owner can create projects.');
+      const name = clip(action.name, 80);
+      if (!name) return fail(input, 'Name the project.');
+      if (state.projects.some(project => project.name.toLowerCase() === name.toLowerCase())) return fail(input, `A project named “${name}” already exists.`);
+      if (state.projects.length >= 200) return fail(input, 'Keep it to 200 projects.');
+      d.s.projects = [...state.projects, { id: newId(), name }];
+      return commit(d, ctx, newId, { kind: 'policy', text: `${me.name} created project “${name}”.`, message: `Project “${name}” created.` });
+    }
     case 'lead/tags': {
       const lead = leadById(state, action.id);
       if (!lead) return fail(input, 'That relationship no longer exists.');

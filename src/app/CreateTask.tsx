@@ -27,7 +27,7 @@ function forgetDraft(key: string) { try { sessionStorage.removeItem(key); } catc
 export function hasCreateDraft(tenant: string, actor: string) { return !!readDraft(draftKey(tenant, actor)); }
 export function discardCreateDraft(tenant: string, actor: string) { forgetDraft(draftKey(tenant, actor)); }
 
-export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; due?: string; onClose: () => void; onCreated: (id: string) => void }) {
+export function CreateTask({ quest, due, projectId, onClose, onCreated }: { quest: Quest; due?: string; projectId?: string; onClose: () => void; onCreated: (id: string) => void }) {
   const { state, actor, now, dispatch } = quest;
   // Managers delegate: creating work doesn't make them its owner by default.
   const delegates = hasRole(state, actor, ['manager']);
@@ -36,8 +36,8 @@ export function CreateTask({ quest, due, onClose, onCreated }: { quest: Quest; d
   const owners = assigns ? state : { ...state, people: state.people.filter(item => item.id === actor) };
   const storageKey = draftKey(state.workspace.tenantId, actor);
   const [saved] = useState(() => readDraft(storageKey));
-  const [draft, setDraft] = useState<NewTask>(() => saved ? { ...saved.draft, ...(due ? { due } : {}) }
-    : { title: '', owner: delegates ? '' : actor, due: due ?? localDate(now), priority: 'normal', nextAction: '', approver: '', nextOwner: '', projectId: '', dependsOn: [] });
+  const [draft, setDraft] = useState<NewTask>(() => saved ? { ...saved.draft, ...(due ? { due } : {}), ...(projectId ? { projectId } : {}) }
+    : { title: '', owner: delegates ? '' : actor, due: due ?? localDate(now), priority: 'normal', nextAction: '', approver: '', nextOwner: '', projectId: projectId ?? '', dependsOn: [] });
   const manual = useRef(new Set<keyof NewTask>(saved?.manual ?? []));
   const set = (changes: Partial<NewTask>) => {
     for (const key of Object.keys(changes) as (keyof NewTask)[]) manual.current.add(key);

@@ -16,11 +16,11 @@ test('unfinished work is labeled as preview instead of being hidden or presented
 });
 
 test('Reports is an alias of the owner overview: old links still open one destination', () => {
-  assert.equal(canonicalPage('reports'), 'executive');
+  assert.equal(canonicalPage('reports'), 'reports');
   assert.equal(canonicalPage('executive'), 'executive');
   assert.equal(canonicalPage('all-tasks'), 'all-tasks');
   assert.ok(APP_PAGE_IDS.includes('reports'), 'the old id stays a valid destination');
-  assert.ok(!EVERYDAY_PAGES.includes('reports'), 'but it is not listed twice in navigation');
+  assert.ok(EVERYDAY_PAGES.includes('reports'), 'Reports is an everyday page with its own view');
 });
 
 test('everyday and preview navigation together cover every page exactly once, aliases aside', () => {

@@ -15,7 +15,7 @@ export interface TopTab { id: string; label: string; count?: number; hot: boolea
 
 export interface TopSection { id: string; label: string; active: boolean; count?: number; hot?: boolean }
 
-export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title, mode, tabs, onTab, search, onAsk, onBell, onMenu, menuOpen, calendarAccess, sections, onSection, onCreate }: {
+export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title, mode, search, onAsk, onBell, onMenu, menuOpen, calendarAccess, sections, onSection, onCreate }: {
   calendarAccess?: ReactNode;
   /** The primary sections, as a top navigation. Wide screens only; phones use the tab bar. */
   sections?: TopSection[]; onSection?: (id: string) => void;
@@ -23,10 +23,9 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title
   onCreate?: () => void;
   quest: Quest; demo: boolean; focused: boolean; unread: number;
   askOpen: boolean; notifOpen: boolean; /** The current section's name. */ title: string;
-  /** Task filters; only passed while Tasks is the page. */ tabs?: TopTab[];
   /** Optional workspace grouping control. It does not change page availability. */
   mode?: { current: 'work' | 'manage'; onChange: (next: 'work' | 'manage') => void };
-  onTab: (id: string) => void; /** The app-wide search field (TopSearch). */ search: ReactNode; onAsk: () => void; onBell: () => void; onMenu: () => void; menuOpen: boolean;
+  /** The app-wide search field (TopSearch). */ search: ReactNode; onAsk: () => void; onBell: () => void; onMenu: () => void; menuOpen: boolean;
 }) {
   // Side panels open below the bar, so it never moves: publish where the bar ends.
   const bar = useRef<HTMLElement>(null);
@@ -41,7 +40,7 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title
     return () => { observer.disconnect(); window.removeEventListener('scroll', publish); };
   }, []);
   return (
-    <header ref={bar} className={`topbar ${sections ? 'has-sections' : ''} ${tabs ? 'has-sub' : ''}`}>
+    <header ref={bar} className={`topbar ${sections ? 'has-sections' : ''} `}>
       <button type="button" className="icon-btn menu-btn" aria-label="Open navigation" aria-controls="quest-sidebar" aria-expanded={menuOpen} onClick={onMenu}><TopIcon d="M4 6h16M4 12h16M4 18h16" /></button>
       {calendarAccess}
       {demo && <span className="demo-flag" title="Synthetic people and data on this device. Not company work.">Demo · synthetic</span>}
@@ -70,7 +69,6 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title
         {/* New task closes the row: the primary action sits at the far right. */}
         {onCreate && <button type="button" className="btn btn-primary top-create" onClick={onCreate} title="New task (N)" aria-label="New task"><TopIcon d="M12 5v14M5 12h14" /><span>New task</span></button>}
       </div>
-      {tabs && <div className="topbar-sub"><TaskFilters tabs={tabs} onTab={onTab} /></div>}
     </header>
   );
 }
@@ -140,7 +138,8 @@ function TopIcon({ d, small = false }: { d: string; small?: boolean }) {
   return <svg className={`icon ${small ? 'icon-sm' : ''}`} viewBox="0 0 24 24" aria-hidden="true"><path d={d} /></svg>;
 }
 
-function TaskFilters({ tabs, onTab }: { tabs: TopTab[]; onTab: (id: string) => void }) {
+/** Task lens filters (All · Today · Overdue · Urgent · More). Shown in the Tasks page header, beside My work / Company. */
+export function TaskFilters({ tabs, onTab }: { tabs: TopTab[]; onTab: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const { primary, more, activeInMore } = splitFilters(tabs);
   const tabButton = (tab: TopTab) => (
