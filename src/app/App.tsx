@@ -30,7 +30,7 @@ import { ClientWorkspace } from './ClientWorkspace.tsx';
 import { CreateProject, canCreateProject } from './CreateProject.tsx';
 import { Reports } from './Reports.tsx';
 import { ProjectRoom } from './ProjectRoom.tsx';
-import { CreateTask, discardCreateDraft, hasCreateDraft } from './CreateTask.tsx';
+import { DraftTask, discardTaskDraft, hasTaskDraft } from './DraftTask.tsx';
 import { ExecutiveDesk } from './ExecutiveDesk.tsx';
 import { Activity, Settings } from './Settings.tsx';
 import { Home } from './Home.tsx';
@@ -144,7 +144,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   // Project room open on Projects (#/company-work/<projectId>).
   const [roomId, setRoomId] = useState<string | null>(initial.roomId);
   // A draft left open before a reload reopens the dialog where it was.
-  const [creating, setCreating] = useState(() => hasCreateDraft(state.workspace.tenantId, actor));
+  const [creating, setCreating] = useState(() => hasTaskDraft(state.workspace.tenantId, actor));
   const [creatingProject, setCreatingProject] = useState(false);
   // A project chosen for the next task created (from Projects → Add the first task).
   const [createProjectId, setCreateProjectId] = useState<string | undefined>();
@@ -196,7 +196,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { setTaskId(null); setCreating(open => { if (open) discardCreateDraft(state.workspace.tenantId, actor); return false; }); collapseSidebar(); }
+      if (event.key === 'Escape') { setTaskId(null); setCreating(open => { if (open) discardTaskDraft(state.workspace.tenantId, actor); return false; }); collapseSidebar(); }
       if (event.key === 'n' && !event.metaKey && !event.ctrlKey && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement)) { event.preventDefault(); setCreating(true); }
     };
     window.addEventListener('keydown', onKey);
@@ -520,8 +520,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             {attendanceDemo && <ShiftBridge quest={quest} />}
           </details>}
           {!(selected && contextAllowed) && PREVIEW_VIEWS.includes(view) && view !== 'agents' && <PreviewNotice view={view} live={!!live} />}
-          {creating && canCreate ? <CreateTask inline quest={quest} due={createDue} projectId={createProjectId}
-              onClose={() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); }}
+          {creating && canCreate ? <DraftTask key="draft-task" quest={quest} due={createDue} projectId={createProjectId}
+              onCancel={() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); }}
               onCreated={id => evolve(() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); openTask(id); })} />
           : selected && contextAllowed ? <TaskPage key={selected.id} quest={quest} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)}
             onOpenDock={hasDock ? id => { setDockTask({ id, nonce: Date.now() }); setDock(current => (current.snap === 'collapsed' ? withSnap(current, current.last) : current)); } : undefined} />
