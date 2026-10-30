@@ -711,3 +711,28 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .task-conversation-feed { min-width: 0; }
 .task-conversation.is-compact .tp-tabs button { font-size: 14px; }
 @container (max-width: 560px) { .task-conversation .task-comment-form { grid-template-columns: minmax(0, 1fr); } }
+
+/* People & progress (center): responsibility and primary action first, quick actions as chips, one roster. */
+.tp-grid.is-flow.is-two { grid-template-columns: minmax(260px, 1fr) minmax(0, 1.35fr); grid-template-areas: "work momentum"; }
+@container (max-width: 900px) { .tp-grid.is-flow.is-two { grid-template-columns: minmax(0, 1fr); grid-template-areas: "momentum" "work"; } }
+.pp { display: grid; gap: 14px; min-width: 0; }
+.pp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pp-head .ctx-label { margin: 0; }
+:root .tp-quick.is-compact { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+:root .tp-quick.is-compact .tp-quick-list { display: flex; flex-wrap: wrap; gap: 8px; }
+:root .tp-quick.is-compact .tp-quick-btn { min-height: 36px; padding: 0 12px; border-radius: 999px; font-size: 14px; }
+.pp-roster { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 18px; margin: 0; padding: 4px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card, #fff); }
+.pp-role { display: grid; gap: 4px; min-width: 0; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.pp-role.is-informed { grid-column: 1 / -1; border-bottom: 0; }
+.pp-role dt { display: flex; align-items: baseline; gap: 8px; color: var(--ink-2); font-size: 13px; font-weight: 750; letter-spacing: .02em; }
+.pp-role dt small { color: var(--muted); font-size: 12px; font-weight: 550; }
+.pp-role dd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; margin: 0; font-size: 15px; font-weight: 650; }
+.pp-who { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.pp-empty { color: var(--muted); font-weight: 500; }
+.pp-watchers { display: flex; flex-wrap: wrap; gap: 6px; }
+.pp-chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 4px 2px 2px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 14px; }
+:root .pp-chip button { width: 20px; height: 20px; min-height: 0; padding: 0; border: 0; border-radius: 50%; background: var(--sunk); color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
+.pp-chip button:hover { color: var(--ink); }
+.pp-role .inline-select { max-width: 100%; }
+/* The roster below names the next handoff and approver; the story line would repeat it. */
+.pp .tp-story-handoff { display: none; }

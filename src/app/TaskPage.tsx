@@ -96,7 +96,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
           : projectName(state, task.projectId) || '—'}</dd></div>
       </dl>
 
-      <div className="tp-grid is-flow">
+      <div className="tp-grid is-flow is-two">
         <div className="tp-col tp-details tp-work" aria-label="Work">
           <section className="tp-card" aria-labelledby="tp-brief">
             <h2 id="tp-brief" className="ctx-label">Brief</h2>
@@ -153,38 +153,9 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
           </details>
         </div>
 
-        <div className="tp-col tp-momentum" aria-label="Who acts next">
-          <ResponsibilityCard quest={quest} task={task} onOpen={onOpen} />
+        <div className="tp-col tp-momentum" aria-label="People and progress">
+          <PeopleProgress quest={quest} task={task} editable={editable} reviewer={reviewer} onOpen={onOpen} />
         </div>
-        <aside className="tp-col tp-side" aria-label="Actions, people and handoffs">
-          {!reviewer && <QuickActions quest={quest} task={task} />}
-          <section className="tp-card" aria-labelledby="tp-people">
-            <h2 id="tp-people" className="ctx-label">Watchers <span>{task.watchers.length}</span></h2>
-            <ul className="tp-watchers">
-              {task.watchers.map(id => (
-                <li key={id}><Avatar state={state} id={id} size="sm" />{id === actor ? 'You' : nameOf(state, id, 'Former member')}
-                  {(editable || id === actor) && <button type="button" className="icon-btn" aria-label={`Remove ${id === actor ? 'yourself' : nameOf(state, id)} from watchers`} onClick={() => void update({ watchers: task.watchers.filter(item => item !== id) })}>×</button>}
-                </li>
-              ))}
-              {task.watchers.length === 0 && <li className="muted">Nobody is watching yet.</li>}
-            </ul>
-            {editable && people.some(item => !task.watchers.includes(item.id)) && (
-              <Select className="inline-select" value="" aria-label="Add a watcher" onChange={event => { if (event.target.value) void update({ watchers: [...task.watchers, event.target.value] }); }}>
-                <option value="">+ Add a watcher</option>
-                {people.filter(item => !task.watchers.includes(item.id)).map(item => <option key={item.id} value={item.id}>{item.id === actor ? `${item.name} (you)` : item.name}</option>)}
-              </Select>
-            )}
-            {!editable && !reviewer && <p className="muted">Watch this task to follow its comments and changes.</p>}
-          </section>
-          <section className="tp-card tp-routing" aria-labelledby="tp-handoffs">
-            <h2 id="tp-handoffs" className="ctx-label">Handoffs</h2>
-            <dl className="tp-people">
-              <div><dt>Next-step owner</dt><dd>{editable ? <PersonSelect state={state} label="Next-step owner" value={task.nextOwner} onChange={id => void update({ nextOwner: id })} /> : task.nextOwner ? nameOf(state, task.nextOwner) : '—'}</dd></div>
-              <div><dt>Approver</dt><dd>{editable ? <PersonSelect state={state} label="Approver" value={task.approver} emptyLabel="No approval needed" onChange={id => void update({ approver: id })} /> : task.approver ? nameOf(state, task.approver) : 'None'}</dd></div>
-              {(editable || task.decisionOwner) && <div><dt>Decision owner</dt><dd>{editable ? <PersonSelect state={state} label="Decision owner" value={task.decisionOwner} onChange={id => void update({ decisionOwner: id })} /> : nameOf(state, task.decisionOwner)}</dd></div>}
-            </dl>
-          </section>
-        </aside>
       </div>
 
       <section className="tp-collab" aria-labelledby="tp-collab-title">
@@ -197,6 +168,55 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
         <TaskConversation quest={quest} taskId={task.id} />
       </section>
     </article>
+  );
+}
+
+/** People & progress: who acts now and the primary action, quick actions, and every task role in one
+ * roster: owner, next handoff, approver, decision owner and the people kept informed. Names read at a
+ * glance; "Edit roles" reveals the same selects (same task/update actions and permissions as before). */
+function PeopleProgress({ quest, task, editable, reviewer, onOpen }: { quest: Quest; task: Task; editable: boolean; reviewer: boolean; onOpen: (id: string) => void }) {
+  const { state, actor, dispatch } = quest;
+  const [editing, setEditing] = useState(false);
+  const update = (changes: Partial<EditableTaskFields>) => dispatch({ type: 'task/update', id: task.id, changes });
+  const people = state.people.filter(item => item.role !== 'reviewer');
+  const who = (id: string, empty: string) => id ? <span className="pp-who"><Avatar state={state} id={id} size="sm" />{id === actor ? 'You' : nameOf(state, id, 'Former member')}</span> : <span className="pp-empty">{empty}</span>;
+  const role = (label: string, hint: string, value: string, empty: string, field: 'nextOwner' | 'approver' | 'decisionOwner', emptyLabel?: string) => (
+    <div className="pp-role" role="listitem">
+      <dt>{label}<small>{hint}</small></dt>
+      <dd>{editing && editable ? <PersonSelect state={state} label={label} value={value} emptyLabel={emptyLabel} onChange={id => void update({ [field]: id })} /> : who(value, empty)}</dd>
+    </div>
+  );
+  return (
+    <section className="pp" aria-labelledby="pp-title">
+      <header className="pp-head">
+        <h2 id="pp-title" className="ctx-label">People &amp; progress</h2>
+        {editable && <button type="button" className="hd-more" aria-pressed={editing} onClick={() => setEditing(value => !value)}>{editing ? 'Done editing' : 'Edit roles'}</button>}
+      </header>
+      <ResponsibilityCard quest={quest} task={task} onOpen={onOpen} />
+      {!reviewer && <QuickActions quest={quest} task={task} compact />}
+      <dl className="pp-roster" role="list" aria-label="Task roles">
+        <div className="pp-role" role="listitem"><dt>Owns the work<small>Assigned</small></dt><dd>{who(task.owner, 'Unassigned')}</dd></div>
+        {role('Next handoff', 'Receives it when done', task.nextOwner, 'Nobody yet', 'nextOwner')}
+        {role('Approves', 'Signs off the work', task.approver, 'No approval needed', 'approver', 'No approval needed')}
+        {(editable || task.decisionOwner) && role('Decides', 'Makes the call if needed', task.decisionOwner, 'Nobody', 'decisionOwner')}
+        <div className="pp-role is-informed" role="listitem">
+          <dt>Kept informed<small>{task.watchers.length ? `${task.watchers.length} watching` : 'Watchers'}</small></dt>
+          <dd>
+            <span className="pp-watchers">
+              {task.watchers.map(id => <span key={id} className="pp-chip"><Avatar state={state} id={id} size="sm" />{id === actor ? 'You' : nameOf(state, id, 'Former member')}
+                {(editable || id === actor) && <button type="button" aria-label={`Remove ${id === actor ? 'yourself' : nameOf(state, id)} from watchers`} onClick={() => void update({ watchers: task.watchers.filter(item => item !== id) })}>×</button>}</span>)}
+              {task.watchers.length === 0 && <span className="pp-empty">Nobody yet</span>}
+            </span>
+            {editing && editable && people.some(item => !task.watchers.includes(item.id)) && (
+              <Select className="inline-select" value="" aria-label="Add a watcher" onChange={event => { if (event.target.value) void update({ watchers: [...task.watchers, event.target.value] }); }}>
+                <option value="">+ Add a watcher</option>
+                {people.filter(item => !task.watchers.includes(item.id)).map(item => <option key={item.id} value={item.id}>{item.id === actor ? `${item.name} (you)` : item.name}</option>)}
+              </Select>
+            )}
+          </dd>
+        </div>
+      </dl>
+    </section>
   );
 }
 
@@ -227,7 +247,7 @@ function Checklist({ quest, task, editable }: { quest: Quest; task: Task; editab
 
 /** Quick actions, always visible: ask a person for help, report being stuck to the team, nudge the
  * assignee, clear a blocker, or clock in. Each is an engine action, so the usual permissions apply. */
-function QuickActions({ quest, task }: { quest: Quest; task: Task }) {
+function QuickActions({ quest, task, compact = false }: { quest: Quest; task: Task; compact?: boolean }) {
   const { state, actor, dispatch } = quest;
   const workday = useWorkday();
   const [form, setForm] = useState<'help' | 'stuck' | null>(null);
@@ -242,8 +262,8 @@ function QuickActions({ quest, task }: { quest: Quest; task: Task }) {
   };
   if (!open && !workday) return null;
   return (
-    <section className="tp-card tp-quick" aria-labelledby="tp-quick-title">
-      <h2 id="tp-quick-title" className="ctx-label">Quick actions</h2>
+    <section className={`tp-card tp-quick ${compact ? 'is-compact' : ''}`} aria-labelledby="tp-quick-title">
+      <h2 id="tp-quick-title" className={compact ? 'sr-only' : 'ctx-label'}>Quick actions</h2>
       <div className="tp-quick-list">
         {workday && <button type="button" className="tp-quick-btn" onClick={workday.open}><QIcon d="M8 5v14l11-7z" />{workday.shift ? 'On shift · open workday' : 'Clock in on this task'}</button>}
         {open && owner && <button type="button" className="tp-quick-btn" onClick={() => void run({ type: 'task/comment', id: task.id, note: `Nudge for ${firstName(state, owner)}: checking in on this. Where does it stand?` })}><QIcon d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 21h4" />Nudge {firstName(state, owner)}</button>}
