@@ -5,8 +5,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
 import type { EditableTaskFields, Task } from '../core/contract.ts';
-import { canEditTask, canReopenTask, lockedTaskFields } from '../core/permissions.ts';
-import { blockingDeps, dependents, firstName, isOpen, isOverdue, leadById, moveForwardPlan, nameOf, projectName, taskById } from '../core/selectors.ts';
+import { STATUS_LABELS } from '../core/contract.ts';
+import { canArchiveLegacy, canEditTask, canReopenTask, lockedTaskFields } from '../core/permissions.ts';
+import { blockingDeps, coordinates, dependents, firstName, isLegacyArchived, isOpen, isOverdue, leadById, moveForwardPlan, nameOf, projectName, taskById } from '../core/selectors.ts';
 import { completionDetails } from '../core/completed.ts';
 import { MAX_ITEMS, addItem, removeItem, splitChecklist, toggleItem, withNotes } from '../core/checklist.ts';
 import { Avatar, PersonSelect, TaskTags } from '../ui/components.tsx';
@@ -42,7 +43,8 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
 
   const me = state.people.find(item => item.id === actor);
   const reviewer = me?.role === 'reviewer';
-  const editable = draft ? !reviewer : canEditTask(state, task, actor);
+  const legacy = isLegacyArchived(task);
+  const editable = draft ? !reviewer : canEditTask(state, task, actor) && !legacy;
   const locked = lockedTaskFields(state, task, actor);
   const update = (changes: Partial<EditableTaskFields>) => dispatch({ type: 'task/update', id: task.id, changes });
   const saveText = (key: 'title' | 'nextAction' | 'description' | 'waitingOn', value: string) => { if (value.trim() !== task[key]) void update({ [key]: value.trim() }); };
@@ -70,7 +72,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
         <span className={`ctx-verify ${quest.backend.kind === 'live' ? 'is-live' : ''}`} title={quest.backend.kind === 'live' ? 'Every change is checked again by the server before it is saved.' : 'Demo: every change is checked by the same rules engine, on this device.'}>{quest.backend.kind === 'live' ? 'Server-enforced' : 'Local · engine-checked'}</span>
         <span className="tp-bar-actions">
           {draft && <button type="button" className="btn btn-primary btn-sm" disabled={!draft.ready || draft.busy} aria-busy={draft.busy} onClick={draft.onCreate}>{draft.busy ? 'Creating…' : 'Create task'}</button>}
-          {!draft && !reviewer && (
+          {!draft && !reviewer && !legacy && (
             <button type="button" className={`btn btn-sm ${watching ? 'is-on' : 'btn-ghost'} tp-watch`} aria-pressed={watching} onClick={() => void update({ watchers: toggle(task.watchers, actor) })}>
               <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /></svg>{watching ? 'Watching' : 'Watch'}
             </button>
@@ -89,6 +91,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
           : <p className="ctx-sub">Created by {nameOf(state, task.createdBy, 'someone')}{created ? ` · ${when(created.at)}` : ''} · updated {when(task.updatedAt)}</p>}
         <div className="ctx-tags"><TaskTags state={state} task={task} now={quest.now} /></div>
       </header>
+      {legacy && <LegacyArchived quest={quest} task={task} />}
 
 
       <dl className="tp-facts" aria-label="Status, assigned, priority and due date">
@@ -141,6 +144,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
           <details className="tp-card drawer-details">
             <summary>More details <small>lifecycle{editable ? ', time, tags, dependencies' : ''}</small></summary>
             <LifecycleReference task={task} />
+            {!draft && <ArchiveLegacy quest={quest} task={task} />}
             {editable && <>
                 <div className="roles">
                   {quest.backend.supports?.taskTaxonomy !== false && <>
@@ -260,7 +264,7 @@ function QuickActions({ quest, task, compact = false }: { quest: Quest; task: Ta
   const [note, setNote] = useState('');
   const [helper, setHelper] = useState('');
   const [error, setError] = useState('');
-  const open = task.status !== 'done';
+  const open = isOpen(task);
   const owner = task.owner && task.owner !== actor ? task.owner : '';
   const run = async (action: Parameters<typeof dispatch>[0]) => {
     const result = await dispatch(action);
@@ -288,6 +292,40 @@ function QuickActions({ quest, task, compact = false }: { quest: Quest; task: Ta
   );
 }
 const QIcon = ({ d }: { d: string }) => <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={d} /></svg>;
+
+/** Unfinished work archived as legacy: not completed, status kept, restorable by a coordinator. */
+function LegacyArchived({ quest, task }: { quest: Quest; task: Task }) {
+  const { state, actor, dispatch } = quest;
+  const [error, setError] = useState('');
+  const canRestore = coordinates(state.people.find(item => item.id === actor)) && quest.backend.supports?.legacyArchive !== false;
+  const restore = async () => { const result = await dispatch({ type: 'task/unarchive', id: task.id }); setError(result.ok ? '' : result.error); };
+  return (
+    <div className="ctx-done is-archived tp-legacy" role="status">
+      <p className="ctx-done-state"><b>Archived as legacy · not completed</b></p>
+      <p className="muted">Status kept: {STATUS_LABELS[task.status]}. Archived {when(task.archivedAt!)}{task.archivedBy ? ` · ${nameOf(state, task.archivedBy, 'someone')}` : ''}. Out of active work; its comments and history are kept.</p>
+      {canRestore && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void restore()}>Restore from archive</button>}
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </div>
+  );
+}
+
+/** Coordinator-only: take unfinished work out of active views without marking it done. */
+function ArchiveLegacy({ quest, task }: { quest: Quest; task: Task }) {
+  const { state, actor, dispatch } = quest;
+  const [confirm, setConfirm] = useState(false);
+  const [error, setError] = useState('');
+  if (!canArchiveLegacy(state, task, actor) || quest.backend.supports?.legacyArchive === false) return null;
+  const archive = async () => { const result = await dispatch({ type: 'task/archive', id: task.id, reason: 'legacy' }); setError(result.ok ? '' : result.error); if (result.ok) setConfirm(false); };
+  return (
+    <div className="tp-legacy-action">
+      {confirm
+        ? <p className="offer-form-actions"><span className="muted">Archive as legacy? It is not marked done; its status ({STATUS_LABELS[task.status]}) and history are kept.</span>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirm(false)}>Cancel</button><button type="button" className="btn btn-primary btn-sm" onClick={() => void archive()}>Archive as legacy</button></p>
+        : <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirm(true)}>Archive as legacy…</button>}
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </div>
+  );
+}
 
 /** Completed work: who finished it, and the authorized way to reopen it. */
 function Completed({ quest, task }: { quest: Quest; task: Task }) {

@@ -12,6 +12,8 @@ import type { PresetId, Workspace } from './workspace.ts';
 export const SCHEMA_VERSION = 2;
 
 export type TaskStatus = 'ready' | 'working' | 'blocked' | 'review' | 'done';
+/** Why unfinished work was archived without being completed. */
+export type ArchiveReason = 'legacy';
 export type Priority = 'normal' | 'high';
 /** 'reviewer' is a product reviewer: feedback only, never operational work. */
 export type Role = 'manager' | 'coordinator' | 'field' | 'sales' | 'estimator' | 'reviewer';
@@ -84,9 +86,12 @@ export interface Task {
   completedAt: number | null;
   /** Who finished it (saved with the completion; older records fall back to the event log). */
   completedBy?: string | null;
-  /** Archived work stays in history but leaves the default lists. Only completed work can be archived. */
+  /** Archived work stays in history but leaves the default lists. Completed work can be archived by
+   * its owner, approver or a coordinator; unfinished work only by a coordinator, as `legacy`, which
+   * keeps its status so a restore returns it exactly as it was. */
   archivedAt?: number | null;
   archivedBy?: string | null;
+  archivedReason?: ArchiveReason | null;
 }
 
 export type ContactChannel = 'phone' | 'text' | 'email' | 'in-person';
@@ -367,8 +372,9 @@ export type ActionBody =
   | { type: 'task/handoff'; id: string; to: string; note?: string }
   /** Completed work back to Ready (owner, approver, or a coordinator). */
   | { type: 'task/reopen'; id: string; note: string }
-  /** Completed work out of the default lists, history kept (same people who may reopen). */
-  | { type: 'task/archive'; id: string }
+  /** Completed work out of the default lists, history kept (same people who may reopen). With reason
+   * `legacy`, a coordinator archives unfinished work without completing it; its status is kept. */
+  | { type: 'task/archive'; id: string; reason?: ArchiveReason }
   | { type: 'task/unarchive'; id: string }
   | { type: 'ultra/activate'; taskId: string }
   | { type: 'ultra/release'; reason?: string }

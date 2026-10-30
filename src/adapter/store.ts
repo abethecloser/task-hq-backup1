@@ -53,6 +53,8 @@ export interface BackendSupports {
   structuredReferences: boolean;
   /** `project/create`. */
   projectCreate: boolean;
+  /** `task/archive` with reason `legacy`: unfinished work archived without completing it. */
+  legacyArchive: boolean;
 }
 
 export interface QuestBackend {

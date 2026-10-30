@@ -22,7 +22,8 @@ function states(): { name: string; state: QuestState }[] {
   let granted = must(focus, 'alex', { type: 'grant/request', section: 'company-work', reason: 'Need the staging route' });
   granted = must(granted, 'jordan', { type: 'grant/decide', id: granted.grants[0]!.id, approve: true });
   const unowned = must(base, 'maya', { type: 'task/create', task: { title: 'Unowned check', owner: '' } });
-  return [{ name: 'seed', state: base }, { name: 'after approval', state: done }, { name: 'critical focus', state: focus }, { name: 'focus + access granted', state: granted }, { name: 'unowned work', state: unowned }];
+  const legacy = must(base, 'jordan', { type: 'task/archive', id: 'staging-area', reason: 'legacy' }); // unfinished, archived as legacy
+  return [{ name: 'seed', state: base }, { name: 'after approval', state: done }, { name: 'critical focus', state: focus }, { name: 'focus + access granted', state: granted }, { name: 'unowned work', state: unowned }, { name: 'legacy archived', state: legacy }];
 }
 
 /** UI stricter than the engine, on purpose. Each entry is reported, never a failure. */

@@ -33,4 +33,19 @@ To roll back, redeploy the `v3-original/` files as `dispatch` (same layout, veri
 - The app sends `project/create` only after a reply advertises contract 7. Before that it refuses without sending ("needs the server update (dispatch v7)").
 - Deploy: the files in `v7/` as `dispatch`, verify_jwt true. Read them back after deploying.
 - Roll back: redeploy `v6/`. v6 refuses `project/create` and leaves stored projects untouched.
-- After deploying, freeze `v7/` and start further changes as `v8/`.
+- After deploying, freeze `v7/` and start further changes as `v8/`. (Deployed; `v7/` is frozen.)
+
+## v8 candidate (not deployed)
+
+- `v8/`: v7's `index.ts`/`logic.ts` with `CONTRACT = 8` and the current engine (`v8/core` must equal `src/core`; `v8.test.ts` checks it).
+- Adds `task/archive` `{ id, reason: 'legacy' }` for unfinished work.
+  - Supervisors, admins and owners only. Members and reviewers are refused.
+  - The task keeps its status (it is not marked done, and no completedAt/completedBy is written). `archivedAt`, `archivedBy` and `archivedReason: 'legacy'` are recorded, plus one event: "… archived “X” as legacy data (not completed)."
+  - `task/unarchive` returns it to the same status. Until then only comments are accepted on it.
+  - Completed-work archiving is unchanged.
+  - Archived unfinished work is no longer open (`isOpen`), so it leaves overdue counts, dependencies, lists and reports; the app's active views read the workspace without it.
+- No migration or new database function; the fields are stored on the task in `workspace_state`.
+- The app sends the legacy reason only after a reply advertises contract 8. Before that it refuses without sending ("dispatch v8").
+- Deploy: the files in `v8/` as `dispatch`, verify_jwt true. Read them back after deploying.
+- Roll back: redeploy `v7/`. v7 refuses legacy archives, and still reads and writes state that has them (legacy tasks then show as archived; restoring one needs v8).
+- After deploying, freeze `v8/` and start further changes as `v9/`.

@@ -13,7 +13,7 @@ import type { Lens, RegistryQuery } from '../core/registry.ts';
 import { LEGACY_LENSES, LENSES, LENS_LABELS, completedQuery, isCompletedQuery, lensCounts, queryTasks } from '../core/registry.ts';
 import { canCreateTask } from '../core/permissions.ts';
 import { insights, insightsFor } from '../core/rules.ts';
-import { activeGrant, activeLeads, inFocus, leadBucket, myTasks, person, taskById } from '../core/selectors.ts';
+import { activeGrant, activeLeads, inFocus, leadBucket, myTasks, person, taskById, withoutLegacyArchived } from '../core/selectors.ts';
 import { LookSwitch, ModeChip, BrandMark, ToastBar, CtaArrow } from '../ui/components.tsx';
 import { useQuest } from '../ui/useQuest.ts';
 import type { Quest } from '../ui/useQuest.ts';
@@ -133,7 +133,11 @@ export default function App({ onExitDemo, backend }: { onExitDemo?: () => void; 
   return <FeedbackProvider feedback={quest.feedback}><ReferenceProvider scope={referenceScope(quest.state, quest.actor)} drafts={quest.referenceDrafts}><Shell quest={quest as Quest} onExitDemo={onExitDemo} /></ReferenceProvider></FeedbackProvider>;
 }
 
-function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void }) {
+function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => void }) {
+  // Work archived as legacy keeps its status, so every active view (Home, Calendar, Reports, project
+  // rooms, the dock, counts) reads the workspace without it. The task page, the Tasks registry (its
+  // Archived filter), search and activity read the whole record.
+  const quest = useMemo(() => ({ ...whole, state: withoutLegacyArchived(whole.state) }), [whole]);
   const { state, actor, now, dispatch } = quest;
   const live = useLive();
   const feedbackOn = FEEDBACK_ON;
@@ -360,7 +364,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   // Archived modules leave navigation; their routes and data stay (see ARCHIVED_PAGES).
   for (let i = navigation.length - 1; i >= 0; i--) if (ARCHIVED_PAGES.includes(navigation[i]!.id as AppPageId)) navigation.splice(i, 1);
 
-  const selected = taskId ? taskById(state, taskId) : undefined;
+  const selected = taskId ? taskById(whole.state, taskId) : undefined;
   const contextAllowed = selected && (!focused || selected.id === state.focus?.taskId || !!grant);
   // The everyday sections sit in the top navigation on wide screens; the rail keeps the rest.
   // Phones keep the full list in the menu (the top navigation is hidden there).
@@ -499,7 +503,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
           title={(VIEW_LABELS[view] ?? '').replace(' · Preview', '')}
           sections={topSections} onSection={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
           // No New task in the header: creating lives in the right panel's Task action (and N, and the phone's + button).
-          search={<TopSearch quest={quest} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={toggleAsk} onBell={toggleNotifications}
+          search={<TopSearch quest={whole} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={toggleAsk} onBell={toggleNotifications}
           onMenu={() => {
             restoreCalendar.current = false; setMobileCalendarOpen(false);
             // Wide screens: the menu button opens and closes the left "Your work" panel.
@@ -520,17 +524,17 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             {attendanceDemo && <ShiftBridge quest={quest} />}
           </details>}
           {!(selected && contextAllowed) && PREVIEW_VIEWS.includes(view) && view !== 'agents' && <PreviewNotice view={view} live={!!live} />}
-          {creating && canCreate ? <DraftTask key="draft-task" quest={quest} due={createDue} projectId={createProjectId}
+          {creating && canCreate ? <DraftTask key="draft-task" quest={whole} due={createDue} projectId={createProjectId}
               onCancel={() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); }}
               onCreated={id => evolve(() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); openTask(id); })} />
-          : selected && contextAllowed ? <TaskPage key={selected.id} quest={quest} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)}
+          : selected && contextAllowed ? <TaskPage key={selected.id} quest={whole} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)}
             onOpenDock={hasDock ? id => { setDockTask({ id, nonce: Date.now() }); setDock(current => (current.snap === 'collapsed' ? withSnap(current, current.last) : current)); } : undefined} />
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
                 onOpen={openTask} onOpenLead={openLead} onCreate={() => setCreating(true)}
                 onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} focusTaskId={dockFocus} onClearFocus={() => setDockFocus(null)} onReports={() => go('reports')} />
-            : view === 'all-tasks' ? <AllTasks quest={quest} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} registry={registry}
+            : view === 'all-tasks' ? <AllTasks quest={whole} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} registry={registry}
                 lenses={taskTabs} onLens={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} />
             : view === 'inbox' ? <Inbox quest={quest} data={inboxData} notes={notifications} read={sidebar.read} markRead={sidebar.markRead} onOpenTask={openTask} onOpenLead={openLead} />
             : view === 'workbook' ? <OperationsWorkbook key={`${state.workspace.tenantId}:${actor}`} />
@@ -549,7 +553,7 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
                 onAddTask={canCreate ? projectId => { setCreateProjectId(projectId); setCreating(true); } : undefined} />
             : view === 'needs-attention' ? <NeedsAttention quest={quest} onOpen={openTask} />
             : view === 'leads' ? <SpeedToLead quest={quest} onOpen={openTask} selectedLead={leadId} onSelectLead={id => { setLeadId(id); history.replaceState(null, '', id ? `#/leads/${id}` : '#/leads'); }} />
-            : view === 'activity' ? <Activity quest={quest} onOpen={openTask} />
+            : view === 'activity' ? <Activity quest={whole} onOpen={openTask} />
             : view === 'settings' ? <Settings quest={quest} onPeople={() => go('people')} />
             : <PagePreview title="Agent pilot" detail="This pilot is not connected to an agent service or workspace data. No tasks are sent and no outcomes are generated here." />}
         </section>

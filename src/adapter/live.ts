@@ -14,6 +14,8 @@ const FULL_CONTRACT = 5;
 const ARCHIVE_CONTRACT = 6;
 /** dispatch v7 adds `project/create`. */
 const PROJECT_CONTRACT = 7;
+/** dispatch v8 archives unfinished work as legacy (status kept); v7 refuses it as not completed. */
+const LEGACY_CONTRACT = 8;
 
 // dispatch v4 (verified against the deployed source on 2026-10-20) predates these
 // features; they are refused before sending until a reply advertises the v5 contract.
@@ -80,7 +82,8 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
       const full = contract >= FULL_CONTRACT;
       const archiveGate = (action.type === 'task/archive' || action.type === 'task/unarchive') && contract < ARCHIVE_CONTRACT ? 'Archiving is unavailable on the current shared server. Nothing was sent.' : null;
       const projectGate = action.type === 'project/create' && contract < PROJECT_CONTRACT ? 'Creating projects is unavailable until the server update (dispatch v7) is deployed. Nothing was sent.' : null;
-      const error = archiveGate ?? projectGate ?? (full ? null : unsupported(action));
+      const legacyGate = action.type === 'task/archive' && action.reason === 'legacy' && contract < LEGACY_CONTRACT ? 'Archiving unfinished work is unavailable until the server update (dispatch v8) is deployed. Nothing was sent.' : null;
+      const error = archiveGate ?? projectGate ?? legacyGate ?? (full ? null : unsupported(action));
       if (error) return { ok: false, state: latest!, error };
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const { status, reply } = await call({ op: 'dispatch', action: full ? action : withoutReferenceDrafts(action), expectedRev: latest?.rev });
@@ -118,7 +121,7 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
     async outboxCount() { return 0; },
     get supports(): BackendSupports {
       const full = contract >= FULL_CONTRACT;
-      return { taskTaxonomy: full, taskReopen: full, leadOwnership: full, workLabels: full, structuredReferences: full, taskArchive: contract >= ARCHIVE_CONTRACT, projectCreate: contract >= PROJECT_CONTRACT };
+      return { taskTaxonomy: full, taskReopen: full, leadOwnership: full, workLabels: full, structuredReferences: full, taskArchive: contract >= ARCHIVE_CONTRACT, projectCreate: contract >= PROJECT_CONTRACT, legacyArchive: contract >= LEGACY_CONTRACT };
     },
   };
 }

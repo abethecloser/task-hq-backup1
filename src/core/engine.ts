@@ -8,7 +8,7 @@ import { validateAliases, tagKey, validTag, canonicalTag, referenceScope } from 
 import type {
   AccessGrant, Action, ApplyContext, ApplyResult, EventEffect, EventKind, Lead, Policy, QuestEvent, QuestState, Role, Section, Task, UltraFocus,
 } from './contract.ts';
-import { APP_VERSION, EDITABLE_TASK_FIELDS, FEEDBACK_CATEGORY_LABELS, FEEDBACK_STATUS_LABELS, OPERATIONAL_ROLES, SECTION_LABELS } from './contract.ts';
+import { APP_VERSION, EDITABLE_TASK_FIELDS, FEEDBACK_CATEGORY_LABELS, FEEDBACK_STATUS_LABELS, OPERATIONAL_ROLES, SECTION_LABELS, STATUS_LABELS } from './contract.ts';
 import { blankLead, blankTask, seedState } from './seed.ts';
 import { PRESETS, presetFor } from './workspace.ts';
 import {
@@ -160,7 +160,7 @@ function focusGate(state: QuestState, action: Action, actor: string, now: number
 
 function completeTask(d: Draft, task: Task, ctx: ApplyContext): string[] {
   const notes: string[] = [];
-  putTask(d, touch(task, ctx.now, { status: 'done', completedAt: ctx.now, completedBy: ctx.actor, archivedAt: null, archivedBy: null, blocker: null, ultra: false }));
+  putTask(d, touch(task, ctx.now, { status: 'done', completedAt: ctx.now, completedBy: ctx.actor, archivedAt: null, archivedBy: null, archivedReason: null, blocker: null, ultra: false }));
   for (const item of d.s.tasks) {
     if (!item.dependsOn.includes(task.id) || item.status === 'done') continue;
     const still = blockingDeps(d.s, item);
@@ -276,6 +276,9 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
   const policy = state.policy;
   const isManager = manages(me);
   const managerish = coordinates(me);
+  // Work archived as legacy is out of play until it is restored; comments still reach its history.
+  const target = action.type.startsWith('task/') && 'id' in action ? taskById(state, action.id) : action.type === 'ultra/activate' ? taskById(state, action.taskId) : undefined;
+  if (target?.archivedAt && target.status !== 'done' && !['task/comment', 'task/unarchive', 'task/archive'].includes(action.type)) return fail(input, 'Restore this task from the archive first.');
 
   switch (action.type) {
     case 'task/comment': {
@@ -416,7 +419,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       if (task.owner !== actor && task.approver !== actor && !managerish) return fail(input, 'Only the owner, the approver, or a supervisor, admin or owner can reopen this.');
       const note = action.note.trim();
       if (!note) return fail(input, 'Say why it is being reopened.');
-      putTask(d, touch(task, now, { status: 'ready', completedAt: null, completedBy: null, archivedAt: null, archivedBy: null, nextAction: note }));
+      putTask(d, touch(task, now, { status: 'ready', completedAt: null, completedBy: null, archivedAt: null, archivedBy: null, archivedReason: null, nextAction: note }));
       return commit(d, ctx, newId, { kind: 'task', taskId: task.id, undoable: true, text: `${me.name} reopened “${task.title}”: “${note}”.`, message: `Reopened. ${nameOf(state, task.owner, 'It needs an owner')}${task.owner ? ' has it again' : ''}.` });
     }
 
@@ -424,11 +427,18 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
     case 'task/unarchive': {
       const task = taskById(state, action.id);
       const archiving = action.type === 'task/archive';
-      if (!task || task.status !== 'done') return fail(input, 'Only completed work can be archived.');
-      if (task.owner !== actor && task.approver !== actor && !managerish) return fail(input, 'Only the owner, the approver, or a supervisor, admin or owner can archive this.');
+      if (!task) return fail(input, 'That task no longer exists.');
+      // Unfinished work is archived only as legacy, by a coordinator, and keeps its status: it is not
+      // marked done, and restoring it returns it to exactly where it was.
+      const legacy = archiving ? action.reason === 'legacy' && task.status !== 'done' : task.archivedReason === 'legacy';
+      if (archiving && action.reason !== undefined && action.reason !== 'legacy') return fail(input, 'Unknown archive reason.');
+      if (task.status !== 'done' && !legacy) return fail(input, 'Only completed work can be archived.');
+      if (legacy && !managerish) return fail(input, 'Only a supervisor, admin or owner can archive unfinished work as legacy.');
+      if (!legacy && task.owner !== actor && task.approver !== actor && !managerish) return fail(input, 'Only the owner, the approver, or a supervisor, admin or owner can archive this.');
       if (archiving === !!task.archivedAt) return fail(input, archiving ? 'That task is already archived.' : 'That task is not archived.');
-      putTask(d, touch(task, now, archiving ? { archivedAt: now, archivedBy: actor } : { archivedAt: null, archivedBy: null }));
-      return commit(d, ctx, newId, { kind: 'task', taskId: task.id, undoable: true, text: `${me.name} ${archiving ? 'archived' : 'restored from the archive'} “${task.title}”.`, message: archiving ? 'Archived. It stays in history.' : 'Restored from the archive.' });
+      putTask(d, touch(task, now, archiving ? { archivedAt: now, archivedBy: actor, archivedReason: legacy ? 'legacy' : null } : { archivedAt: null, archivedBy: null, archivedReason: null }));
+      const text = archiving ? `${me.name} archived “${task.title}”${legacy ? ' as legacy data (not completed)' : ''}.` : `${me.name} restored “${task.title}” from the archive${legacy ? ` (${STATUS_LABELS[task.status]})` : ''}.`;
+      return commit(d, ctx, newId, { kind: 'task', taskId: task.id, undoable: true, text, message: archiving ? 'Archived. It stays in history.' : 'Restored from the archive.' });
     }
 
     case 'task/handoff': {

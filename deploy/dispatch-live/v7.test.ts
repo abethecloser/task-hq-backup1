@@ -1,5 +1,5 @@
-// dispatch v7: adds `project/create` for supervisors, admins and owners. v6 (the rollback
-// target) refuses it without touching stored work.
+// dispatch v7 (deployed, frozen): adds `project/create` for supervisors, admins and owners. v6
+// (the rollback target) refuses it without touching stored work. v8 now tracks src/core.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as v6 from './v6/logic.ts';
@@ -47,10 +47,4 @@ test('the v6 rollback refuses project/create and leaves projects untouched', () 
   const r = v6.runAction(s, ORG, members, OWNER, create('Smith Residence') as never, T0);
   assert.equal(r.ok, false);
   assert.deepEqual(s.projects.map(p => p.name), ['General']);
-});
-
-test('v7 core is the current engine, byte for byte', async () => {
-  const { readFileSync, readdirSync } = await import('node:fs');
-  const dir = new URL('./v7/core/', import.meta.url);
-  for (const file of readdirSync(dir)) assert.equal(readFileSync(new URL(file, dir), 'utf8'), readFileSync(new URL(`../../src/core/${file}`, import.meta.url), 'utf8'), `${file} drifted; copy src/core/${file} into deploy/dispatch-live/v7/core`);
 });
