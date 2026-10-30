@@ -5,6 +5,7 @@
 //           (ContextPanel.tsx). Docked beside the canvas when there is room, so
 //           nothing ever covers the work; a drawer on smaller screens.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import type { ReactNode } from 'react';
 import { SECTION_LABELS } from '../core/contract.ts';
 import { decisionDesk } from '../core/executive.ts';
@@ -248,6 +249,14 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
     setTaskId(null);
     setRoomId(null);
     history.pushState(null, '', next === 'leads' && leadId ? `#/leads/${leadId}` : `#/${next}`);
+  }
+  /** Creating → created: the same workspace evolves into the task. Uses a view transition where the
+   * browser supports it (and motion is allowed); otherwise the swap is immediate. */
+  function evolve(change: () => void) {
+    const doc = document as Document & { startViewTransition?: (update: () => void) => unknown };
+    const still = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!doc.startViewTransition || still) { change(); return; }
+    doc.startViewTransition(() => flushSync(change));
   }
   function openTask(id: string) {
     setTaskId(id);
@@ -511,7 +520,10 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             {attendanceDemo && <ShiftBridge quest={quest} />}
           </details>}
           {!(selected && contextAllowed) && PREVIEW_VIEWS.includes(view) && view !== 'agents' && <PreviewNotice view={view} live={!!live} />}
-          {selected && contextAllowed ? <TaskPage key={selected.id} quest={quest} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)}
+          {creating && canCreate ? <CreateTask inline quest={quest} due={createDue} projectId={createProjectId}
+              onClose={() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); }}
+              onCreated={id => evolve(() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); openTask(id); })} />
+          : selected && contextAllowed ? <TaskPage key={selected.id} quest={quest} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)}
             onOpenDock={hasDock ? id => { setDockTask({ id, nonce: Date.now() }); setDock(current => (current.snap === 'collapsed' ? withSnap(current, current.last) : current)); } : undefined} />
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
@@ -612,7 +624,6 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         </EdgeDrawer>
       </div>}
       {canCreate && !focused && !creating && <button type="button" className="fab-create" aria-label="New task" title="New task" onClick={() => setCreating(true)}><Icon d="M12 5v14M5 12h14" /></button>}
-      {creating && canCreate && <CreateTask quest={quest} due={createDue} projectId={createProjectId} onClose={() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); }} onCreated={id => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); openTask(id); }} />}
       {creatingProject && <CreateProject quest={quest} onClose={() => setCreatingProject(false)} onCreated={(projectId, addTask) => {
         setCreatingProject(false);
         if (addTask && canCreate) { setCreateProjectId(projectId); setCreating(true); }

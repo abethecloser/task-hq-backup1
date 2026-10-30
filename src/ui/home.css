@@ -713,7 +713,8 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 @container (max-width: 560px) { .task-conversation .task-comment-form { grid-template-columns: minmax(0, 1fr); } }
 
 /* People & progress (center): responsibility and primary action first, quick actions as chips, one roster. */
-.tp-grid.is-flow.is-two { grid-template-columns: minmax(260px, 1fr) minmax(0, 1.35fr); grid-template-areas: "work momentum"; }
+/* Created: work and People & progress carry equal weight. */
+.tp-grid.is-flow.is-two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "work momentum"; }
 @container (max-width: 900px) { .tp-grid.is-flow.is-two { grid-template-columns: minmax(0, 1fr); grid-template-areas: "momentum" "work"; } }
 .pp { display: grid; gap: 14px; min-width: 0; }
 .pp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -736,3 +737,24 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .pp-role .inline-select { max-width: 100%; }
 /* The roster below names the next handoff and approver; the story line would repeat it. */
 .pp .tp-story-handoff { display: none; }
+
+/* One task workspace: creating (editor + live preview) evolves into the created task (work + people). */
+.create-workspace { display: grid; gap: 4px; padding: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--card, #fff); view-transition-name: task-workspace; container: create / inline-size; }
+.create-workspace > .modal-head { padding: 18px 22px 0; border: 0; }
+.create-workspace .cx { grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr); }
+@container create (max-width: 820px) { .create-workspace .cx { grid-template-columns: minmax(0, 1fr); } .create-workspace .cx-preview { position: static; order: -1; } }
+.task-page { view-transition-name: task-workspace; }
+.create-workspace .cx-title input, .task-page .tp-title { view-transition-name: task-title; }
+::view-transition-old(task-workspace), ::view-transition-new(task-workspace) { animation-duration: 320ms; animation-timing-function: cubic-bezier(.2, .7, .2, 1); }
+::view-transition-group(task-title) { animation-duration: 320ms; }
+@media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; } }
+.cx-checklist { display: grid; gap: 6px; }
+.cx-steps { display: grid; gap: 2px; margin: 0; padding: 0 0 0 20px; }
+.cx-steps li { padding: 2px 0; font-size: 15px; }
+.cx-steps li { display: list-item; }
+.cx-steps li span { margin-right: 6px; }
+.cx-steps .icon-btn { width: 22px; height: 22px; min-height: 0; font-size: 14px; vertical-align: middle; opacity: .6; }
+.cx-step-add { display: flex; gap: 8px; }
+.cx-step-add input { flex: 1 1 auto; min-width: 0; }
+.cx-preview-steps { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 14px; }
+.cx-preview-steps li::before { content: "☐ "; color: var(--muted); }
