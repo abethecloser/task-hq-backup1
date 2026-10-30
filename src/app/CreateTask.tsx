@@ -13,10 +13,11 @@ import { PersonSelect } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import type { Draft } from '../core/command.ts';
 import { Composer } from './Composer.tsx';
+import { MAX_ITEMS, MAX_ITEM_LENGTH, joinChecklist } from '../core/checklist.ts';
 
 // An unfinished task survives a reload in this tab (sessionStorage), exactly as left,
 // including a cleared due date. Closing or creating discards it.
-interface SavedDraft { draft: NewTask; entryText: string; manual: (keyof NewTask)[] }
+interface SavedDraft { draft: NewTask; entryText: string; manual: (keyof NewTask)[]; steps?: string[] }
 const draftKey = (tenant: string, actor: string) => `quest.createDraft.${tenant}.${actor}`;
 const FULL_KEY = 'quest.createFull';
 function readDraft(key: string): SavedDraft | null {
@@ -27,7 +28,11 @@ function forgetDraft(key: string) { try { sessionStorage.removeItem(key); } catc
 export function hasCreateDraft(tenant: string, actor: string) { return !!readDraft(draftKey(tenant, actor)); }
 export function discardCreateDraft(tenant: string, actor: string) { forgetDraft(draftKey(tenant, actor)); }
 
-export function CreateTask({ quest, due, projectId, onClose, onCreated }: { quest: Quest; due?: string; projectId?: string; onClose: () => void; onCreated: (id: string) => void }) {
+export function CreateTask({ quest, due, projectId, onClose, onCreated, inline = false }: {
+  quest: Quest; due?: string; projectId?: string; onClose: () => void; onCreated: (id: string) => void;
+  /** Render as the center workspace (creating state of the task workspace) instead of a dialog. */
+  inline?: boolean;
+}) {
   const { state, actor, now, dispatch } = quest;
   // Managers delegate: creating work doesn't make them its owner by default.
   const delegates = hasRole(state, actor, ['manager']);
@@ -44,9 +49,13 @@ export function CreateTask({ quest, due, projectId, onClose, onCreated }: { ques
     setDraft(current => ({ ...current, ...changes }));
   };
   const [entryText, setEntryText] = useState(saved?.entryText ?? '');
+  // Checklist steps, saved into the description the same way the task page stores them (core/checklist.ts).
+  const [steps, setSteps] = useState<string[]>(saved?.steps ?? []);
+  const [step, setStep] = useState('');
+  const addStep = () => { const text = step.replace(/\s+/g, ' ').trim().slice(0, MAX_ITEM_LENGTH); if (text && steps.length < MAX_ITEMS) { setSteps(current => [...current, text]); setStep(''); } };
   useEffect(() => {
-    try { sessionStorage.setItem(storageKey, JSON.stringify({ draft, entryText, manual: [...manual.current] } satisfies SavedDraft)); } catch { /* storage unavailable */ }
-  }, [storageKey, draft, entryText]);
+    try { sessionStorage.setItem(storageKey, JSON.stringify({ draft, entryText, manual: [...manual.current], steps } satisfies SavedDraft)); } catch { /* storage unavailable */ }
+  }, [storageKey, draft, entryText, steps]);
   const close = () => { forgetDraft(storageKey); onClose(); };
   // Full-page view is a per-device preference.
   const [full, setFull] = useState(() => { try { return localStorage.getItem(FULL_KEY) === '1'; } catch { return false; } });
@@ -83,7 +92,8 @@ export function CreateTask({ quest, due, projectId, onClose, onCreated }: { ques
     saving.current = true; setBusy(true);
     try {
       const watchers = [...new Set([...(draft.watchers ?? []), ...(delegated && watch ? [actor] : [])])];
-      const result = await dispatch({ type: 'task/create', task: { ...draft, watchers } });
+      const description = joinChecklist(draft.description ?? '', steps.map(text => ({ text, done: false })));
+      const result = await dispatch({ type: 'task/create', task: { ...draft, watchers, ...(description ? { description } : {}) } });
       if (result.ok) { forgetDraft(storageKey); onCreated(result.state.tasks[0]!.id); }
     } finally { saving.current = false; setBusy(false); }
   }
@@ -123,13 +133,13 @@ export function CreateTask({ quest, due, projectId, onClose, onCreated }: { ques
 
   return (
     <>
-      {!full && <button className="scrim scrim-modal" aria-label="Close" onClick={close} />}
-      <section className={`modal create-wide ${full ? 'is-full' : ''}`} role="dialog" aria-modal="true" aria-labelledby="create-title">
+      {!full && !inline && <button className="scrim scrim-modal" aria-label="Close" onClick={close} />}
+      <section className={inline ? 'view create-workspace' : `modal create-wide ${full ? 'is-full' : ''}`} role={inline ? 'region' : 'dialog'} aria-modal={inline ? undefined : true} aria-labelledby="create-title">
         <header className="modal-head"><div><span className="kicker">NEW TASK</span><h2 id="create-title">Create a task</h2></div>
           <div className="modal-head-actions">
-            <button type="button" className="icon-btn" aria-pressed={full} aria-label={full ? 'Exit full page' : 'Expand to full page'} title={full ? 'Exit full page' : 'Expand to full page'} onClick={toggleFull}>
+            {!inline && <button type="button" className="icon-btn" aria-pressed={full} aria-label={full ? 'Exit full page' : 'Expand to full page'} title={full ? 'Exit full page' : 'Expand to full page'} onClick={toggleFull}>
               <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">{full ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}</svg>
-            </button>
+            </button>}
             <button type="button" className="icon-btn" aria-label="Close" onClick={close}>×</button>
           </div>
         </header>
@@ -176,6 +186,10 @@ export function CreateTask({ quest, due, projectId, onClose, onCreated }: { ques
                 <h3 id="cx-detail" className="cx-sec"><i>03</i> Detail</h3>
                 <label className="field"><span>Next action</span><ReferenceInput maxLength={200} value={draft.nextAction ?? ''} onChange={event => set({ nextAction: event.target.value })} placeholder="The first physical step" /></label>
                 <label className="field"><span>Notes</span><ReferenceTextarea rows={3} value={draft.description ?? ''} maxLength={1000} onChange={event => set({ description: event.target.value })} placeholder="Context, @people and #tags" /></label>
+                <div className="field cx-checklist"><span>Checklist <small className="field-hint">{steps.length ? `${steps.length} step${steps.length === 1 ? '' : 's'}` : 'Optional steps to tick off'}</small></span>
+                  {steps.length > 0 && <ol className="cx-steps">{steps.map((text, at) => <li key={`${at}-${text}`}><span>{text}</span><button type="button" className="icon-btn" aria-label={`Remove “${text}”`} onClick={() => setSteps(current => current.filter((_, index) => index !== at))}>×</button></li>)}</ol>}
+                  {steps.length < MAX_ITEMS && <span className="cx-step-add"><input value={step} maxLength={MAX_ITEM_LENGTH} placeholder="Add a step" aria-label="Add a checklist step" onChange={event => setStep(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addStep(); } }} /><button type="button" className="btn btn-sm" disabled={!step.trim()} onClick={addStep}>Add</button></span>}
+                </div>
                 <div className="cx-grid">
                   <label className="field"><span>Next-step owner</span><small className="field-hint">Receives the handoff afterward.</small><PersonSelect state={state} label="Next-step owner" value={draft.nextOwner ?? ''} onChange={nextOwner => set({ nextOwner })} /></label>
                   <label className="field"><span>Approver</span><small className="field-hint">Reviews before it is complete.</small><PersonSelect state={state} label="Approver" value={draft.approver ?? ''} emptyLabel="No approval needed" onChange={approver => set({ approver })} />
@@ -208,6 +222,7 @@ export function CreateTask({ quest, due, projectId, onClose, onCreated }: { ques
                 <div><dt>Project</dt><dd>{(draft.projectId && projectName(state, draft.projectId)) || '—'}</dd></div>
                 {taxonomyOk && draft.type && <div><dt>Type</dt><dd>{types.find(item => item.id === draft.type)?.label ?? draft.type}</dd></div>}
               </dl>
+              {steps.length > 0 && <><p className="cx-kicker">CHECKLIST · 0/{steps.length}</p><ul className="cx-preview-steps">{steps.map((text, at) => <li key={`${at}-${text}`}>{text}</li>)}</ul></>}
               <p className="cx-kicker">DISPATCH</p>
               <ul className="cx-dispatch">
                 <li className={owner ? 'is-on' : 'is-off'}><b>In their task list</b><small>{owner ? `Appears in ${owner === actor ? 'your' : `${nameOf(state, owner)}’s`} My work. No alert is sent.` : 'Assign someone first.'}</small></li>
