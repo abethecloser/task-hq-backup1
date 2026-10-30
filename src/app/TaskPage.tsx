@@ -16,14 +16,16 @@ import { Select } from '../ui/Select.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import { AssigneeSelect, DueInput, PrioritySelect, StatusMenu } from './TaskControls.tsx';
 import { TaskSituation } from './WorkSurface.tsx';
-import { CommentReply, EventFeed, isComment } from './TaskComments.tsx';
+import { TaskConversation } from './TaskComments.tsx';
 import { useWorkday } from '../shifts/Workday.tsx';
 
 const when = (at: number) => new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const isFormField = (target: EventTarget) => target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable="true"]');
 
-export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: {
+export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, onOpenDock }: {
   quest: Quest; task: Task; canCreate: boolean; onClose: () => void; onOpen: (id: string) => void; onCreate: () => void;
+  /** Shows this task's conversation in the collaboration dock (wide screens, where the dock exists). */
+  onOpenDock?: (taskId: string) => void;
 }) {
   const { state, actor, dispatch } = quest;
   const [title, setTitle] = useState(task.title);
@@ -31,7 +33,6 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
   // Notes field shows the description's notes; the trailing checklist block is edited in Checklist.
   const [description, setDescription] = useState(() => splitChecklist(task.description).notes);
   const [waitingOn, setWaitingOn] = useState(task.waitingOn);
-  const [tab, setTab] = useState<'comments' | 'activity' | 'history'>('comments');
   const feedback = useFeedbackRecord(task.id);
   const back = useRef<HTMLButtonElement>(null);
   useEffect(() => { setTitle(task.title); setNextAction(task.nextAction); setDescription(splitChecklist(task.description).notes); setWaitingOn(task.waitingOn); }, [task.title, task.nextAction, task.description, task.waitingOn]);
@@ -49,9 +50,6 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
   const unlocks = dependents(state, task);
   const candidates = state.tasks.filter(item => (item.id !== task.id && item.status !== 'done') || task.dependsOn.includes(item.id));
   const events = state.events.filter(event => event.taskId === task.id);
-  const comments = events.filter(isComment);
-  const historyEvents = events.filter(event => !isComment(event));
-  const feed = tab === 'comments' ? comments : tab === 'history' ? historyEvents : events;
   const created = events.find(event => event.text.includes('created'));
   const people = state.people.filter(item => item.role !== 'reviewer');
   const watching = task.watchers.includes(actor);
@@ -98,9 +96,8 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
           : projectName(state, task.projectId) || '—'}</dd></div>
       </dl>
 
-      <div className="tp-grid is-three">
-        <div className="tp-col tp-details" aria-label="Task details">
-          <ResponsibilityCard quest={quest} task={task} onOpen={onOpen} />
+      <div className="tp-grid is-flow">
+        <div className="tp-col tp-details tp-work" aria-label="Work">
           <section className="tp-card" aria-labelledby="tp-brief">
             <h2 id="tp-brief" className="ctx-label">Brief</h2>
             {task.status !== 'done' && (
@@ -121,6 +118,19 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
             {lead && <div className="callout"><b>Lead</b> {lead.name} · {lead.phone} · {lead.address}</div>}
           </section>
           <Checklist quest={quest} task={task} editable={editable} />
+          {(waitsOn.length > 0 || unlocks.length > 0) && (
+            <section className="tp-card ctx-deps" aria-label="Dependencies">
+              {waitsOn.length > 0 && <>
+                <h2 className="ctx-label">Starts after</h2>
+                <ul>{waitsOn.map(item => <li key={item.id}><button type="button" className="ctx-link" onClick={() => onOpen(item.id)}><span className={`state-dot dot-${item.status}`} aria-hidden="true" />{item.title}<small>{item.status === 'done' ? 'done' : `${firstName(state, item.owner, 'unassigned')} · ${item.status}`}</small></button></li>)}</ul>
+              </>}
+              {unlocks.length > 0 && <>
+                <h2 className="ctx-label">Unlocks</h2>
+                <ul>{unlocks.map(item => <li key={item.id}><button type="button" className="ctx-link" onClick={() => onOpen(item.id)}><span className={`state-dot dot-${item.status}`} aria-hidden="true" />{item.title}<small>{firstName(state, item.owner || task.nextOwner, 'needs an owner')}</small></button></li>)}</ul>
+              </>}
+              {blockingDeps(state, task).length > 0 && isOpen(task) && <p className="muted">This task can’t move until the work above is done.</p>}
+            </section>
+          )}
 
 
           <details className="tp-card drawer-details">
@@ -143,28 +153,9 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
           </details>
         </div>
 
-        <aside className="tp-col tp-conversation" aria-label="Conversation">
-          <section className="tp-card tp-talk" aria-label="Comments and activity">
-            <div className="tp-tabs" role="tablist" aria-label="Comments, activity and history" onKeyDown={event => {
-              const tabs = ['comments', 'activity', 'history'] as const;
-              const index = tabs.indexOf(tab);
-              const next = event.key === 'ArrowRight' ? (index + 1) % 3 : event.key === 'ArrowLeft' ? (index + 2) % 3 : event.key === 'Home' ? 0 : event.key === 'End' ? 2 : null;
-              if (next !== null) { event.preventDefault(); setTab(tabs[next]!); (event.currentTarget.children[next] as HTMLButtonElement).focus(); }
-            }}>
-              <button type="button" role="tab" id="tp-tab-comments" aria-controls="tp-feed-panel" tabIndex={tab === 'comments' ? 0 : -1} aria-selected={tab === 'comments'} onClick={() => setTab('comments')}>Comments <span>{comments.length}</span></button>
-              <button type="button" role="tab" id="tp-tab-activity" aria-controls="tp-feed-panel" tabIndex={tab === 'activity' ? 0 : -1} aria-selected={tab === 'activity'} onClick={() => setTab('activity')}>Activity <span>{events.length}</span></button>
-              <button type="button" role="tab" id="tp-tab-history" aria-controls="tp-feed-panel" tabIndex={tab === 'history' ? 0 : -1} aria-selected={tab === 'history'} onClick={() => setTab('history')}>History <span>{historyEvents.length}</span></button>
-            </div>
-            <p className="muted tp-sub">Recent retained workspace activity; older events may no longer be available.</p>
-            {!reviewer && tab === 'comments' && (
-              <CommentReply quest={quest} taskId={task.id} onSent={() => setTab('comments')} />
-            )}
-            <div id="tp-feed-panel" role="tabpanel" aria-labelledby={`tp-tab-${tab}`}>
-            <EventFeed events={feed} empty={tab === 'comments' ? 'No comments yet.' : tab === 'history' ? 'No history yet.' : 'No activity yet.'} />
-            </div>
-          </section>
-
-        </aside>
+        <div className="tp-col tp-momentum" aria-label="Who acts next">
+          <ResponsibilityCard quest={quest} task={task} onOpen={onOpen} />
+        </div>
         <aside className="tp-col tp-side" aria-label="Actions, people and handoffs">
           {!reviewer && <QuickActions quest={quest} task={task} />}
           <section className="tp-card" aria-labelledby="tp-people">
@@ -193,21 +184,18 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate }: 
               {(editable || task.decisionOwner) && <div><dt>Decision owner</dt><dd>{editable ? <PersonSelect state={state} label="Decision owner" value={task.decisionOwner} onChange={id => void update({ decisionOwner: id })} /> : nameOf(state, task.decisionOwner)}</dd></div>}
             </dl>
           </section>
-          {(waitsOn.length > 0 || unlocks.length > 0) && (
-            <section className="tp-card ctx-deps" aria-label="Dependencies">
-              {waitsOn.length > 0 && <>
-                <h2 className="ctx-label">Starts after</h2>
-                <ul>{waitsOn.map(item => <li key={item.id}><button type="button" className="ctx-link" onClick={() => onOpen(item.id)}><span className={`state-dot dot-${item.status}`} aria-hidden="true" />{item.title}<small>{item.status === 'done' ? 'done' : `${firstName(state, item.owner, 'unassigned')} · ${item.status}`}</small></button></li>)}</ul>
-              </>}
-              {unlocks.length > 0 && <>
-                <h2 className="ctx-label">Unlocks</h2>
-                <ul>{unlocks.map(item => <li key={item.id}><button type="button" className="ctx-link" onClick={() => onOpen(item.id)}><span className={`state-dot dot-${item.status}`} aria-hidden="true" />{item.title}<small>{firstName(state, item.owner || task.nextOwner, 'needs an owner')}</small></button></li>)}</ul>
-              </>}
-              {blockingDeps(state, task).length > 0 && isOpen(task) && <p className="muted">This task can’t move until the work above is done.</p>}
-            </section>
-          )}
         </aside>
       </div>
+
+      <section className="tp-collab" aria-labelledby="tp-collab-title">
+        <header className="tp-collab-head">
+          <h2 id="tp-collab-title" className="ctx-label">Collaboration</h2>
+          {onOpenDock && <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpenDock(task.id)}>
+            <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15h18M3 19h18M8 11l4-4 4 4" /></svg>Open in dock
+          </button>}
+        </header>
+        <TaskConversation quest={quest} taskId={task.id} />
+      </section>
     </article>
   );
 }

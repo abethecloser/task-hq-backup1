@@ -271,3 +271,14 @@
   & .dock-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   & .dock-back .icon { width: 16px; height: 16px; }
 }
+
+/* "This task" on the dock rail: the open task's conversation, reachable collapsed or expanded. */
+:root .dock-this-task { display: inline-flex; flex: 0 1 auto; align-items: center; gap: 6px; min-width: 0; max-width: 340px; margin-left: auto; padding: 4px 10px; border: 1px solid var(--dock-line, var(--line)); border-radius: 999px; background: var(--card, #fff); color: var(--ink-2); font: inherit; font-size: 13px; cursor: pointer; }
+.dock-this-task span { flex: none; color: var(--dock-micro, var(--muted)); font-size: 11.5px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+.dock-this-task b { overflow: hidden; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.dock-this-task .icon { flex: none; width: 14px; height: 14px; }
+.dock-this-task:hover, .dock-this-task.is-on { border-color: var(--accent-line); background: var(--accent-pale); color: var(--ink); }
+.dock-this-task:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dock-this-task + .dock-faces { margin-left: 8px; }
+.dock-task-thread .dock-scroll .task-conversation { padding-bottom: 8px; }
+@container dock (max-width: 560px) { .dock-this-task b { display: none; } }
