@@ -173,6 +173,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
   const dockOpen = dock.snap !== 'collapsed';
   /** The task the dock is reading, focused in the overview's Living view until cleared. */
   const [dockFocus, setDockFocus] = useState<string | null>(null);
+  /** An explicit "Open in dock" request from a task page (nonce repeats a request for the same task). */
+  const [dockTask, setDockTask] = useState<{ id: string; nonce: number } | null>(null);
   const [dockTab, setDockTab] = useState<DockTab>('inbox');
   /** Notifications drawer (right). Session-only: it always starts closed. The calendar pullout (left) is `sidebar.open`. */
   const [notifOpen, setNotifOpen] = useState(false);
@@ -509,7 +511,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
             {attendanceDemo && <ShiftBridge quest={quest} />}
           </details>}
           {!(selected && contextAllowed) && PREVIEW_VIEWS.includes(view) && view !== 'agents' && <PreviewNotice view={view} live={!!live} />}
-          {selected && contextAllowed ? <TaskPage key={selected.id} quest={quest} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)} />
+          {selected && contextAllowed ? <TaskPage key={selected.id} quest={quest} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)}
+            onOpenDock={hasDock ? id => { setDockTask({ id, nonce: Date.now() }); setDock(current => (current.snap === 'collapsed' ? withSnap(current, current.last) : current)); } : undefined} />
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
@@ -543,7 +546,8 @@ function Shell({ quest, onExitDemo }: { quest: Quest; onExitDemo?: () => void })
         {hasDock && <CollabDock quest={quest} company={company} snap={dock.snap} onSnap={snap => setDock(current => withSnap(current, snap))}
           onToggle={() => setDock(current => withSnap(current, current.snap === 'collapsed' ? current.last : 'collapsed'))} tab={dockTab} onTab={setDockTab}
           inbox={inbox} data={inboxData} read={sidebar.read} markRead={sidebar.markRead} mentions={mentions}
-          onOpen={openTask} onOpenLead={openLead} onActivity={() => go('activity')} onOpenInboxPage={() => go('inbox')} onFocusTask={setDockFocus} />}
+          onOpen={openTask} onOpenLead={openLead} onActivity={() => go('activity')} onOpenInboxPage={() => go('inbox')} onFocusTask={setDockFocus}
+          contextTaskId={selected && contextAllowed ? selected.id : null} openTask={dockTask} />}
 
         <nav className="tabbar" aria-label="Task-HQ sections">
           {[

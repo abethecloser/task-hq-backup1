@@ -24,7 +24,7 @@ import type { Quest } from '../ui/useQuest.ts';
 import { COLLAB_VERB, Chevron, Initial, Recent } from './Home.tsx';
 import { ChannelThread } from './Inbox.tsx';
 import type { InboxData } from './Inbox.tsx';
-import { CommentReply, EventFeed, canReply, isComment, taskEvents } from './TaskComments.tsx';
+import { TaskConversation } from './TaskComments.tsx';
 
 export type DockTab = 'inbox' | 'conversations' | 'mentions' | 'activity';
 type Reading = { kind: 'task'; id: string } | { kind: 'channel'; id: string } | { kind: 'item'; item: InboxItem } | { kind: 'compose' } | null;
@@ -33,7 +33,7 @@ const TABS: { id: DockTab; label: string; short?: string }[] = [
   { id: 'inbox', label: 'Inbox' }, { id: 'conversations', label: 'Conversations', short: 'Channels' }, { id: 'mentions', label: 'Comments & mentions', short: 'Mentions' }, { id: 'activity', label: 'Activity' },
 ];
 
-export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab, inbox, data, read, markRead, mentions, onOpen, onOpenLead, onActivity, onOpenInboxPage, onFocusTask }: {
+export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab, inbox, data, read, markRead, mentions, onOpen, onOpenLead, onActivity, onOpenInboxPage, onFocusTask, contextTaskId = null, openTask = null }: {
   quest: Quest; company: boolean;
   /** The saved snap position; the toggle collapses it or restores the last open position. */
   snap: DockSnap; onSnap: (snap: DockSnap) => void; onToggle: () => void;
@@ -45,6 +45,10 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
   onOpen: (id: string) => void; onOpenLead: (id: string) => void; onActivity: () => void; onOpenInboxPage: () => void;
   /** Picking a task thread (inbox item, comment or mention) focuses its project in the overview's Living view. */
   onFocusTask?: (taskId: string) => void;
+  /** The task open on the page, offered as "This task" (rail and lists) without replacing what the dock is reading. */
+  contextTaskId?: string | null;
+  /** An explicit request (Open in dock) to read a task here; `nonce` repeats a request for the same task. */
+  openTask?: { id: string; nonce: number } | null;
 }) {
   const { state, actor, now } = quest;
   const collab = useMemo(() => collaboration(state, actor, company, mentions, read, 20), [state, actor, company, mentions, read]);
@@ -58,6 +62,9 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
   const [picked, setPickedState] = useState<Reading>(null);
   // Compact (collapsed/default height, between the side panels): one view at a time, the list or the reader.
   const [pane, setPane] = useState<'list' | 'reader'>('list');
+  const contextTask = contextTaskId ? taskById(state, contextTaskId) : undefined;
+  const readTask = (id: string) => { setPickedState({ kind: 'task', id }); setPane('reader'); };
+  useEffect(() => { if (openTask) readTask(openTask.id); }, [openTask?.id, openTask?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
   const setPicked = (next: Reading) => { setPickedState(next); setPane('reader'); if (next?.kind === 'task') onFocusTask?.(next.id); };
   const fallback = collab.find(item => item.taskId && !item.channelId)?.taskId ?? activity.find(event => event.taskId && taskById(state, event.taskId))?.taskId;
   const reading: Reading = picked && !(picked.kind === 'task' && !taskById(state, picked.id)) && !(picked.kind === 'channel' && !channels.some(item => item.id === picked.id))
@@ -165,6 +172,11 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
           <span className={`dock-count ${inbox.unread ? 'is-hot' : ''}`}>{inbox.unread ? `${inbox.unread > 99 ? '99+' : inbox.unread} unread` : 'All caught up'}</span>
           {activity[0] && <span className="dock-latest">Latest · {ago(activity[0].at, now)}</span>}
         </button>
+        {contextTask && <button type="button" className={`dock-this-task ${isReading('task', contextTask.id) && open ? 'is-on' : ''}`}
+          title={`This task's comments, activity and history: ${contextTask.title}`}
+          onClick={() => { readTask(contextTask.id); if (!open) onSnap('default'); }}>
+          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v4H4zM4 11h16v4H4z" /></svg><span>This task</span><b>{contextTask.title}</b>
+        </button>}
         {people.length > 0 && <span className="dock-faces" aria-hidden="true">{people.map(id => <Initial key={id} state={state} id={id} />)}</span>}
       </div>
 
@@ -284,18 +296,12 @@ function Reader({ quest, reading, data, postable, onPick, onOpen, onOpenInboxPag
     <header className="dock-head"><h2>Conversation</h2></header>
     <div className="dock-scroll"><p className="hd-quiet">Pick an inbox item, a channel or a task comment to read the thread and reply here.</p></div>
   </>;
-  const comments = taskEvents(state.events, task.id).filter(isComment);
   const who = responsibility(state, task);
   const today = localDate(quest.now);
   return <div className="dock-task">
     <div className="dock-task-thread">
       <header className="dock-head"><h2>{task.title}</h2><button type="button" className="hd-more" onClick={() => onOpen(task.id)}>Open task<Chevron /></button></header>
-      <div className="dock-scroll"><EventFeed events={comments} empty="No comments on this task yet." /></div>
-      <div className="dock-reply">
-        {canReply(quest)
-          ? <CommentReply quest={quest} taskId={task.id} label={`Reply on ${task.title}`} placeholder="Write a reply. Use @ to mention someone." send="Reply" />
-          : <p className="hd-quiet">Reviewer view: no replies.</p>}
-      </div>
+      <div className="dock-scroll"><TaskConversation quest={quest} taskId={task.id} compact /></div>
     </div>
     {/* Task context beside the thread (shown where the dock is wide enough). */}
     <aside className="dock-task-context" aria-label="Task details">

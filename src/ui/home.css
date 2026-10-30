@@ -674,8 +674,8 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 @container room (max-width: 900px) { .pr-grid { grid-template-columns: minmax(0, 1fr); } .pr-people { margin-left: 0; } }
 .pr-board .board { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); overflow-x: visible; }
 /* In the left column the "who acts next" story reads at panel scale, not page-headline scale. */
-:root .tp-details .tp-story h2 { font-size: 24px; line-height: 1.15; }
-:root .tp-details .tp-story .tp-story-action { font-size: 18px; line-height: 1.35; }
+:root .tp-momentum .tp-story h2 { font-size: 26px; line-height: 1.15; }
+:root .tp-momentum .tp-story .tp-story-action { font-size: 19px; line-height: 1.35; }
 
 /* Task checklist (left column, under Brief). */
 .tp-checklist { display: grid; gap: 10px; }
@@ -693,3 +693,21 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .tp-check-add { display: flex; gap: 8px; }
 .tp-check-add input { flex: 1 1 auto; min-width: 0; }
 @media (prefers-reduced-motion: reduce) { .tp-check-meter > i { transition: none; } }
+
+/* Task workspace: work (left) · momentum (center) · people and controls (right) · collaboration (bottom).
+   Fluid: three columns when there's room, then momentum across the top, then one column. */
+.tp-grid.is-flow { grid-template-columns: minmax(240px, 1fr) minmax(300px, 1.15fr) minmax(230px, .85fr); grid-template-areas: "work momentum side"; gap: 22px; }
+.tp-grid.is-flow > .tp-work { grid-area: work; }
+.tp-grid.is-flow > .tp-momentum { grid-area: momentum; align-content: start; }
+.tp-grid.is-flow > .tp-side { grid-area: side; }
+@container (max-width: 1120px) { .tp-grid.is-flow { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); grid-template-areas: "momentum momentum" "work side"; } }
+@container (max-width: 720px) { .tp-grid.is-flow { grid-template-columns: minmax(0, 1fr); grid-template-areas: "momentum" "work" "side"; } }
+.tp-collab { display: grid; gap: 10px; margin-top: 8px; padding-top: 18px; border-top: 1px solid var(--line); }
+.tp-collab-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tp-collab-head .ctx-label { margin: 0; }
+.tp-collab-head .icon { width: 16px; height: 16px; }
+.task-conversation { display: grid; gap: 12px; min-width: 0; }
+.task-conversation .task-comment-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; }
+.task-conversation-feed { min-width: 0; }
+.task-conversation.is-compact .tp-tabs button { font-size: 14px; }
+@container (max-width: 560px) { .task-conversation .task-comment-form { grid-template-columns: minmax(0, 1fr); } }
