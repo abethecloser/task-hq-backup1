@@ -22,10 +22,12 @@ import { useWorkday } from '../shifts/Workday.tsx';
 const when = (at: number) => new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const isFormField = (target: EventTarget) => target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable="true"]');
 
-export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, onOpenDock }: {
+export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, onOpenDock, draft }: {
   quest: Quest; task: Task; canCreate: boolean; onClose: () => void; onOpen: (id: string) => void; onCreate: () => void;
   /** Shows this task's conversation in the collaboration dock (wide screens, where the dock exists). */
   onOpenDock?: (taskId: string) => void;
+  /** Draft state of the task canvas (DraftTask): same page, editable and not yet saved; Create saves it. */
+  draft?: { onCreate: () => void; busy: boolean; error: string; ready: boolean };
 }) {
   const { state, actor, dispatch } = quest;
   const [title, setTitle] = useState(task.title);
@@ -36,11 +38,11 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
   const feedback = useFeedbackRecord(task.id);
   const back = useRef<HTMLButtonElement>(null);
   useEffect(() => { setTitle(task.title); setNextAction(task.nextAction); setDescription(splitChecklist(task.description).notes); setWaitingOn(task.waitingOn); }, [task.title, task.nextAction, task.description, task.waitingOn]);
-  useEffect(() => { window.scrollTo(0, 0); document.querySelector('.main > .content')?.scrollTo(0, 0); back.current?.focus({ preventScroll: true }); }, [task.id]);
+  useEffect(() => { window.scrollTo(0, 0); document.querySelector('.main > .content')?.scrollTo(0, 0); if (draft) document.getElementById('task-page-title')?.focus({ preventScroll: true }); else back.current?.focus({ preventScroll: true }); }, [task.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const me = state.people.find(item => item.id === actor);
   const reviewer = me?.role === 'reviewer';
-  const editable = canEditTask(state, task, actor);
+  const editable = draft ? !reviewer : canEditTask(state, task, actor);
   const locked = lockedTaskFields(state, task, actor);
   const update = (changes: Partial<EditableTaskFields>) => dispatch({ type: 'task/update', id: task.id, changes });
   const saveText = (key: 'title' | 'nextAction' | 'description' | 'waitingOn', value: string) => { if (value.trim() !== task[key]) void update({ [key]: value.trim() }); };
@@ -62,16 +64,18 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
     <article {...feedback} data-feedback-record={task.id} className={`view task-page status-${task.status}`} aria-labelledby="task-page-title" onKeyDown={onKeyDown}>
       <nav className="tp-bar" aria-label="Task">
         <button ref={back} type="button" className="btn btn-ghost btn-sm tp-back" onClick={onClose}>
-          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>Back
+          <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>{draft ? 'Cancel' : 'Back'}
         </button>
+        {draft && <span className="tp-draft-chip">Draft · not saved yet</span>}
         <span className={`ctx-verify ${quest.backend.kind === 'live' ? 'is-live' : ''}`} title={quest.backend.kind === 'live' ? 'Every change is checked again by the server before it is saved.' : 'Demo: every change is checked by the same rules engine, on this device.'}>{quest.backend.kind === 'live' ? 'Server-enforced' : 'Local · engine-checked'}</span>
         <span className="tp-bar-actions">
-          {!reviewer && (
+          {draft && <button type="button" className="btn btn-primary btn-sm" disabled={!draft.ready || draft.busy} aria-busy={draft.busy} onClick={draft.onCreate}>{draft.busy ? 'Creating…' : 'Create task'}</button>}
+          {!draft && !reviewer && (
             <button type="button" className={`btn btn-sm ${watching ? 'is-on' : 'btn-ghost'} tp-watch`} aria-pressed={watching} onClick={() => void update({ watchers: toggle(task.watchers, actor) })}>
               <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /></svg>{watching ? 'Watching' : 'Watch'}
             </button>
           )}
-          {canCreate && <button type="button" className="btn btn-primary btn-sm" onClick={onCreate}>
+          {!draft && canCreate && <button type="button" className="btn btn-primary btn-sm" onClick={onCreate}>
             <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>New task
           </button>}
         </span>
@@ -79,15 +83,16 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
 
       <header className="tp-head">
         <p className="ctx-eyebrow">{projectName(state, task.projectId) || 'No project'}{task.leadId ? ' · from a lead' : ''}</p>
-        <ReferenceTextarea id="task-page-title" className="title-edit tp-title" rows={1} referenceDocument={task.references?.title} value={title} maxLength={160} readOnly={!editable}
-          onChange={event => setTitle(event.target.value)} onBlur={() => saveText('title', title)} aria-label="Task name" />
-        <p className="ctx-sub">Created by {nameOf(state, task.createdBy, 'someone')}{created ? ` · ${when(created.at)}` : ''} · updated {when(task.updatedAt)}</p>
+        <ReferenceTextarea id="task-page-title" className="title-edit tp-title" rows={1} referenceDocument={task.references?.title} value={title} maxLength={160} readOnly={!editable} placeholder={draft ? 'Name the task' : undefined}
+          onChange={event => { setTitle(event.target.value); if (draft) void update({ title: event.target.value }); }} onBlur={() => { if (!draft) saveText('title', title); }} aria-label="Task name" />
+        {draft ? <><p className="ctx-sub">New task · fill in what you know; everything stays editable after it’s created.</p>{draft.error && <p className="form-error" role="alert">{draft.error}</p>}</>
+          : <p className="ctx-sub">Created by {nameOf(state, task.createdBy, 'someone')}{created ? ` · ${when(created.at)}` : ''} · updated {when(task.updatedAt)}</p>}
         <div className="ctx-tags"><TaskTags state={state} task={task} now={quest.now} /></div>
       </header>
 
 
       <dl className="tp-facts" aria-label="Status, assigned, priority and due date">
-        <div><dt>Status</dt><dd><StatusMenu quest={quest} task={task} /></dd></div>
+        <div><dt>Status</dt><dd>{draft ? <span className="pill tp-draft-status">Draft</span> : <StatusMenu quest={quest} task={task} />}</dd></div>
         <div><dt>Assigned</dt><dd><Avatar state={state} id={task.owner} size="sm" /><AssigneeSelect quest={quest} task={task} /></dd></div>
         <div><dt>Priority</dt><dd><PrioritySelect quest={quest} task={task} /></dd></div>
         <div><dt>Due</dt><dd><DueInput quest={quest} task={task} overdue={isOverdue(task, quest.now)} />{task.dueTime && <small>{task.dueTime}</small>}</dd></div>
@@ -154,18 +159,18 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
         </div>
 
         <div className="tp-col tp-momentum" aria-label="People and progress">
-          <PeopleProgress quest={quest} task={task} editable={editable} reviewer={reviewer} onOpen={onOpen} />
+          <PeopleProgress quest={quest} task={task} editable={editable} reviewer={reviewer} onOpen={onOpen} isDraft={!!draft} />
         </div>
       </div>
 
       <section className="tp-collab" aria-labelledby="tp-collab-title">
         <header className="tp-collab-head">
           <h2 id="tp-collab-title" className="ctx-label">Collaboration</h2>
-          {onOpenDock && <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpenDock(task.id)}>
+          {onOpenDock && !draft && <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpenDock(task.id)}>
             <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15h18M3 19h18M8 11l4-4 4 4" /></svg>Open in dock
           </button>}
         </header>
-        <TaskConversation quest={quest} taskId={task.id} />
+        {draft ? <p className="muted tp-collab-draft">Comments, activity and history start once the task is created.</p> : <TaskConversation quest={quest} taskId={task.id} />}
       </section>
     </article>
   );
@@ -174,9 +179,10 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
 /** People & progress: who acts now and the primary action, quick actions, and every task role in one
  * roster: owner, next handoff, approver, decision owner and the people kept informed. Names read at a
  * glance; "Edit roles" reveals the same selects (same task/update actions and permissions as before). */
-function PeopleProgress({ quest, task, editable, reviewer, onOpen }: { quest: Quest; task: Task; editable: boolean; reviewer: boolean; onOpen: (id: string) => void }) {
+function PeopleProgress({ quest, task, editable, reviewer, onOpen, isDraft = false }: { quest: Quest; task: Task; editable: boolean; reviewer: boolean; onOpen: (id: string) => void; isDraft?: boolean }) {
   const { state, actor, dispatch } = quest;
-  const [editing, setEditing] = useState(false);
+  // A draft starts with the role pickers open: assigning people is part of writing the task.
+  const [editing, setEditing] = useState(isDraft);
   const update = (changes: Partial<EditableTaskFields>) => dispatch({ type: 'task/update', id: task.id, changes });
   const people = state.people.filter(item => item.role !== 'reviewer');
   const who = (id: string, empty: string) => id ? <span className="pp-who"><Avatar state={state} id={id} size="sm" />{id === actor ? 'You' : nameOf(state, id, 'Former member')}</span> : <span className="pp-empty">{empty}</span>;
@@ -192,8 +198,8 @@ function PeopleProgress({ quest, task, editable, reviewer, onOpen }: { quest: Qu
         <h2 id="pp-title" className="ctx-label">People &amp; progress</h2>
         {editable && <button type="button" className="hd-more" aria-pressed={editing} onClick={() => setEditing(value => !value)}>{editing ? 'Done editing' : 'Edit roles'}</button>}
       </header>
-      <ResponsibilityCard quest={quest} task={task} onOpen={onOpen} />
-      {!reviewer && <QuickActions quest={quest} task={task} compact />}
+      <ResponsibilityCard quest={quest} task={task} onOpen={onOpen} isDraft={isDraft} />
+      {!reviewer && !isDraft && <QuickActions quest={quest} task={task} compact />}
       <dl className="pp-roster" role="list" aria-label="Task roles">
         <div className="pp-role" role="listitem"><dt>Owns the work<small>Assigned</small></dt><dd>{who(task.owner, 'Unassigned')}</dd></div>
         {role('Next handoff', 'Receives it when done', task.nextOwner, 'Nobody yet', 'nextOwner')}
@@ -325,7 +331,7 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
 }
 
 /** One presentation of the existing lifecycle and its engine-authorized actions. */
-export function ResponsibilityCard({ quest, task, onOpen }: { quest: Quest; task: Task; onOpen: (id: string) => void }) {
+export function ResponsibilityCard({ quest, task, onOpen, isDraft = false }: { quest: Quest; task: Task; onOpen: (id: string) => void; isDraft?: boolean }) {
   const { state, actor } = quest;
   const plan = moveForwardPlan(state, task, actor);
   const dependency = blockingDeps(state, task)[0];
@@ -335,7 +341,7 @@ export function ResponsibilityCard({ quest, task, onOpen }: { quest: Quest; task
   const handoff = task.status !== 'review' && task.status !== 'done' && task.approver ? `Next: review by ${nameOf(state, task.approver)}` : task.nextOwner ? `Next handoff: ${nameOf(state, task.nextOwner)}` : 'Next handoff not assigned';
   return <section className={`tp-story tp-actions ${task.status === 'done' ? 'is-done' : ''}`} aria-labelledby="tp-story-title">
     <div className="tp-story-person">{responsible && task.status !== 'done' && <Avatar state={state} id={responsible} size="md" />}<div><p className="tp-story-label">Who acts next</p><h2 id="tp-story-title">{heading}</h2></div></div>
-    {task.status === 'done' ? <Completed quest={quest} task={task} /> : <><p className="tp-story-action"><span className="tp-story-k">What to do</span>{action}</p>{task.waitingOn && <p>External wait: {task.waitingOn}</p>}<TaskSituation key={task.id} quest={quest} taskId={task.id} onOpen={onOpen} actionsOnly /></>}
+    {task.status === 'done' ? <Completed quest={quest} task={task} /> : <><p className="tp-story-action"><span className="tp-story-k">What to do</span>{action}</p>{task.waitingOn && <p>External wait: {task.waitingOn}</p>}{!isDraft && <TaskSituation key={task.id} quest={quest} taskId={task.id} onOpen={onOpen} actionsOnly />}</>}
     <p className="tp-story-handoff">{handoff}</p>
   </section>;
 }
