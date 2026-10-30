@@ -50,14 +50,20 @@ export function projectName(state: QuestState, id: string) {
   return state.projects.find(project => project.id === id)?.name ?? '';
 }
 
-export const isOpen = (task: Task) => task.status !== 'done';
+/** Active work: not done, and not archived as legacy (archived unfinished work keeps its status). */
+export const isOpen = (task: Task) => task.status !== 'done' && !task.archivedAt;
+/** Archived without being completed. */
+export const isLegacyArchived = (task: Task) => task.status !== 'done' && !!task.archivedAt;
+/** The workspace as active views read it: work archived as legacy left out (it keeps its status). */
+export const withoutLegacyArchived = (state: QuestState): QuestState =>
+  state.tasks.some(isLegacyArchived) ? { ...state, tasks: state.tasks.filter(task => !isLegacyArchived(task)) } : state;
 
 export function isOverdue(task: Task, now: number) {
   return isOpen(task) && task.due !== '' && task.due < localDate(now);
 }
 
 export function blockingDeps(state: QuestState, task: Task) {
-  return task.dependsOn.map(id => taskById(state, id)).filter((dep): dep is Task => !!dep && dep.status !== 'done');
+  return task.dependsOn.map(id => taskById(state, id)).filter((dep): dep is Task => !!dep && isOpen(dep));
 }
 
 export function dependents(state: QuestState, task: Task) {
