@@ -15,7 +15,7 @@ export interface TopTab { id: string; label: string; count?: number; hot: boolea
 
 export interface TopSection { id: string; label: string; active: boolean; count?: number; hot?: boolean }
 
-export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title, mode, search, onAsk, onBell, onMenu, menuOpen, calendarAccess, sections, onSection, onCreate }: {
+export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, calendarOpen, onCalendar, title, mode, search, onAsk, onBell, onMenu, menuOpen, calendarAccess, sections, onSection, onCreate }: {
   calendarAccess?: ReactNode;
   /** The primary sections, as a top navigation. Wide screens only; phones use the tab bar. */
   sections?: TopSection[]; onSection?: (id: string) => void;
@@ -23,6 +23,8 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title
   onCreate?: () => void;
   quest: Quest; demo: boolean; focused: boolean; unread: number;
   askOpen: boolean; notifOpen: boolean; /** The current section's name. */ title: string;
+  /** The calendar in the right panel (omitted in Critical Focus). */
+  calendarOpen?: boolean; onCalendar?: () => void;
   /** Optional workspace grouping control. It does not change page availability. */
   mode?: { current: 'work' | 'manage'; onChange: (next: 'work' | 'manage') => void };
   /** The app-wide search field (TopSearch). */ search: ReactNode; onAsk: () => void; onBell: () => void; onMenu: () => void; menuOpen: boolean;
@@ -61,6 +63,7 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, title
         {/* A fixed slot: the field expands inside it (or as a popover on narrow bars), so nothing beside it moves. */}
         <div className="top-search-slot">{search}</div>
         {!focused && <button type="button" className={`top-icon ${askOpen ? 'is-on' : ''}`} aria-label="Ask your tasks" title={askOpen ? 'Close Ask your tasks drawer' : 'Open Ask your tasks drawer'} aria-controls="right-edge-drawer" data-edge="ask" aria-expanded={askOpen} onClick={onAsk}><TopIcon d={SPARK} /></button>}
+        {onCalendar && <button type="button" className={`top-icon ${calendarOpen ? 'is-on' : ''}`} aria-label="Calendar" title={calendarOpen ? 'Close calendar' : 'Open calendar'} aria-controls="right-edge-drawer" data-edge="calendar" aria-expanded={!!calendarOpen} onClick={onCalendar}><TopIcon d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4" /></button>}
         <button type="button" className={`top-icon ${notifOpen ? 'is-on' : ''}`} title={notifOpen ? 'Close notifications drawer' : 'Open notifications drawer'} aria-controls="right-edge-drawer" data-edge="updates" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'} aria-expanded={notifOpen} onClick={onBell}>
           <TopIcon d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0" />
           {unread > 0 && <span className="rail-unread" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>}

@@ -4,6 +4,7 @@ import { Select } from '../ui/Select.tsx';
 // full page in the canvas (TaskPage.tsx), never a side panel.
 // Docked beside the canvas on wide screens (the canvas reflows); a drawer otherwise.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { MouseEvent, ReactNode } from 'react';
 import type { Task } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
@@ -223,8 +224,10 @@ export function DeckCalendar({ quest, company, date, onDate, onOpenTask, connect
       )}
       <p className="sig-note">{connected ? 'Includes task due dates.' : 'Task due dates only. No calendar is connected, so meetings and events don’t appear yet.'}</p>
     </section>}
-    {peek && !menu && <DayPeek quest={quest} at={peek} tasks={due(peek.date)} />}
-    {menu && <DayMenu quest={quest} at={menu} tasks={due(menu.date)} onClose={() => setMenu(null)} onOpenTask={onOpenTask} onCreate={onCreate} />}
+    {/* Portalled: inside a sliding drawer (a transformed ancestor) fixed positioning would be relative
+        to the drawer, not the window, and the card would land off-screen. */}
+    {peek && !menu && createPortal(<DayPeek quest={quest} at={peek} tasks={due(peek.date)} />, document.body)}
+    {menu && createPortal(<DayMenu quest={quest} at={menu} tasks={due(menu.date)} onClose={() => setMenu(null)} onOpenTask={onOpenTask} onCreate={onCreate} />, document.body)}
   </>;
 }
 
