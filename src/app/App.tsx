@@ -399,7 +399,8 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   // isn't listed twice. The calendar quick view is the right panel (top-right Calendar icon).
   const split = splitNavigation(navigation.filter(item => item.id !== 'calendar' || !focused), sidebar.isMobile);
   // With the dock on, the rail keeps only workspace utilities (Settings stays its gear); the dock and More hold the rest.
-  const railItems = sidebar.isMobile ? navigation : dockNav ? split.rail.filter(item => item.id !== 'settings') : navigation.filter(item => item.id !== 'settings');
+  const railItems = sidebar.isMobile ? navigation : navigation.filter(item => item.id !== 'settings');
+  const railShown = dockNav && !sidebar.isMobile ? split.rail.filter(item => item.id !== 'settings') : railItems;
   const dockItem = (id: string) => {
     const item = navigation.find(entry => entry.id === id);
     return item && split.dock.includes(id) ? { id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, active: view === item.id && !(selected && contextAllowed) } : undefined;
@@ -529,7 +530,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
         navigator={workNavigator}
         pullout={null}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
-        items={railItems.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: view === item.id, info: info[item.id] }))}
+        items={railShown.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: view === item.id, info: info[item.id] }))}
         onSelect={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
