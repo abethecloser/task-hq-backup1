@@ -316,10 +316,10 @@ function ArchiveTask({ quest, task }: { quest: Quest; task: Task }) {
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState('');
   const done = task.status === 'done';
-  const allowed = !task.archivedAt && (done
-    ? canReopenTask(state, task, actor) && backend.supports?.taskArchive !== false
-    : canArchiveLegacy(state, task, actor) && backend.supports?.legacyArchive !== false);
+  const allowed = !task.archivedAt && (done ? canReopenTask(state, task, actor) : canArchiveLegacy(state, task, actor));
   if (!allowed) return null;
+  // Shown whenever the person may archive, so it's findable; an older server is explained, not hidden.
+  const serverReady = done ? backend.supports?.taskArchive !== false : backend.supports?.legacyArchive !== false;
   const archive = async () => {
     const result = await dispatch(done ? { type: 'task/archive', id: task.id } : { type: 'task/archive', id: task.id, reason: 'legacy' });
     setError(result.ok ? '' : result.error); if (result.ok) setConfirm(false);
@@ -327,9 +327,9 @@ function ArchiveTask({ quest, task }: { quest: Quest; task: Task }) {
   if (!confirm) return <button type="button" className="btn btn-ghost btn-sm tp-archive" onClick={() => setConfirm(true)}>Archive…</button>;
   return (
     <span className="offer-form-actions tp-archive-confirm" role="group" aria-label="Archive this task">
-      <span className="muted">{done ? 'Archive this completed task? It leaves active lists; its history stays.' : `Archive without completing? It is not marked done; its status (${STATUS_LABELS[task.status]}) and history stay.`}</span>
-      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirm(false)}>Cancel</button>
-      <button type="button" className="btn btn-primary btn-sm" onClick={() => void archive()}>Archive</button>
+      <span className="muted">{!serverReady ? `Archiving ${done ? 'tasks' : 'unfinished tasks'} needs the Task HQ server update (dispatch v9). Nothing was changed.` : done ? 'Archive this completed task? It leaves active lists; its history stays.' : `Archive without completing? It is not marked done; its status (${STATUS_LABELS[task.status]}) and history stay.`}</span>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirm(false)}>{serverReady ? 'Cancel' : 'OK'}</button>
+      {serverReady && <button type="button" className="btn btn-primary btn-sm" onClick={() => void archive()}>Archive</button>}
       {error && <span className="form-error" role="alert">{error}</span>}
     </span>
   );

@@ -91,7 +91,8 @@ function ProjectArchive({ quest, projectId, openTasks }: { quest: Quest; project
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState('');
   const project = state.projects.find(item => item.id === projectId);
-  if (!project || !coordinates(person(state, actor)) || quest.backend.supports?.projectArchive === false) return null;
+  if (!project || !coordinates(person(state, actor))) return null;
+  const serverReady = quest.backend.supports?.projectArchive !== false;
   if (!project.archivedAt && project.id === DEFAULT_PROJECT_ID) return null;
   const run = async () => {
     const result = await dispatch({ type: project.archivedAt ? 'project/unarchive' : 'project/archive', id: project.id });
@@ -99,8 +100,8 @@ function ProjectArchive({ quest, projectId, openTasks }: { quest: Quest; project
   };
   if (project.archivedAt) return <><button type="button" className="btn btn-ghost btn-sm" onClick={() => void run()}>Restore project</button>{error && <span className="form-error" role="alert">{error}</span>}</>;
   return confirm
-    ? <span className="offer-form-actions pr-archive-confirm"><span className="muted">Archive “{project.name}”? {openTasks ? `Its ${openTasks} open ${openTasks === 1 ? 'task keeps its' : 'tasks keep their'} status.` : 'Its tasks and history stay.'}</span>
-      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirm(false)}>Cancel</button><button type="button" className="btn btn-primary btn-sm" onClick={() => void run()}>Archive project</button>
+    ? <span className="offer-form-actions pr-archive-confirm"><span className="muted">{!serverReady ? 'Archiving projects needs the Task HQ server update (dispatch v9). Nothing was changed.' : `Archive “${project.name}”? ${openTasks ? `Its ${openTasks} open ${openTasks === 1 ? 'task keeps its' : 'tasks keep their'} status.` : 'Its tasks and history stay.'}`}</span>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirm(false)}>{serverReady ? 'Cancel' : 'OK'}</button>{serverReady && <button type="button" className="btn btn-primary btn-sm" onClick={() => void run()}>Archive project</button>}
       {error && <span className="form-error" role="alert">{error}</span>}</span>
     : <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirm(true)}>Archive project…</button>;
 }
