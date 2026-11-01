@@ -93,3 +93,35 @@ export function withSavedLayout(all: unknown, orgId: string, pageId: string, nex
   base[orgId] = pages;
   return base;
 }
+
+/** Columns each width takes at a breakpoint: desktop 12-column, tablet halves/full, phone one column. */
+export const SPANS: Record<'desktop' | 'tablet' | 'phone', Record<ModuleSize, number>> = {
+  desktop: { s: 4, m: 6, l: 8, xl: 12 },
+  tablet: { s: 6, m: 6, l: 12, xl: 12 },
+  phone: { s: 12, m: 12, l: 12, xl: 12 },
+};
+/**
+ * Rows in the person's order, each filled edge to edge: modules go into a row while they fit; a row
+ * with spare columns shares them out in proportion to each module's width. Order never changes and
+ * no row is left with a hole at its end, so the system, not the person, owns the geometry.
+ */
+export function fillRows(items: { id: string; span: number }[], columns = 12): Record<string, number> {
+  const out: Record<string, number> = {};
+  const rows: { id: string; span: number }[][] = [];
+  let row: { id: string; span: number }[] = [], used = 0;
+  for (const item of items) {
+    const span = Math.min(columns, Math.max(1, item.span));
+    if (row.length && used + span > columns) { rows.push(row); row = []; used = 0; }
+    row.push({ id: item.id, span }); used += span;
+  }
+  if (row.length) rows.push(row);
+  for (const members of rows) {
+    const total = members.reduce((sum, member) => sum + member.span, 0);
+    let given = 0;
+    members.forEach((member, index) => {
+      const span = index === members.length - 1 ? columns - given : Math.max(1, Math.round(member.span * columns / total));
+      out[member.id] = span; given += span;
+    });
+  }
+  return out;
+}
