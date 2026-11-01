@@ -4,7 +4,7 @@
 // records always produce the same picture, so nothing jumps between renders.
 import type { QuestState, Task, TaskStatus } from './contract.ts';
 import { recentActivity } from './dashboard.ts';
-import { blockingDeps, firstName, isOpen, isOverdue } from './selectors.ts';
+import { blockingDeps, firstName, isOpen, isOverdue, isProjectArchived } from './selectors.ts';
 import { NO_PROJECT } from './project-intel.ts';
 
 /** How long a task counts as moving after its latest activity. */
@@ -52,7 +52,8 @@ export function phyllotaxis(count: number): { x: number; y: number }[] {
 }
 
 export function livingLayout(state: QuestState, actor: string, now: number, company: boolean, size = { width: 640, height: 420 }): LivingLayout {
-  const visible = state.tasks.filter(task => company || task.owner === actor);
+  // Archived projects leave the picture; their tasks are unchanged.
+  const visible = state.tasks.filter(task => (company || task.owner === actor) && !isProjectArchived(state, task.projectId));
   const lastMove = new Map<string, number>();
   for (const event of recentActivity(state, actor, company, Infinity)) if (event.taskId && !lastMove.has(event.taskId)) lastMove.set(event.taskId, event.at);
   const moving = (task: Task) => now - (lastMove.get(task.id) ?? -Infinity) <= MOVING_WINDOW;

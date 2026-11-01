@@ -1,4 +1,4 @@
-// dispatch v8: `task/archive` with reason `legacy` lets a supervisor, admin or owner archive
+// dispatch v8 (frozen; superseded by v9 before deploying): `task/archive` with reason `legacy` lets a supervisor, admin or owner archive
 // unfinished work without completing it. Status is kept, restore returns it unchanged, and every
 // active view leaves it out. v7 (the rollback target) refuses it and still reads v8 state.
 import { test } from 'node:test';
@@ -176,10 +176,4 @@ test('the v7 rollback refuses legacy archive and still reads v8 state', () => {
     assert.equal(task.status, 'working');
     assert.equal(task.archivedReason, 'legacy', 'stored fields survive a v7 write');
   }
-});
-
-test('v8 core is the current engine, byte for byte', async () => {
-  const { readFileSync, readdirSync } = await import('node:fs');
-  const dir = new URL('./v8/core/', import.meta.url);
-  for (const file of readdirSync(dir)) assert.equal(readFileSync(new URL(file, dir), 'utf8'), readFileSync(new URL(`../../src/core/${file}`, import.meta.url), 'utf8'), `${file} drifted; copy src/core/${file} into deploy/dispatch-live/v8/core`);
 });

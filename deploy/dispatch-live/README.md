@@ -35,7 +35,7 @@ To roll back, redeploy the `v3-original/` files as `dispatch` (same layout, veri
 - Roll back: redeploy `v6/`. v6 refuses `project/create` and leaves stored projects untouched.
 - After deploying, freeze `v7/` and start further changes as `v8/`. (Deployed; `v7/` is frozen.)
 
-## v8 candidate (not deployed)
+## v8 candidate (not deployed; superseded by v9, frozen)
 
 - `v8/`: v7's `index.ts`/`logic.ts` with `CONTRACT = 8` and the current engine (`v8/core` must equal `src/core`; `v8.test.ts` checks it).
 - Adds `task/archive` `{ id, reason: 'legacy' }` for unfinished work.
@@ -49,3 +49,18 @@ To roll back, redeploy the `v3-original/` files as `dispatch` (same layout, veri
 - Deploy: the files in `v8/` as `dispatch`, verify_jwt true. Read them back after deploying.
 - Roll back: redeploy `v7/`. v7 refuses legacy archives, and still reads and writes state that has them (legacy tasks then show as archived; restoring one needs v8).
 - After deploying, freeze `v8/` and start further changes as `v9/`.
+
+## v9 candidate (not deployed)
+
+- `v9/`: v8's `index.ts`/`logic.ts` with `CONTRACT = 9` and the current engine (`v9/core` must equal `src/core`; `v9.test.ts` checks it). It includes everything in v8, so v8 doesn't need to be deployed first.
+- Adds `project/archive` and `project/unarchive` `{ id }`.
+  - Supervisors, admins and owners only. The default project (`general`) can't be archived.
+  - Records `archivedAt` and `archivedBy` on the project plus one event. Its tasks are not touched: no status change, no completion, no move.
+  - An archived project takes no new tasks (`task/create`) and no tasks moved into it (`task/update`). Tasks already in it stay editable and can move out.
+  - Restoring clears the two fields; nothing else changes.
+- No migration: projects are stored in `workspace_state.projects`.
+- The app sends the new actions only after a reply advertises contract 9. Before that it refuses without sending ("dispatch v9").
+- Deploy from an isolated copy, never from the repository root (the root's `supabase/functions/dispatch` is a different handler that needs migration `20261017230608_operational_attention`):
+  `rm -rf /tmp/v9 && mkdir -p /tmp/v9/supabase/functions && cp -r deploy/dispatch-live/v9 /tmp/v9/supabase/functions/dispatch && cd /tmp/v9 && supabase functions deploy dispatch --project-ref xthyyxnfjaxmtrqrhyxc`
+- Roll back: redeploy `v7/` the same way. v7 and v8 refuse the new actions and still read and write state that has archived projects (archived projects then show as ordinary projects).
+- After deploying, freeze `v9/` and start further changes as `v10/`.

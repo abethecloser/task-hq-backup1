@@ -2,7 +2,7 @@ import { Select } from '../ui/Select.tsx';
 import { useState } from 'react';
 import type { TaskStatus } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
-import { compareTasks } from '../core/selectors.ts';
+import { activeProjects, compareTasks } from '../core/selectors.ts';
 import { Empty, TaskRow } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 
@@ -24,7 +24,7 @@ export function CompanyWork({ quest, onOpen, onCreateProject, onAddTask, onOpenR
     .filter(task => !project || task.projectId === project)
     .filter(task => !who || (who === 'none' ? !task.owner : [task.owner, task.nextOwner, task.approver, task.decisionOwner, ...task.watchers].includes(who)))
     .sort(compareTasks(now));
-  const byProject = [...state.projects, { id: '', name: 'No project' }]
+  const byProject = [...activeProjects(state), { id: '', name: 'No project' }]
     .map(item => ({ ...item, tasks: tasks.filter(task => task.projectId === item.id) }))
     // Unfiltered, every project shows (a new one has no tasks yet); filtered, only matching ones.
     .filter(item => item.tasks.length || (item.id && !project && !who && status === 'open') || (item.id && item.id === project));
@@ -47,7 +47,7 @@ export function CompanyWork({ quest, onOpen, onCreateProject, onAddTask, onOpenR
         </Select>
         <Select value={project} onChange={event => setProject(event.target.value)} aria-label="Project">
           <option value="">All projects</option>
-          {state.projects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+          {activeProjects(state).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
         </Select>
         <Select value={who} onChange={event => setWho(event.target.value)} aria-label="Person">
           <option value="">Anyone involved</option>

@@ -12,7 +12,7 @@ import { COMPANIES, companiesOf, companyLabel, workspaceCompanies } from '../cor
 import type { CompanyId } from '../core/companies.ts';
 import { inScope } from '../core/registry.ts';
 import type { Scope } from '../core/registry.ts';
-import { isOpen } from '../core/selectors.ts';
+import { activeProjects, isOpen } from '../core/selectors.ts';
 
 export interface JobChoice { project: string; company: CompanyId | '' }
 interface PickerOption { key: string; name: string; choice: JobChoice; count?: number; section?: string }
@@ -41,7 +41,7 @@ export function JobPicker({ state, actor, scope, project, company, onChange }: {
       key: `company:${item.id}`, name: item.label, section: index === 0 ? 'Companies' : undefined, choice: { project: '', company: item.id },
       count: openTasks.filter(task => companiesOf(state, task, inWorkspace).has(item.id)).length,
     })),
-    ...state.projects.filter(item => matches(item.name)).map((item, index) => ({
+    ...activeProjects(state).filter(item => matches(item.name)).map((item, index) => ({
       key: `job:${item.id}`, name: item.name, section: index === 0 ? 'Jobs' : undefined, choice: { project: item.id, company: '' as const },
       count: openTasks.filter(task => task.projectId === item.id).length,
     })),

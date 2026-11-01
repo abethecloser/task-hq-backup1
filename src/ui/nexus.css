@@ -1302,3 +1302,17 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .calendar-mobile-drawer { left: 0; right: auto; transform: translateX(-100%); }
 .calendar-mobile-drawer button { min-height: 44px; }
 .calendar-mobile-drawer .icon-btn { min-width: 44px; }
+
+/* Archive: archived projects and tasks, with restore. */
+.archive-search { max-width: 520px; }
+.archive-search input { box-sizing: border-box; width: 100%; min-height: 40px; padding: 8px 12px; border: 1px solid var(--hair); border-radius: 10px; background: var(--card); color: var(--ink); font: inherit; }
+.archive-group { display: grid; gap: 8px; margin-top: 18px; }
+.archive-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--hair); border-radius: 12px; background: var(--card); }
+.archive-row { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; }
+.archive-row + .archive-row { border-top: 1px solid var(--hair); }
+.archive-text { display: grid; gap: 2px; min-width: 0; }
+.archive-text strong { overflow-wrap: anywhere; }
+.archive-text small { color: var(--ink-2); }
+.archive-icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; color: var(--ink-2); }
+.tp-archive-confirm, .pr-archive-confirm { flex-wrap: wrap; justify-content: flex-end; }
+.pr-archived { margin: 4px 0 12px; }

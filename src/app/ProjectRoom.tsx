@@ -4,7 +4,8 @@
 // The collaboration dock stays available below (shell), so nothing here duplicates it.
 import { useMemo, useState } from 'react';
 import { projectIntel } from '../core/project-intel.ts';
-import { firstName, isOpen, isOverdue } from '../core/selectors.ts';
+import { DEFAULT_PROJECT_ID } from '../core/engine.ts';
+import { coordinates, firstName, isOpen, isOverdue, nameOf, person } from '../core/selectors.ts';
 import type { Quest } from '../ui/useQuest.ts';
 import { Board } from './AllTasks.tsx';
 import { CommentReply, EventFeed, isComment } from './TaskComments.tsx';
@@ -30,8 +31,15 @@ export function ProjectRoom({ quest, projectId, company, onBack, onOpenTask, onA
     <div className="view project-room">
       <nav className="tp-bar" aria-label="Project">
         <button type="button" className="btn btn-ghost btn-sm tp-back" onClick={onBack}><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>Projects</button>
-        {onAddTask && <button type="button" className="btn btn-primary btn-sm" onClick={() => onAddTask(projectId)}><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>New task</button>}
+        <span className="tp-bar-actions">
+        <ProjectArchive quest={quest} projectId={projectId} openTasks={open.length} />
+        {onAddTask && !project.archivedAt && <button type="button" className="btn btn-primary btn-sm" onClick={() => onAddTask(projectId)}><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>New task</button>}
+        </span>
       </nav>
+      {project.archivedAt && <div className="ctx-done is-archived pr-archived" role="status">
+        <p className="ctx-done-state"><b>Archived project</b></p>
+        <p className="muted">Archived {new Date(project.archivedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}{project.archivedBy ? ` · ${nameOf(state, project.archivedBy, 'someone')}` : ''}. It’s out of active navigation and can’t take new tasks; its tasks keep their status and history.</p>
+      </div>}
       <header className="view-head">
         <div>
           <p className="eyebrow">Project room · shared with the team</p>
@@ -52,7 +60,7 @@ export function ProjectRoom({ quest, projectId, company, onBack, onOpenTask, onA
       <div className="pr-grid">
         <section className="pr-board" aria-labelledby="pr-board-title">
           <h2 id="pr-board-title" className="ctx-label">Task board</h2>
-          {tasks.length === 0 ? <p className="hd-quiet">No tasks yet.{onAddTask && <> <button type="button" className="link" onClick={() => onAddTask(projectId)}>Add the first task</button></>}</p>
+          {tasks.length === 0 ? <p className="hd-quiet">No tasks yet.{onAddTask && !project.archivedAt && <> <button type="button" className="link" onClick={() => onAddTask(projectId)}>Add the first task</button></>}</p>
             : <Board quest={quest} tasks={tasks} selectedId={null} onSelect={onOpenTask} />}
         </section>
 
@@ -75,4 +83,24 @@ export function ProjectRoom({ quest, projectId, company, onBack, onOpenTask, onA
       </div>
     </div>
   );
+}
+
+/** Archive or restore this project (supervisors, admins and owners; the server checks again). */
+function ProjectArchive({ quest, projectId, openTasks }: { quest: Quest; projectId: string; openTasks: number }) {
+  const { state, actor, dispatch } = quest;
+  const [confirm, setConfirm] = useState(false);
+  const [error, setError] = useState('');
+  const project = state.projects.find(item => item.id === projectId);
+  if (!project || !coordinates(person(state, actor)) || quest.backend.supports?.projectArchive === false) return null;
+  if (!project.archivedAt && project.id === DEFAULT_PROJECT_ID) return null;
+  const run = async () => {
+    const result = await dispatch({ type: project.archivedAt ? 'project/unarchive' : 'project/archive', id: project.id });
+    setError(result.ok ? '' : result.error); if (result.ok) setConfirm(false);
+  };
+  if (project.archivedAt) return <><button type="button" className="btn btn-ghost btn-sm" onClick={() => void run()}>Restore project</button>{error && <span className="form-error" role="alert">{error}</span>}</>;
+  return confirm
+    ? <span className="offer-form-actions pr-archive-confirm"><span className="muted">Archive “{project.name}”? {openTasks ? `Its ${openTasks} open ${openTasks === 1 ? 'task keeps its' : 'tasks keep their'} status.` : 'Its tasks and history stay.'}</span>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirm(false)}>Cancel</button><button type="button" className="btn btn-primary btn-sm" onClick={() => void run()}>Archive project</button>
+      {error && <span className="form-error" role="alert">{error}</span>}</span>
+    : <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirm(true)}>Archive project…</button>;
 }

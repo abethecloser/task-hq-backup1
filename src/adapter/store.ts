@@ -55,6 +55,8 @@ export interface BackendSupports {
   projectCreate: boolean;
   /** `task/archive` with reason `legacy`: unfinished work archived without completing it. */
   legacyArchive: boolean;
+  /** `project/archive` and `project/unarchive`. */
+  projectArchive: boolean;
 }
 
 export interface QuestBackend {

@@ -12,7 +12,7 @@ import { APP_VERSION, EDITABLE_TASK_FIELDS, FEEDBACK_CATEGORY_LABELS, FEEDBACK_S
 import { blankLead, blankTask, seedState } from './seed.ts';
 import { PRESETS, presetFor } from './workspace.ts';
 import {
-  activeGrant, allowedBy, blockingDeps, canDecideGrants, coordinates, firstName, hasRole, inFocus, leadById, manages, nameOf, observes, owns, peopleWithRole, person, sectionFor, taskById,
+  activeGrant, allowedBy, blockingDeps, canDecideGrants, coordinates, firstName, hasRole, inFocus, isOpen, leadById, manages, nameOf, observes, owns, peopleWithRole, person, sectionFor, taskById,
 } from './selectors.ts';
 import { duration, localDate } from './time.ts';
 
@@ -212,6 +212,11 @@ const TAG = /^[a-z0-9][a-z0-9-]{0,29}$/;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /** Validates type/tags/time against the organization's taxonomy. A string is the refusal. */
+/** The seeded default project; it always stays active. */
+export const DEFAULT_PROJECT_ID = 'general';
+const ARCHIVED_PROJECT = 'That project is archived. Restore it from the Archive or choose another project.';
+const archivedProject = (state: QuestState, id: string) => !!state.projects.find(project => project.id === id)?.archivedAt;
+
 function classify(state: QuestState, t: { type?: string; tags?: string[]; dueTime?: string; due?: string }): { type: string | undefined; tags: string[] | undefined; dueTime: string | undefined } | string {
   const type = t.type || undefined;
   if (type && !state.taxonomy?.types.some(item => item.id === type)) return 'That task type isn’t configured for this workspace.';
@@ -293,6 +298,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       if (!title) return fail(input, 'Give the task a name.');
       if (title.length > 160) return fail(input, 'Keep the task name under 160 characters.');
       const t = action.task;
+      if (t.projectId && archivedProject(state, t.projectId)) return fail(input, ARCHIVED_PROJECT);
       if (![t.owner, t.nextOwner, t.decisionOwner, t.approver].every(id => validPerson(state, id))) return fail(input, 'One of the chosen people is not in this workspace.');
       if ((t.dependsOn ?? []).some(id => !taskById(state, id))) return fail(input, 'A chosen dependency no longer exists.');
       // Live members create work for themselves (or leave it unassigned); assigning others needs coordination authority.
@@ -312,6 +318,7 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       if (Object.keys(action.changes).some(key => !(EDITABLE_TASK_FIELDS as readonly string[]).includes(key))) return fail(input, 'Those task fields can’t be edited directly. Nothing was changed.');
       const changes = { ...action.changes };
       if (changes.title !== undefined && !changes.title.trim()) return fail(input, 'A task needs a name.');
+      if (changes.projectId && changes.projectId !== task.projectId && archivedProject(state, changes.projectId)) return fail(input, ARCHIVED_PROJECT);
       if (me.authority && !managerish) {
         // Live members update their own tasks. On anyone else's they may only add or remove themselves as a watcher.
         const keys = Object.keys(changes).filter(key => (changes as Record<string, unknown>)[key] !== undefined);
@@ -537,10 +544,29 @@ export function apply(input: QuestState, action: Action, ctx: ApplyContext): App
       if (!managerish) return fail(input, 'Only a supervisor, admin or owner can create projects.');
       const name = clip(action.name, 80);
       if (!name) return fail(input, 'Name the project.');
-      if (state.projects.some(project => project.name.toLowerCase() === name.toLowerCase())) return fail(input, `A project named “${name}” already exists.`);
+      const existing = state.projects.find(project => project.name.toLowerCase() === name.toLowerCase());
+      if (existing) return fail(input, existing.archivedAt ? `A project named “${name}” is archived. Restore it from the Archive instead.` : `A project named “${name}” already exists.`);
       if (state.projects.length >= 200) return fail(input, 'Keep it to 200 projects.');
       d.s.projects = [...state.projects, { id: newId(), name }];
       return commit(d, ctx, newId, { kind: 'policy', text: `${me.name} created project “${name}”.`, message: `Project “${name}” created.` });
+    }
+    case 'project/archive':
+    case 'project/unarchive': {
+      // Archiving a project only takes it out of active navigation and pickers. Its tasks, their
+      // status, people and history are untouched; restoring brings it back as it was.
+      const archiving = action.type === 'project/archive';
+      if (!managerish) return fail(input, `Only a supervisor, admin or owner can ${archiving ? 'archive' : 'restore'} projects.`);
+      const project = state.projects.find(item => item.id === action.id);
+      if (!project) return fail(input, 'That project no longer exists.');
+      if (archiving && project.id === DEFAULT_PROJECT_ID) return fail(input, `${project.name} is the default project and stays active.`);
+      if (archiving === !!project.archivedAt) return fail(input, archiving ? 'That project is already archived.' : 'That project is not archived.');
+      d.s.projects = state.projects.map(item => (item.id === project.id ? { ...item, archivedAt: archiving ? now : null, archivedBy: archiving ? actor : null } : item));
+      const open = state.tasks.filter(task => task.projectId === project.id && isOpen(task)).length;
+      return commit(d, ctx, newId, {
+        kind: 'policy', undoable: true,
+        text: archiving ? `${me.name} archived project “${project.name}”${open ? ` (${open} open ${open === 1 ? 'task keeps' : 'tasks keep'} their status)` : ''}.` : `${me.name} restored project “${project.name}” from the archive.`,
+        message: archiving ? 'Project archived. Its tasks and history are unchanged.' : 'Project restored.',
+      });
     }
     case 'lead/tags': {
       const lead = leadById(state, action.id);

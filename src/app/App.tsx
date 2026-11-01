@@ -13,7 +13,7 @@ import type { Lens, RegistryQuery } from '../core/registry.ts';
 import { LEGACY_LENSES, LENSES, LENS_LABELS, completedQuery, isCompletedQuery, lensCounts, queryTasks } from '../core/registry.ts';
 import { canCreateTask } from '../core/permissions.ts';
 import { insights, insightsFor } from '../core/rules.ts';
-import { activeGrant, activeLeads, inFocus, leadBucket, myTasks, person, taskById, withoutLegacyArchived } from '../core/selectors.ts';
+import { activeGrant, activeLeads, activeProjects, inFocus, leadBucket, myTasks, person, taskById, withoutLegacyArchived } from '../core/selectors.ts';
 import { LookSwitch, ModeChip, BrandMark, ToastBar, CtaArrow } from '../ui/components.tsx';
 import { useQuest } from '../ui/useQuest.ts';
 import type { Quest } from '../ui/useQuest.ts';
@@ -33,6 +33,7 @@ import { ProjectRoom } from './ProjectRoom.tsx';
 import { DraftTask, discardTaskDraft, hasTaskDraft } from './DraftTask.tsx';
 import { ExecutiveDesk } from './ExecutiveDesk.tsx';
 import { Activity, Settings } from './Settings.tsx';
+import { Archive } from './Archive.tsx';
 import { Home } from './Home.tsx';
 import { CollabDock } from './CollabDock.tsx';
 import type { DockTab } from './CollabDock.tsx';
@@ -80,7 +81,7 @@ export type View = AppPageId;
 
 const VIEW_LABELS: Record<View, string> = {
   workbook: 'Operations Workbook · Preview', home: 'Home', calendar: 'Calendar', reports: 'Reports', relationships: 'Relationship Vault', 'all-tasks': 'Tasks', inbox: 'Inbox', tools: 'Estimates & Proposals', 'company-work': 'Projects', 'needs-attention': 'Needs Attention', leads: 'First Response',
-  executive: 'Owner overview', people: 'People & Access', feedback: 'Feedback', activity: 'Activity', settings: 'Settings', agents: 'Agent pilot',
+  executive: 'Owner overview', people: 'People & Access', feedback: 'Feedback', activity: 'Activity', settings: 'Settings', agents: 'Agent pilot', archive: 'Archive',
 };
 
 /** Views where the Instrument Deck (signals, calendar, insights) is useful beside the canvas. */
@@ -338,6 +339,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
     go(noteView ?? 'needs-attention');
   }
 
+  const archivedCount = whole.state.projects.filter(item => item.archivedAt).length + whole.state.tasks.filter(task => task.archivedAt).length;
   const navigation: { id: View; label: string; count?: number; countLabel?: string; hot?: boolean; preview?: boolean; icon: ReactNode }[] = [
     // Everyday work. Reports (company measures) and Owner overview (decisions) are separate pages.
     { id: 'home', label: 'Home', icon: <Icon d="M3 11l9-8 9 8M5 10v11h14V10M10 21v-7h4v7" /> },
@@ -351,6 +353,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
     // Oversight, not a place: the same eye the task page uses for Watch.
     { id: 'executive' as View, label: 'Owner overview', count: decisions, countLabel: decisions === 1 ? 'decision' : 'decisions', hot: decisions > 0, icon: <Icon d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /> },
     { id: 'activity', label: 'Activity', icon: <Icon d="M4 12h4l3-7 3 14 3-7h3" /> },
+    { id: 'archive', label: 'Archive', count: archivedCount || undefined, countLabel: 'archived records', icon: <Icon d="M3 4h18v4H3zM5 8v12h14V8M10 12h4" /> },
     { id: 'settings', label: 'Settings', icon: <Icon d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v3M12 19v3M2 12h3M19 12h3" /> },
     // Preview modules: still reachable, kept out of the everyday list (see the Previews group).
     { id: 'workbook', label: 'Operations Workbook', icon: <Icon d="M3 4h18v16H3zM3 9h18M8 4v16M14 4v16" /> },
@@ -484,7 +487,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
         pulloutTitle={calendarAllowed ? 'Calendar' : 'Your work'}
         pullout={<div className="left-stack">
           {calendarAllowed && view !== 'calendar' && <CalendarPullout quest={quest} company={company} dayList={false} onOpenTask={openTask} onExpandCalendar={() => go('calendar')} onCreate={canCreate ? due => createOn(due) : undefined} />}
-          {view !== 'calendar' && <WorkNavigator lenses={taskTabs} projects={state.projects} onLens={id => { if (id === 'completed') openCompleted(); else openLens(id as Lens); }} onProjects={() => go('company-work')} />}
+          {view !== 'calendar' && <WorkNavigator lenses={taskTabs} projects={activeProjects(state)} onLens={id => { if (id === 'completed') openCompleted(); else openLens(id as Lens); }} onProjects={() => go('company-work')} />}
         </div>}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
         items={railItems.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: item.id === 'calendar' && !sidebar.isMobile ? pullouts.calendar : view === item.id, info: item.id === 'calendar' && !sidebar.isMobile ? 'Quick view · opens beside the page' : info[item.id] }))}
@@ -544,7 +547,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
             : view === 'relationships' ? <Relationships quest={quest} onOpen={openTask} />
             : view === 'people' ? <People quest={quest} />
             : view === 'calendar' ? <CalendarPage quest={quest} company={company} onOpenTask={openTask} onCreate={canCreate ? createOn : undefined}
-                filters={taskTabs} projects={state.projects.length} onProjects={() => go('company-work')} />
+                filters={taskTabs} projects={activeProjects(state).length} onProjects={() => go('company-work')} />
             : view === 'feedback' ? <FeedbackInbox quest={quest} onOpen={id => { setFeedbackId(id); history.replaceState(null, '', `#/feedback/${id}`); }} />
             : view === 'company-work' && roomId ? <ProjectRoom quest={quest} projectId={roomId} company={company} onBack={() => { location.hash = '#/company-work'; }} onOpenTask={openTask}
                 onAddTask={canCreate ? projectId => { setCreateProjectId(projectId); setCreating(true); } : undefined} />
@@ -553,6 +556,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
                 onAddTask={canCreate ? projectId => { setCreateProjectId(projectId); setCreating(true); } : undefined} />
             : view === 'needs-attention' ? <NeedsAttention quest={quest} onOpen={openTask} />
             : view === 'leads' ? <SpeedToLead quest={quest} onOpen={openTask} selectedLead={leadId} onSelectLead={id => { setLeadId(id); history.replaceState(null, '', id ? `#/leads/${id}` : '#/leads'); }} />
+            : view === 'archive' ? <Archive quest={whole} onOpenTask={openTask} onOpenProject={id => { location.hash = `#/company-work/${encodeURIComponent(id)}`; }} />
             : view === 'activity' ? <Activity quest={whole} onOpen={openTask} />
             : view === 'settings' ? <Settings quest={quest} onPeople={() => go('people')} />
             : <PagePreview title="Agent pilot" detail="This pilot is not connected to an agent service or workspace data. No tasks are sent and no outcomes are generated here." />}
