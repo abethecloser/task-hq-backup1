@@ -4,7 +4,7 @@
 // widening into flush, integrated bottom navigation as room shrinks. In the capsule, with a fine pointer,
 // icons magnify with pointer proximity (neighbours a little) and spring back. Touch: steady, no hover.
 // It owns no navigation state: items, counts and actions come from the app's one `navigation` list.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 
 export interface DockItem { id: string; label: string; icon: ReactNode; count?: number; countLabel?: string; hot?: boolean; active: boolean }
@@ -29,6 +29,23 @@ export function NavDock({ items, onSelect, mobile }: {
     return () => { query.removeEventListener('change', change); cancelAnimationFrame(frame.current); };
   }, []);
   const active = magnify && !mobile;
+  // Size the dock from the page column's real width (not 100vw, which includes a visible scrollbar).
+  const nav = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const shell = nav.current?.closest<HTMLElement>('.shell'), main = shell?.querySelector<HTMLElement>(':scope > .main');
+    if (!shell || !main) return;
+    const measure = () => {
+      const box = main.getBoundingClientRect();
+      const left = box.left, width = main.clientWidth;
+      shell.style.setProperty('--nd-avail', `${width}px`);
+      shell.style.setProperty('--nd-center', `${left + width / 2}px`);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(main);
+    window.addEventListener('resize', measure);
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure); shell.style.removeProperty('--nd-avail'); shell.style.removeProperty('--nd-center'); };
+  }, [mobile]);
 
   // Scale each tile by how close the pointer is to its centre (a smooth cosine falloff).
   function track(event: PointerEvent<HTMLUListElement>) {
@@ -63,7 +80,7 @@ export function NavDock({ items, onSelect, mobile }: {
   }
 
   return (
-    <nav className={`nav-dock ${mobile ? 'is-mobile' : 'is-float'} ${active ? 'can-magnify' : ''}`} aria-label="Primary">
+    <nav ref={nav} className={`nav-dock ${mobile ? 'is-mobile' : 'is-float'} ${active ? 'can-magnify' : ''}`} aria-label="Primary">
       <ul ref={bar} className="nd-bar" onPointerMove={track} onPointerLeave={rest} onKeyDown={keys}>
         {items.map(item => {
           const home = item.id === 'home';

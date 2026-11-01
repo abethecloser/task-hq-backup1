@@ -8,7 +8,8 @@
    never a card sitting on a separate white strip. */
 .shell.nav-dock-on {
   --nd-h: 72px; --nd-reserve: calc(var(--nd-h) + 30px + env(safe-area-inset-bottom));
-  /* The work area: viewport minus the rail (and any docked right panel). */
+  /* The work area. NavDock replaces this with the measured width of the page column (100vw counts the
+     scrollbar on desktops with visible scrollbars, which pushed the flush bar past the edge). */
   --nd-avail: calc(100vw - var(--rail, 72px) - var(--panel-offset, 0px) - var(--context-offset, 0px));
   /* 0 at ≤760px of work area, growing to its maximum by ~1110px: lift, roundness and shadow follow it. */
   --nd-lift: clamp(0px, calc((var(--nd-avail) - 760px) * .04), 14px);
@@ -24,28 +25,31 @@
 .shell.nav-dock-on .collab-dock { margin-bottom: calc(var(--nd-h) + 1px + var(--nd-lift) + env(safe-area-inset-bottom)); }
 .shell.nav-dock-on .collab-dock:not(.is-open) { display: none; }
 .shell.nav-dock-on .tabbar { display: none; }
+.shell.nav-dock-on .toast { bottom: calc(var(--nd-h) + var(--nd-lift) + 16px + env(safe-area-inset-bottom)); }
 .shell.nav-dock-on .fab-create { bottom: calc(var(--nd-h) + 16px + env(safe-area-inset-bottom)); }
 
 .nav-dock {
   --nd-spring: cubic-bezier(.34, 1.56, .64, 1);
   --nd-tile: 40px;
-  position: fixed; z-index: 40; bottom: var(--nd-lift);
-  left: calc(var(--rail, 72px) + var(--panel-offset, 0px) + var(--nd-avail) / 2);
+  /* Above page content and the top bar; below scrims, drawers, the rail and its menus, and modals. */
+  position: fixed; z-index: 26; bottom: var(--nd-lift);
+  left: var(--nd-center, calc(var(--rail, 72px) + var(--panel-offset, 0px) + var(--nd-avail) / 2));
   width: var(--nd-w); transform: translateX(-50%);
   container: nd / inline-size;
 }
 .nd-bar {
   display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; justify-content: center;
   height: var(--nd-h); margin: 0; padding: 0 8px env(safe-area-inset-bottom); list-style: none; box-sizing: content-box;
-  border-top: 1px solid color-mix(in srgb, var(--hair, #e5e7eb) 90%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--hair, #e5e7eb) 55%, transparent);
   border-radius: var(--nd-round);
-  background: color-mix(in srgb, var(--card, #fff) 80%, transparent);
-  backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  /* Translucent: page content shows softly through; icons and labels stay fully opaque. */
+  background: color-mix(in srgb, var(--card, #fff) 62%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4);
   /* The outline ring and elevation scale with the lift, so the flush bar keeps only its top hairline. */
   box-shadow:
-    0 0 0 clamp(0px, calc(var(--nd-lift) * .08), 1px) color-mix(in srgb, var(--hair, #e5e7eb) 90%, transparent),
-    0 calc(var(--nd-lift) * .9) calc(var(--nd-lift) * 2.6) rgb(17 24 39 / 12%),
-    0 calc(var(--nd-lift) * .12) calc(var(--nd-lift) * .4) rgb(17 24 39 / 6%);
+    0 0 0 clamp(0px, calc(var(--nd-lift) * .08), 1px) color-mix(in srgb, var(--hair, #e5e7eb) 50%, transparent),
+    0 calc(var(--nd-lift) * .7) calc(var(--nd-lift) * 2.2) rgb(17 24 39 / 7%),
+    0 calc(var(--nd-lift) * .1) calc(var(--nd-lift) * .3) rgb(17 24 39 / 3%);
 }
 /* Wide surfaces keep the five destinations together in the middle, evenly spaced. */
 @container nd (min-width: 640px) { .nd-bar { grid-template-columns: repeat(5, minmax(0, 132px)); } }
@@ -77,7 +81,7 @@
 .nd-badge.is-hot { background: var(--accent); }
 
 /* Phones: the same flush surface, steady targets, no motion on touch. */
-.nav-dock.is-mobile { left: 50%; }
+.nav-dock.is-mobile { left: var(--nd-center, 50%); }
 .nav-dock.is-mobile .nd-tile { --nd-tile: 34px; background: transparent; transform: none; transition: background .2s, color .2s; }
 .nav-dock.is-mobile .nd-home .nd-tile { --nd-tile: 42px; background: var(--ink, #111827); }
 .nav-dock.is-mobile .nd-item { min-height: 54px; font-size: 11px; }
