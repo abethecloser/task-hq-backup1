@@ -31,8 +31,11 @@ export function WorkNavigator({ sections, lenses, projects, activeProjectId, onS
   grouped[grouped.length - 1]!.items.push(...rest);
   const shown = projects.slice(0, PROJECT_LIMIT);
 
+  // A parent whose view or project is the current page reads as "you are in here", not as a second
+  // current page; the child carries the active highlight.
+  const childActive = (id: string) => (id === 'all-tasks' && lenses.some(lens => lens.active)) || (id === 'company-work' && !!activeProjectId);
   const row = (item: NavSection) => (
-    <button type="button" className={`work-nav-item is-section ${item.active ? 'is-active' : ''}`} aria-current={item.active ? 'page' : undefined}
+    <button type="button" className={`work-nav-item is-section ${item.active && !childActive(item.id) ? 'is-active' : ''} ${childActive(item.id) ? 'has-active-child' : ''}`} aria-current={item.active && !childActive(item.id) ? 'page' : undefined}
       aria-label={`${item.label}${item.preview ? ', preview' : ''}${item.count && item.countLabel ? `, ${item.count} ${item.countLabel}` : ''}`}
       onClick={() => onSelect(item.id)}>
       <span className="work-nav-icon" aria-hidden="true">{item.icon}</span><span className="work-nav-text">{item.label}</span>

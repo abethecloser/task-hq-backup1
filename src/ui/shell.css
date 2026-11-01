@@ -450,3 +450,15 @@
 .work-nav, .work-nav-group, .work-list, .work-sub, .work-list li { min-width: 0; }
 .work-nav ul { grid-template-columns: minmax(0, 1fr); }
 #quest-sidebar .panel-scroll { overflow-x: hidden; }
+
+/* Navigator refinement: one left edge for icons and labels, nested items aligned under the parent's
+   label, a clear current-page marker, and a quiet "you are inside this" state for parents. */
+.work-nav { gap: 16px; }
+.work-nav-item.is-section { gap: 10px; padding-inline: 10px; }
+.work-nav-item b { flex: none; margin-left: auto; }
+.work-sub { margin: 2px 0 6px 21px !important; padding-left: 9px !important; }
+.work-sub .work-nav-item { padding-inline: 10px; }
+.work-nav-item.is-active { position: relative; font-weight: 750; }
+.work-nav-item.is-active::before { content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 3px; border-radius: 2px; background: var(--accent); }
+.work-nav-item.has-active-child { color: var(--ink); font-weight: 750; }
+.work-nav-item.has-active-child .work-nav-icon { color: var(--accent-ink); }
