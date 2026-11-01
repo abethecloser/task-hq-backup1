@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import App from './app/App.tsx';
 import { AuthScreen, useSession } from './auth/AuthScreen.tsx';
 import { BadgeCheckIn } from './auth/BadgeCheckIn.tsx';
+import { WORKDAY_ROUTE } from './shifts/Workday.tsx';
 import { LiveRoot } from './live/LiveRoot.tsx';
 import type { AuthView } from './auth/AuthScreen.tsx';
 import { supabase } from './auth/client.ts';
@@ -87,11 +88,11 @@ function Root() {
 
   const client = supabase();
   // A badge scan: the person signs in with their own account (the badge is kept in memory only),
-  // the server confirms that account owns the badge, then the workday gate takes SOD and check-in.
+  // the server confirms that account owns the badge, then the shift panel opens for SOD and check-in.
   if (badge && mode !== 'demo') {
     if (!session.ready) return null;
     if (session.email || !badgeSignIn) {
-      return <BadgeCheckIn code={badge} email={session.email} onContinue={() => { setBadge(null); history.replaceState(null, '', '#/home'); }}
+      return <BadgeCheckIn code={badge} email={session.email} onContinue={() => { setBadge(null); history.replaceState(null, '', WORKDAY_ROUTE); }}
         onSignIn={() => { setBadgeSignIn(true); go('sign-in'); }} onCancel={() => setBadge(null)}
         onSwitch={() => { setBadgeSignIn(true); go('sign-in'); void client?.auth.signOut({ scope: 'local' }); }} />;
     }

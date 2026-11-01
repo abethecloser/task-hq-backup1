@@ -1,14 +1,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { entryPhase } from './workday.ts';
+const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8');
 
-test('signed in and off-shift: viewing work is allowed and never needs a check-in', () => {
-  assert.equal(entryPhase({ open: false, lateEodDue: false, viewingOffShift: false }), 'gate', 'first visit offers SOD and check-in');
-  assert.equal(entryPhase({ open: false, lateEodDue: false, viewingOffShift: true }), 'work', 'choosing to view work opens it, off-shift');
-  assert.equal(entryPhase({ open: true, lateEodDue: false, viewingOffShift: false }), 'work', 'an open shift goes straight to work');
-  assert.equal(entryPhase({ open: false, lateEodDue: true, viewingOffShift: false }), 'gate', 'a missed EOD is offered first');
-  assert.equal(entryPhase({ open: false, lateEodDue: true, viewingOffShift: true }), 'work', 'but never blocks viewing work');
+test('signing in opens the workspace directly; no check-in page stands in front of it', () => {
+  const gate = read('Workday.tsx');
+  assert.match(gate, /useState<'work' \| 'panel'>\(\(\) => \(canCheckIn && location\.hash === WORKDAY_ROUTE \? 'panel' : 'work'\)\)/, 'entry is the workspace unless the shift panel was asked for');
+  assert.doesNotMatch(gate, /'gate'|'checking'/, 'no gate or blocking status check on entry');
+  // Shift status never blocks: a failed status load is shown inside the panel, not instead of the work.
+  assert.match(gate, /return <WorkdayContext\.Provider value=\{canCheckIn \? workday : null\}>\{children\}<\/WorkdayContext\.Provider>;/);
+  // The live root still wraps the app in the workday provider, so shift tools stay available.
+  assert.match(read('../live/LiveRoot.tsx'), /<WorkdayGate /);
+});
+
+test('shift management stays reachable on request: account menu, task page, badge scan', () => {
+  assert.match(read('../app/TopBar.tsx'), /workday\.open\(\)/, 'account menu: Check in / Check out');
+  assert.match(read('../app/TaskPage.tsx'), /onClick=\{workday\.open\}/, 'task page: Clock in on this task');
+  assert.match(read('../main.tsx'), /history\.replaceState\(null, '', WORKDAY_ROUTE\)/, 'a badge scan opens the shift panel');
+  assert.match(read('Workday.tsx'), /<ShiftModule backend=\{shifts\}/, 'the shift module itself is unchanged and still rendered');
 });
 
 test('only the explicit Clock in button starts a shift; entering, reading or opening tasks never does', () => {
