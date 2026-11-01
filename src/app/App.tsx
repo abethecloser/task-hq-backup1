@@ -178,7 +178,6 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   useEffect(() => { try { saveDockPreference(localStorage, dock); } catch { /* storage unavailable */ } }, [dock]);
   const dockOpen = dock.snap !== 'collapsed';
   /** The task the dock is reading, focused in the overview's Living view until cleared. */
-  const [dockFocus, setDockFocus] = useState<string | null>(null);
   /** An explicit "Open in dock" request from a task page (nonce repeats a request for the same task). */
   const [dockTask, setDockTask] = useState<{ id: string; nonce: number } | null>(null);
   const [dockTab, setDockTab] = useState<DockTab>('inbox');
@@ -503,6 +502,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
       style={{ ...sidebar.shellStyle, ...(sidebar.isMobile ? {} : { ['--panel-offset' as string]: `${leftReserved}px` }), ['--context-offset' as string]: `${contextOffset}px` }}
       data-sidebar={sidebar.isMobile ? undefined : sidebar.open ? 'open' : 'closed'} data-context={contextOffset ? 'open' : 'closed'} data-dock={hasDock ? (dockOpen ? 'open' : 'closed') : undefined} data-resizing={sidebar.resizing || undefined}>
       <Sidebar
+        workspaceName={state.workspace.name}
         control={sidebar}
         notifications={notifications}
         settings={close => <>
@@ -564,7 +564,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
             ? <CriticalFocus quest={quest} onOpen={openTask} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
                 onOpen={openTask} onOpenLead={openLead} onCreate={() => setCreating(true)}
-                onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} focusTaskId={dockFocus} onClearFocus={() => setDockFocus(null)} onReports={() => go('reports')} />
+                onRegistry={openRegistry} onDeck={openDeck} onTeam={() => go('people')} onReports={() => go('reports')} />
             : view === 'all-tasks' ? <AllTasks quest={whole} selectedId={taskId} onSelect={openTask} onCreate={() => setCreating(true)} canCreate={canCreate} preset={preset} onPresetApplied={clearPreset} registry={registry}
                 lenses={taskTabs} onLens={id => { if (id === 'completed') openCompleted(); else if (LENSES.includes(id as Lens)) openLens(id as Lens); else go(id as View); }} />
             : view === 'inbox' ? <Inbox quest={quest} data={inboxData} notes={notifications} read={sidebar.read} markRead={sidebar.markRead} onOpenTask={openTask} onOpenLead={openLead} />
@@ -594,7 +594,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
         {hasDock && <CollabDock quest={quest} company={company} snap={dock.snap} onSnap={snap => setDock(current => withSnap(current, snap))}
           onToggle={() => setDock(current => withSnap(current, current.snap === 'collapsed' ? current.last : 'collapsed'))} tab={dockTab} onTab={setDockTab}
           inbox={inbox} data={inboxData} read={sidebar.read} markRead={sidebar.markRead} mentions={mentions}
-          onOpen={openTask} onOpenLead={openLead} onActivity={() => go('activity')} onOpenInboxPage={() => go('inbox')} onFocusTask={setDockFocus}
+          onOpen={openTask} onOpenLead={openLead} onActivity={() => go('activity')} onOpenInboxPage={() => go('inbox')}
           contextTaskId={selected && contextAllowed ? selected.id : null} openTask={dockTask} />}
 
         <nav className="tabbar" aria-label="Task-HQ sections">

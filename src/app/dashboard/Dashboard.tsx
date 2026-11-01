@@ -24,9 +24,7 @@ function useBreakpoint(): 'desktop' | 'tablet' | 'phone' {
 }
 
 /** Packed rows are this fine (px; CSS grid-auto-rows wins), so a module's span tracks its real height; the gutter matches the columns. */
-const ROW_UNIT = 2, GUTTER = 14;
-/** Neighbours this close in height (px) line up; bigger differences pack, so no space is wasted. */
-const BALANCE = 96;
+const ROW_UNIT = 2, GUTTER = 14, COLUMNS = 12;
 
 export interface DashboardModule extends ModuleSpec {
   name: string;
@@ -57,11 +55,10 @@ export function Dashboard({ pageId, scope, actor, modules, defaultItems }: {
   const live = useRef<HTMLParagraphElement>(null);
   const announce = (text: string) => setNotice(text);
   const grid = useRef<HTMLDivElement>(null);
-  // Adaptive placement, chosen for the person: modules keep their order; each spans its natural
-  // height on fine rows, so later modules rise into space under shorter neighbours (no dense backfill,
-  // so reading, Tab and arranged order agree). Neighbours that start together and differ by less than
-  // BALANCE share the taller height, so near-equal cards line up instead of leaving ragged edges or
-  // slivers too small to use. Saved 'aligned' arrangements from earlier versions read the same way.
+  // Adaptive placement, chosen for the person: modules keep their order (reading, Tab and arranged
+  // order agree) and each spans its natural height on fine rows. Cards that start a row together share
+  // the row's tallest height, so neighbours always line up edge to edge with no ragged gaps between
+  // them. Saved 'aligned' arrangements from earlier versions read the same way.
   useLayoutEffect(() => {
     const node = grid.current;
     if (!node) return;
@@ -71,17 +68,21 @@ export function Dashboard({ pageId, scope, actor, modules, defaultItems }: {
       const span = (height: number) => `span ${Math.max(1, Math.ceil((height + GUTTER) / unit))}`;
       for (const item of items) item.style.minHeight = '';
       const natural = items.map(item => item.getBoundingClientRect().height);
-      items.forEach((item, index) => { item.style.gridRowEnd = span(natural[index]!); });
-      const rows = new Map<number, number[]>();
+      // Rows come from the column spans (fillRows closes every row at exactly 12), not from measured
+      // positions, so a short card can never pull the next row's cards out of line.
+      const rows: number[][] = [];
+      let used = COLUMNS;
       items.forEach((item, index) => {
-        const top = item.offsetTop;
-        const row = [...rows.keys()].find(key => Math.abs(key - top) <= unit) ?? top;
-        rows.set(row, [...(rows.get(row) ?? []), index]);
+        const columns = parseInt(item.style.gridColumn.replace(/\D+/g, ''), 10) || COLUMNS;
+        if (used + columns > COLUMNS) { rows.push([]); used = 0; }
+        rows.at(-1)!.push(index); used += columns;
       });
-      for (const members of rows.values()) {
-        if (members.length < 2) continue;
+      for (const members of rows) {
         const tallest = Math.max(...members.map(index => natural[index]!));
-        for (const index of members) if (tallest - natural[index]! <= BALANCE) { items[index]!.style.minHeight = `${tallest}px`; items[index]!.style.gridRowEnd = span(tallest); }
+        for (const index of members) {
+          if (members.length > 1) items[index]!.style.minHeight = `${tallest}px`;
+          items[index]!.style.gridRowEnd = span(tallest);
+        }
       }
     };
     fit();

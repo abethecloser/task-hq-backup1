@@ -770,6 +770,8 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .dash-item:not([data-module="welcome"]):not([data-module="performance"]) { overflow: hidden; border: 1px solid var(--wb-line, #e5e7eb); border-radius: var(--wb-radius, 12px); background: var(--card, #fff); box-shadow: var(--wb-shadow, 0 1px 2px rgb(17 24 39 / 4%)); }
 .dash-cell { display: flex; flex-direction: column; flex: 0 0 auto; min-height: 0; }
 .dash-cell > * { flex: 1 1 auto; box-sizing: border-box; }
+/* Spotlight modules grow with their row, so the media frame fills the card beside a taller neighbour. */
+.dash-item:is([data-module="culture"], [data-module="video"], [data-module="moments"]) > .dash-cell { flex-grow: 1; }
 /* Compact empty states and spotlight on the dashboard, so an empty module doesn't stand tall. */
 .dash .hd-empty { padding: 14px 12px !important; gap: 2px !important; }
 .dash .hd-empty-mark { width: 34px; height: 34px; margin-bottom: 2px; border-radius: 10px; }
@@ -805,3 +807,8 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
   .dash-tool, .dash-tool select { flex: 1 1 100%; max-width: none; width: 100%; }
   .dash-expand { display: none; } /* one column on phones: width has no effect */
 }
+
+.hd-report-summary { display: grid; gap: 12px; margin: 16px 0 0; }
+.hd-report-summary > div { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.hd-report-summary dt { color: var(--muted); }
+.hd-report-summary dd { margin: 0; text-align: right; font-weight: 650; }

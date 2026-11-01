@@ -1,0 +1,34 @@
+/* Reference-led sidebar treatment, scoped to desktop navigation. Existing state, routes and tree stay authoritative. */
+@media (min-width: 761px) {
+  .shell[data-sidebar="closed"] { --rail: 72px; }
+  :root .shell .rail { background: #f8f8f8; border: 0; box-shadow: none; padding: 16px 12px 12px; }
+  .rail .rail-head { gap: 10px; padding: 0; margin: 0 0 18px; }
+  .rail:not(.is-expanded) .rail-head { width: 48px; margin-bottom: 18px; }
+  .rail .sidebar-brand { padding: 0; }
+  .rail .brand { justify-content: center; padding: 0; width: 44px; height: 44px; }
+  :root .shell .rail .rail-collapse { flex: none; width: 44px; height: 44px; margin: 0; border: 0; border-radius: 10px; background: transparent; color: #737373; box-shadow: none; }
+  :root .shell .rail .rail-collapse .icon { width: 20px; height: 20px; }
+  :root .shell .rail .rail-collapse:hover { background: #eeeeee; color: var(--ink); }
+  .rail .rail-title { font-size: 16px; font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  :root .shell .rail:not(.is-expanded) .nav-item { width: 48px; min-height: 48px; margin: 0; border-radius: 12px; color: #737373; }
+  :root .shell .rail:not(.is-expanded) .nav-item.is-active { color: #202020; background: #ededed; box-shadow: none; }
+  :root .shell .rail:not(.is-expanded) .nav-item[aria-current="page"]::before { left: -8px; width: 3px; top: 16px; bottom: 16px; background: #202020; }
+  .rail:not(.is-expanded) .nav-icon { width: 22px; height: 22px; }
+  .rail:not(.is-expanded) .nav-icon > .icon { width: 22px; height: 22px; }
+  .rail:not(.is-expanded) .rail-group { gap: 6px; }
+  .rail:not(.is-expanded) .rail-group + .rail-group { margin-top: 18px; }
+  :root .shell .rail .sidebar-foot { border-top: 1px solid #e9e9e9; padding-top: 12px; }
+  .rail.is-expanded .rail-tree { margin-top: 0; }
+  .rail.is-expanded .work-nav-item { border-radius: 10px; min-height: 44px; color: #676767; }
+  .rail.is-expanded .work-nav-item.is-active { position: relative; background: #eeeeee; color: #202020; }
+  .rail.is-expanded .work-nav-item[aria-current="page"]::before { content: ''; position: absolute; left: 0; top: 13px; bottom: 13px; width: 3px; border-radius: 3px; background: #202020; }
+  .rail.is-expanded .work-nav-item:hover { background: #efefef; }
+  .rail.is-expanded .sidebar-foot { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 6px; align-items: center; }
+  .rail.is-expanded .rail-account { justify-content: flex-start; gap: 10px; min-height: 56px; padding: 8px; border-radius: 12px; background: #efefef; min-width: 0; }
+  .rail.is-expanded .rail-account .nav-icon { width: 30px; height: 30px; }
+  .rail-account-copy { display: grid; gap: 3px; min-width: 0; text-align: left; }
+  .rail-account-copy strong,.rail-account-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rail-account-copy strong { font-size: 13px; font-weight: 650; color: var(--ink); }
+  .rail-account-copy small { font-size: 11px; font-weight: 400; color: var(--muted); }
+  .rail.is-expanded .rail-settings { width: 44px; min-height: 44px; }
+}

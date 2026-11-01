@@ -23,6 +23,7 @@ import './ui/wallboard.css';
 import './ui/panels.css';
 import './ui/cta.css';
 import './ui/header.css';
+import './ui/sidebar-refinement.css';
 import { applyLook } from './ui/look.ts';
 
 // Entry: real sign-in by default on the web; the synthetic demo is a separate,
