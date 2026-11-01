@@ -70,10 +70,9 @@
   & :is(.pt-label) { color: var(--wb-micro); font-size: 12px; letter-spacing: .18em; }
   & .pt-ring-label small, & .pt-ring-sub { color: var(--wb-micro); font-size: 11.5px; font-weight: 750; letter-spacing: .16em; text-transform: uppercase; }
   & .pt-ring-label b { font-weight: 800; }
-  & :is(.pt-row, .pt-mini button) { border-radius: var(--wb-radius-sm); }
-  & :is(.pt-row, .pt-mini button):hover { background: var(--wb-hover); }
-  & .pt-row.is-on { background: #fff4ed; }
-  & :is(.pt-row small, .pt-mini small) { color: var(--wb-meta); font-size: 13px; }
+  & .pt-mini button { border-radius: var(--wb-radius-sm); }
+  & .pt-mini button:hover { background: var(--wb-hover); }
+  & .pt-mini small { color: var(--wb-meta); font-size: 13px; }
   & .pt-mini strong { font-size: 15px; }
   & :is(.pt-projects-done, .pt-actions) { border-top-color: var(--wb-line-soft); }
 

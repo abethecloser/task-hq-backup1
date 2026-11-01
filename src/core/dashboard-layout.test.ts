@@ -7,7 +7,7 @@ const SPECS: ModuleSpec[] = [
   { id: 'welcome', sizes: ['xl'], defaultSize: 'xl' }, { id: 'performance', sizes: ['l', 'xl'], defaultSize: 'xl' },
   { id: 'up-next', sizes: ['s', 'm', 'l'], defaultSize: 'm' }, { id: 'at-risk', sizes: ['s', 'm', 'l'], defaultSize: 'm' },
   { id: 'reports', sizes: ['s', 'm', 'l'], defaultSize: 'm' },
-  { id: 'projects', sizes: ['l', 'xl'], defaultSize: 'l' }, { id: 'culture', sizes: ['s', 'm'], defaultSize: 's' },
+  { id: 'projects', sizes: ['m', 'l', 'xl'], defaultSize: 'm' }, { id: 'culture', sizes: ['s', 'm'], defaultSize: 'm' },
   { id: 'video', sizes: ['s', 'm'], defaultSize: 's' }, { id: 'moments', sizes: ['s', 'm'], defaultSize: 's' },
   { id: 'people', sizes: ['s', 'm'], defaultSize: 'm' }, { id: 'needs-hand', sizes: ['s', 'm'], defaultSize: 's' },
   { id: 'next-actions', sizes: ['s', 'm'], defaultSize: 's' }, { id: 'activity', sizes: ['s', 'm'], defaultSize: 's' },
@@ -21,7 +21,7 @@ test('no saved preference: everyone sees today’s dashboard', () => {
 
 test('saved layouts are cleaned: unknown, duplicate and unavailable modules dropped, bad sizes fixed', () => {
   const layout = normalizeLayout({ version: 1, items: [{ id: 'at-risk', size: 'l' }, { id: 'gone' }, { id: 'at-risk', size: 's' }, { id: 'welcome', size: 's' }, null, { id: 'culture', size: 'xl' }] }, SPECS);
-  assert.deepEqual(layout.items, [{ id: 'at-risk', size: 'l' }, { id: 'welcome', size: 'xl' }, { id: 'culture', size: 's' }]);
+  assert.deepEqual(layout.items, [{ id: 'at-risk', size: 'l' }, { id: 'welcome', size: 'xl' }, { id: 'culture', size: 'm' }]);
   // A module this person can't use (not in their available specs) is left out.
   assert.deepEqual(normalizeLayout({ version: 1, items: [{ id: 'people', size: 'm' }, { id: 'up-next', size: 'm' }] }, SPECS.filter(s => s.id !== 'people')).items, [{ id: 'up-next', size: 'm' }]);
 });
@@ -34,7 +34,7 @@ test('move, resize, remove and add', () => {
   assert.equal(layout.items.at(-1)!.id, 'culture');
   const projects = SPECS.find(s => s.id === 'projects')!;
   assert.equal(resizeItem(layout, 'projects', 'xl', projects).items.find(i => i.id === 'projects')!.size, 'xl');
-  assert.equal(resizeItem(layout, 'projects', 's', projects).items.find(i => i.id === 'projects')!.size, 'l', 'unsupported size refused');
+  assert.equal(resizeItem(layout, 'projects', 's', projects).items.find(i => i.id === 'projects')!.size, 'm', 'unsupported size refused');
   layout = removeItem(layout, 'at-risk');
   assert.ok(!layout.items.some(i => i.id === 'at-risk'));
   layout = addItem(layout, SPECS.find(s => s.id === 'at-risk')!);
@@ -78,9 +78,12 @@ test('height is separate from width: Auto by default, stored only when chosen, k
 
 test('rows fill edge to edge in the person’s order; widths only grow to close a gap', async () => {
   const { fillRows } = await import('./dashboard-layout.ts');
-  // Default desktop: already full rows, unchanged.
-  assert.deepEqual(fillRows([{ id: 'welcome', span: 12 }, { id: 'up', span: 6 }, { id: 'risk', span: 6 }, { id: 'projects', span: 8 }, { id: 'culture', span: 4 }]),
-    { welcome: 12, up: 6, risk: 6, projects: 8, culture: 4 });
+  // Default desktop: already full rows, unchanged; every paired row shares one column line.
+  assert.deepEqual(fillRows([{ id: 'welcome', span: 12 }, { id: 'up', span: 6 }, { id: 'risk', span: 6 }, { id: 'projects', span: 6 }, { id: 'culture', span: 6 }]),
+    { welcome: 12, up: 6, risk: 6, projects: 6, culture: 6 });
+  // A saved wider overview still fills its row: Quest Culture takes whatever is left.
+  assert.deepEqual(fillRows([{ id: 'projects', span: 8 }, { id: 'culture', span: 6 }]), { projects: 12, culture: 12 });
+  assert.deepEqual(fillRows([{ id: 'projects', span: 8 }, { id: 'culture', span: 4 }]), { projects: 8, culture: 4 });
   // Up next expanded (8) no longer fits beside At risk (6): each row closes its own gap; order kept.
   assert.deepEqual(fillRows([{ id: 'up', span: 8 }, { id: 'risk', span: 6 }, { id: 'projects', span: 8 }, { id: 'culture', span: 4 }]),
     { up: 12, risk: 12, projects: 8, culture: 4 });

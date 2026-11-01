@@ -141,7 +141,7 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
               </ul>}
         </section>
     </> },
-    { id: 'projects', name: 'Projects and Team Overview', description: 'Completion by project', sizes: ['m', 'l', 'xl'], defaultSize: 'l',
+    { id: 'projects', name: 'Projects and Team Overview', description: 'Task completion and stages', sizes: ['m', 'l', 'xl'], defaultSize: 'm',
       // Parts shown as their own modules (by default Needs a hand and Next actions) aren't repeated here.
       render: ({ layout }) => <ProjectTeam quest={quest} company={company} onOpen={onOpen} onReports={onReports}
         omit={{ needsHand: shown(layout, 'needs-hand'), nextActions: shown(layout, 'next-actions') }} /> },
@@ -149,7 +149,7 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
     { id: 'next-actions', name: 'Next actions', description: 'Open work ready to move', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} only="next-actions" /> },
     { id: 'reports', name: 'Reports', description: 'Completion and delivery measures', sizes: ['s', 'm', 'l'], defaultSize: 'm',
       render: () => <ReportsModule quest={quest} company={company} onReports={onReports} /> },
-    { id: 'culture', name: 'Quest Culture', description: 'Culture spotlight', sizes: ['s', 'm', 'l', 'xl'], defaultSize: 's',
+    { id: 'culture', name: 'Quest Culture', description: 'Culture spotlight', sizes: ['s', 'm', 'l', 'xl'], defaultSize: 'm',
       // Video and Team Moments are tabs here unless they're shown as their own modules.
       render: ({ layout }) => <CultureSpotlight items={culture} slots={CULTURE_SLOTS.map(slot => slot.id).filter(id => id === 'culture' || !shown(layout, id))} /> },
     { id: 'video', name: 'Video', description: 'Video of the week', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <CultureSpotlight items={culture} slots={['video']} /> },
