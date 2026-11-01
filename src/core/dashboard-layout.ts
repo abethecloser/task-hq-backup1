@@ -28,7 +28,7 @@ export const DEFAULT_ITEMS: LayoutItem[] = [
 export const PRESETS: Record<PresetId, LayoutItem[]> = {
   balanced: DEFAULT_ITEMS,
   operations: [
-    { id: 'at-risk', size: 'm' }, { id: 'needs-hand', size: 'm' }, { id: 'up-next', size: 'm' }, { id: 'people', size: 'm' },
+    { id: 'at-risk', size: 'm' }, { id: 'needs-hand', size: 'm' }, { id: 'up-next', size: 'm' }, { id: 'next-actions', size: 'm' },
     { id: 'projects', size: 'xl' }, { id: 'performance', size: 'xl' },
   ],
   visual: [

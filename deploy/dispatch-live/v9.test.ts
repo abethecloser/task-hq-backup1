@@ -8,7 +8,6 @@ import * as v9 from './v9/logic.ts';
 import type { Action, QuestState } from './v9/core/contract.ts';
 import { activeProjects, withoutLegacyArchived } from '../../src/core/selectors.ts';
 import { projectIntel } from '../../src/core/project-intel.ts';
-import { livingLayout } from '../../src/core/living.ts';
 
 const T0 = new Date('2026-11-01T09:00:00').getTime();
 const ORG = { id: '11111111-1111-4111-8111-111111111111', slug: 'quest-roofing', name: 'Quest Roofing', preset: 'roofing' };
@@ -100,13 +99,12 @@ test('an archived project takes no new tasks or reassignments; its own tasks sta
   run(restored, OWNER, { type: 'task/create', task: { title: 'New', owner: MEMBER, projectId } } as Action);
 });
 
-test('archived projects leave active selectors, project rows and the living view', () => {
+test('archived projects leave active selectors and project rows', () => {
   const { s, projectId } = workspace();
   const archived = run(s, OWNER, { type: 'project/archive', id: projectId });
   assert.deepEqual(activeProjects(archived).map(p => p.id), ['general']);
   assert.ok(archived.projects.some(p => p.id === projectId), 'still stored, reachable from the Archive');
   assert.equal(projectIntel(archived, OWNER, clock, true).projects.some(p => p.id === projectId), false);
-  assert.equal(livingLayout(archived, OWNER, clock, true).bubbles.some(b => b.id === projectId), false);
   assert.equal(withoutLegacyArchived(archived).tasks.length, s.tasks.length, 'its tasks are still active work');
 });
 

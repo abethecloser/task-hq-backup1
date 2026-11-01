@@ -152,7 +152,7 @@
 /* ── Projects & team ───────────────────────────────────────────────────────────────────── */
 .home-dash .hd-row3.is-intel { grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr); }
 .pt { gap: 14px; }
-.pt-grid { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(0, 1.1fr) minmax(0, 1.1fr); gap: 22px; align-items: start; }
+.pt-grid { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(0, 2.2fr); gap: 22px; align-items: start; }
 .pt-ring { position: relative; display: grid; justify-items: center; gap: 6px; }
 .pt-ring svg { width: 136px; height: 136px; }
 .pt-track { fill: none; stroke: var(--sunk, #f1f1f3); stroke-width: 10; }
@@ -184,10 +184,6 @@
 .pt-row em, .pt-mini em { font-style: normal; font-weight: 700; }
 .is-late { color: var(--stop, #b42318); }
 .is-blocked { color: var(--accent-ink); }
-.pt-bar { display: block; height: 5px; border-radius: 99px; background: var(--sunk, #f1f1f3); overflow: hidden; }
-.pt-bar span { display: block; height: 100%; border-radius: inherit; background: var(--ok, #15803d); transition: width .4s var(--ease-spring); }
-.pt-stack { display: flex; gap: 2px; height: 5px; overflow: hidden; border-radius: 99px; transition: width .4s var(--ease-spring); }
-.pt-stack i { display: block; min-width: 4px; }
 .pt-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; padding-top: 12px; border-top: 1px solid var(--hair); }
 .pt-mini { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .pt-mini button { display: grid; gap: 2px; width: 100%; padding: 7px 10px; border: 0; border-radius: 9px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -198,12 +194,11 @@
 @container home (max-width: 1080px) {
   .home-dash .hd-row3.is-intel { grid-template-columns: 1fr; }
   .pt-grid { grid-template-columns: minmax(170px, .8fr) minmax(0, 1.2fr); }
-  .pt-grid > .pt-col:last-child:nth-child(3) { grid-column: 1 / -1; }
 }
 @container home (max-width: 640px) {
   .pt-grid, .pt-actions { grid-template-columns: 1fr; }
 }
-@media (prefers-reduced-motion: reduce) { .pt-value, .pt-bar span, .pt-stack { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pt-value { transition: none; } }
 
 /* ── Settings: an overview of categories, then one focused view ────────────────────────── */
 .settings-view { max-width: 1040px; }
@@ -390,62 +385,8 @@
   :root[data-dock-full] .shell.has-dock > .main > .content { flex: 0 0 0; height: 0; min-height: 0; padding-block: 0; overflow: hidden; visibility: hidden; }
 }
 
-/* Projects and Team Overview: Standard | Living switch, dock focus note, and the Living view. */
 .pt .hd-head .pt-head-end { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; margin-left: auto; }
-.pt-view button { min-height: 28px; padding: 0 12px; }
-.pt-focus { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--accent-pale, #fff1e7); font-size: 14px; }
-.pt-grid.is-living { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.pt-grid.is-living > .pt-living { grid-column: 1 / -1; container-type: inline-size; }
-.lv { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 16px; align-items: start; }
-@container (max-width: 640px) { .lv { grid-template-columns: minmax(0, 1fr); } }
-.lv-stage { display: block; width: 100%; height: auto; max-height: 400px; overflow: visible; }
-.lv-bubble { cursor: pointer; outline: none; transition: opacity .25s; }
-.lv-bubble.is-dim { opacity: .38; }
-.lv-skin { fill: color-mix(in srgb, var(--accent) 6%, transparent); stroke: color-mix(in srgb, var(--accent) 28%, var(--hair)); stroke-width: 1.2; transition: fill .2s, stroke .2s; }
-.lv-bubble:hover .lv-skin { fill: color-mix(in srgb, var(--accent) 11%, transparent); }
-.lv-bubble.is-on .lv-skin { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: var(--accent); stroke-width: 2; }
-.lv-bubble.is-focus .lv-skin { stroke-dasharray: 5 4; stroke: var(--accent); stroke-width: 2; }
-.lv-bubble:focus-visible .lv-skin { stroke: var(--ink); stroke-width: 2.5; }
-.lv-name { fill: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .04em; pointer-events: none; }
-.lv-dot { fill: #b9bcc3; stroke: var(--card, #fff); stroke-width: 1; cursor: pointer; transition: opacity .2s, r .2s; }
-.lv-dot.s-working { fill: var(--act); } .lv-dot.s-review { fill: #8b5cf6; } .lv-dot.s-blocked { fill: var(--stop); } .lv-dot.s-done { fill: var(--done, #16a34a); opacity: .45; }
-.lv-dot.is-late { stroke: var(--danger); stroke-width: 2.5; }
-.lv-dot.is-picked { stroke: var(--ink); stroke-width: 3; }
-.lv-dot.is-dim { opacity: .18; }
-.lv-dot.is-moving { animation: lv-pulse 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-@keyframes lv-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
-@media (prefers-reduced-motion: reduce) { .lv-dot.is-moving { animation: none; stroke: var(--act); stroke-width: 2.5; } .lv-bubble, .lv-skin, .lv-dot { transition: none; } }
-.lv-detail { display: grid; gap: 12px; min-width: 0; font-size: 14px; }
-.lv-detail header { display: grid; gap: 2px; }
-.lv-detail header strong { font-size: 16px; }
-.lv-detail header small, .lv-task small { color: var(--muted); }
-.lv-task { display: grid; gap: 3px; padding: 8px 10px; border: 1px solid var(--hair-2); border-radius: 10px; }
-.lv-task .link { justify-self: start; }
-.lv-group .pt-label { margin-bottom: 4px; }
-.lv-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
-.lv-list button { width: 100%; overflow: hidden; padding: 4px 8px; border: 0; border-radius: 7px; background: transparent; color: inherit; font: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.lv-list button:hover, .lv-list button.is-on { background: var(--sunk); }
-.lv-list button.is-hot { box-shadow: inset 2px 0 0 var(--danger); }
-.lv-people { display: flex; flex-wrap: wrap; gap: 6px; }
-.lv-person { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border: 1px solid var(--hair-2); border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 13.5px; cursor: pointer; }
-.lv-person b { color: var(--muted); font-variant-numeric: tabular-nums; }
-.lv-person[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-pale, #fff1e7); }
-.lv-key { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; color: var(--muted); font-size: 12px; }
-.lv-key i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
-.lv-key i.s-done { background: var(--done, #16a34a); }
 
-/* Living refinement: project names under each bubble, readable side panel that never pushes past its column. */
-.lv { max-width: 100%; }
-.lv-name { fill: var(--ink-2); font-size: 12px; font-weight: 750; letter-spacing: 0; }
-.lv-count { fill: var(--muted); font-weight: 650; }
-.lv-skin { fill: color-mix(in srgb, var(--accent) 5%, transparent); }
-.lv-detail, .lv-group, .lv-list, .lv-list li { min-width: 0; }
-.lv-list { grid-template-columns: minmax(0, 1fr); }
-.lv-list button { display: block; max-width: 100%; }
-.lv-more { padding: 2px 8px; color: var(--muted); font-size: 13px; }
-.lv-involved { margin: 0; overflow-wrap: anywhere; font-size: 14px; }
-.lv-involved .pt-label { display: block; margin-bottom: 2px; }
-@container (max-width: 640px) { .lv-stage { max-height: 300px; } }
 /* Long project names truncate instead of widening the panel (which scrolled it sideways). */
 .work-nav, .work-nav-group, .work-list, .work-sub, .work-list li { min-width: 0; }
 .work-nav ul { grid-template-columns: minmax(0, 1fr); }
@@ -504,20 +445,6 @@
 .work-nav-fold .icon { width: 14px; height: 14px; transition: transform .15s; }
 .work-nav-fold.is-open .icon { transform: rotate(90deg); }
 
-/* Living reference options replace the old two project envelopes. */
-.lv-visual { min-width: 0; }
-.lv-options { margin-bottom: 12px; }
-.lv-options button,.lv-project-key button { min-height: 44px; }
-.lv .lv-reference { max-height: 560px; aspect-ratio: 1; overflow: hidden; }
-.lg-pick,.lg-task { cursor: pointer; }
-.lg-pick:focus-visible,.lg-task:focus-visible,.lg-task.is-picked { outline: none; stroke: var(--ink); stroke-width: 2; }
-.lg-pick:hover,.lg-task:hover { filter: brightness(.92); }
-.lg-total { fill: var(--ink); font-size: 24px; font-weight: 650; }
-.lg-caption { fill: var(--muted); font-size: 11px; }
-.lg-project-name { fill: #172e35; font-size: 12px; font-weight: 650; pointer-events: none; }
-.lv-graphic-key { color: var(--muted); font-size: 12px; line-height: 1.6; }
-.lv-project-key { display: flex; flex-wrap: wrap; gap: 6px; }
-@container (max-width: 640px) { .lv .lv-reference { max-height: 460px; } }
 
 /* Collapsed navigation is a quiet instrument rail; expanded navigation keeps its panel treatment. */
 @media (min-width: 761px) {
@@ -564,23 +491,7 @@
   .rail:not(.is-expanded) .sidebar-foot { border: 0; padding-top: 12px; gap: 6px; }
 }
 
-.pt-project-picker { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 24px; }
-.pt-project-picker .btn { min-height: 44px; max-width: 100%; white-space: normal; text-align: left; }
-.pt-project-picker .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-pale); }
-.pt-grid.pt-cohesive { grid-template-columns: minmax(0, 1fr); }
-.pt-cohesive .pt-ring { width: min(100%, 440px); justify-self: center; }
-.pt-cohesive .pt-stages { width: 100%; }
 
-.lv.lv-minimal { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 12px; }
-.lv-minimal .lv-reference { width: min(100%, 440px); max-height: 440px; }
-.lv-minimal .lg-total { font-size: 48px; font-weight: 550; letter-spacing: -.04em; }
-.lv-minimal .lg-caption { font-size: 15px; }
-.lv-selection { min-height: 44px; display: grid; align-items: center; text-align: center; color: var(--muted); font-size: 13px; max-width: 100%; }
-.lv-selection button { min-height: 44px; overflow-wrap: anywhere; }
-.lv-compact-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 16px; padding-bottom: 12px; font-size: 12px; color: var(--muted); }
-.lv-compact-legend > span { display: inline-flex; align-items: center; gap: 6px; }
-.lv-compact-legend i { width: 8px; height: 8px; border-radius: 50%; background: #d5d8dd; }
-.lv-compact-legend i[data-status=working] { background: #438bb3; }.lv-compact-legend i[data-status=review] { background: #9d8ac2; }.lv-compact-legend i[data-status=blocked] { background: #df6862; }.lv-compact-legend i[data-status=done] { background: #5bb59c; }
 
 /* Keep collapsed targets centered on the 56px rail; one header control, no separate tile. */
 @media (min-width: 761px) {
@@ -591,36 +502,3 @@
   .rail:not(.is-expanded) .sidebar-foot { padding-bottom: 2px; }
   .rail:not(.is-expanded) .nav-item[aria-current="page"]::before { left: 0; }
 }
-/* Living (radial): layered rings, project sectors of packed task nodes, people orbit, activity ticks. */
-.lv-radial { max-height: 460px; }
-.lv-guide { fill: none; stroke: var(--hair); stroke-width: 1; stroke-dasharray: 2 4; }
-.lv-sector { cursor: pointer; outline: none; transition: opacity .25s; }
-.lv-sector.is-dim { opacity: .45; }
-.lv-wedge { fill: color-mix(in srgb, var(--accent) 3%, transparent); stroke: color-mix(in srgb, var(--accent) 16%, var(--hair)); stroke-width: 1; transition: fill .2s, stroke .2s; }
-.lv-sector:hover .lv-wedge { fill: color-mix(in srgb, var(--accent) 7%, transparent); }
-.lv-sector.is-on .lv-wedge { fill: color-mix(in srgb, var(--accent) 10%, transparent); stroke: var(--accent); stroke-width: 1.6; }
-.lv-sector.is-focus .lv-wedge { stroke: var(--accent); stroke-dasharray: 5 4; stroke-width: 1.6; }
-.lv-sector:focus-visible .lv-wedge { stroke: var(--ink); stroke-width: 2.2; }
-.lv-tick { stroke: #b9bcc3; stroke-width: 4; stroke-linecap: round; }
-.lv-tick.s-working { stroke: var(--act); } .lv-tick.s-review { stroke: #8b5cf6; } .lv-tick.s-blocked { stroke: var(--stop); } .lv-tick.s-done { stroke: var(--done, #16a34a); }
-.lv-link { fill: none; stroke: color-mix(in srgb, var(--ink) 22%, transparent); stroke-width: 1.2; stroke-dasharray: 3 3; }
-.lv-link.is-on { stroke: var(--accent); stroke-width: 2; stroke-dasharray: none; }
-.lv-tie { stroke: color-mix(in srgb, var(--accent) 45%, transparent); stroke-width: 1; }
-.lv-person-node { cursor: pointer; outline: none; transition: opacity .25s; }
-.lv-person-node circle { fill: var(--card, #fff); stroke: color-mix(in srgb, var(--ink) 35%, transparent); stroke-width: 1.5; }
-.lv-person-node text { fill: var(--ink-2); font-size: 10.5px; font-weight: 800; pointer-events: none; }
-.lv-person-node:hover circle { stroke: var(--accent); }
-.lv-person-node.is-on circle { fill: var(--accent-pale, #fff1e7); stroke: var(--accent); stroke-width: 2.2; }
-.lv-person-node.is-dim { opacity: .35; }
-.lv-person-node:focus-visible circle { stroke: var(--ink); stroke-width: 2.5; }
-.lv-arc-track { fill: none; stroke: var(--hair); stroke-width: 6; }
-.lv-arc { fill: none; stroke-width: 6; stroke-linecap: round; }
-.lv-arc.a-done { stroke: var(--done, #16a34a); } .lv-arc.a-working { stroke: var(--act); } .lv-arc.a-blocked { stroke: var(--stop); }
-.lv-core-n { fill: var(--ink); font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.lv-core-l { fill: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
-@media (prefers-reduced-motion: reduce) { .lv-sector, .lv-person-node, .lv-wedge { transition: none; } }
-/* Living legend with stage counts (merged from the compact legend on feature/living-graph-restoration). */
-.lv-key > span { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; }
-.lv-key > span b { color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.lv-key > span.is-zero { opacity: .5; }
-.lv-key-note { font-size: 11.5px; }

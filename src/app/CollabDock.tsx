@@ -33,7 +33,7 @@ const TABS: { id: DockTab; label: string; short?: string }[] = [
   { id: 'inbox', label: 'Inbox' }, { id: 'conversations', label: 'Conversations', short: 'Channels' }, { id: 'mentions', label: 'Comments & mentions', short: 'Mentions' }, { id: 'activity', label: 'Activity' },
 ];
 
-export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab, inbox, data, read, markRead, mentions, onOpen, onOpenLead, onActivity, onOpenInboxPage, onFocusTask, contextTaskId = null, openTask = null }: {
+export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab, inbox, data, read, markRead, mentions, onOpen, onOpenLead, onActivity, onOpenInboxPage, contextTaskId = null, openTask = null }: {
   quest: Quest; company: boolean;
   /** The saved snap position; the toggle collapses it or restores the last open position. */
   snap: DockSnap; onSnap: (snap: DockSnap) => void; onToggle: () => void;
@@ -43,8 +43,6 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
   /** Channel @mentions from the universal inbox. */
   mentions: MentionSource[];
   onOpen: (id: string) => void; onOpenLead: (id: string) => void; onActivity: () => void; onOpenInboxPage: () => void;
-  /** Picking a task thread (inbox item, comment or mention) focuses its project in the overview's Living view. */
-  onFocusTask?: (taskId: string) => void;
   /** The task open on the page, offered as "This task" (rail and lists) without replacing what the dock is reading. */
   contextTaskId?: string | null;
   /** An explicit request (Open in dock) to read a task here; `nonce` repeats a request for the same task. */
@@ -65,7 +63,7 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
   const contextTask = contextTaskId ? taskById(state, contextTaskId) : undefined;
   const readTask = (id: string) => { setPickedState({ kind: 'task', id }); setPane('reader'); };
   useEffect(() => { if (openTask) readTask(openTask.id); }, [openTask?.id, openTask?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
-  const setPicked = (next: Reading) => { setPickedState(next); setPane('reader'); if (next?.kind === 'task') onFocusTask?.(next.id); };
+  const setPicked = (next: Reading) => { setPickedState(next); setPane('reader'); };
   const fallback = collab.find(item => item.taskId && !item.channelId)?.taskId ?? activity.find(event => event.taskId && taskById(state, event.taskId))?.taskId;
   const reading: Reading = picked && !(picked.kind === 'task' && !taskById(state, picked.id)) && !(picked.kind === 'channel' && !channels.some(item => item.id === picked.id))
     ? picked : fallback ? { kind: 'task', id: fallback } : null;

@@ -10,7 +10,6 @@ import { isOpen, isOverdue, myTasks, withoutLegacyArchived } from '../../src/cor
 import { DEFAULT_QUERY, lensCounts, queryTasks } from '../../src/core/registry.ts';
 import { companyReport } from '../../src/core/reports.ts';
 import { atRisk, statusMix, teamWorkload } from '../../src/core/dashboard.ts';
-import { livingLayout } from '../../src/core/living.ts';
 import { canArchiveLegacy } from '../../src/core/permissions.ts';
 
 const T0 = new Date('2026-10-29T09:00:00').getTime();
@@ -159,7 +158,6 @@ test('every active view leaves legacy work out', () => {
   assert.equal(statusMix(active, MEMBER).total, 0, 'status mix');
   assert.equal(atRisk(active, OWNER, now, true).length, 0, 'at risk');
   assert.ok(teamWorkload(active, now).every(row => row.open === 0 && row.late === 0 && row.attention === 0), 'workload');
-  assert.equal(livingLayout(active, OWNER, now, true).bubbles.length, 0, 'living view');
   // Completed archived work stays in the state those views read, as before.
   assert.equal(withoutLegacyArchived(s), s);
 });

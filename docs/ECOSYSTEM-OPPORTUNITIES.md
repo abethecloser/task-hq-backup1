@@ -48,3 +48,13 @@ Local synthetic demo only. Typecheck, 396 tests, production build and diff check
 | Contextual actions on nodes | Engine actions with UI permission predicates (`permissions.ts`) | Offer the same permitted moves (advance, ask for help, hand off) from a Living task node, through the existing dispatch. |
 | Rule-based automation (Monday-style "when / then") | `runTaskHooks`, notifications | One rule: when a task is blocked for more than N hours, notify its approver. Off by default, audited, per workspace. |
 | Multi-homing (Asana-style) | Single `projectId` per task | Explicit contract change needed (dispatch v10): secondary project memberships, with the primary project staying authoritative. Not started. |
+
+## Simplification (product decision, after the reconciliation above)
+
+Removed intentionally, not hidden:
+- The Living visualization and its Standard / Living toggle (`LivingView.tsx`, `LivingGraphic.tsx`, `src/core/living.ts` and its tests, `scripts/verify-living-options.mjs`, their styles, and the dock's "focus in Living" wiring).
+- The project picker strip (All projects / General / No project).
+- The green per-project progress bars in the Projects list.
+- "Open work by person": the dashboard module, the overview column and the person filter. It's not in any default or preset; saved layouts that include it load without it.
+
+Projects and Team Overview is now one completion ring with stage counts, the Projects list (names, done counts, overdue/blocked/waiting), Needs a hand and Next actions (unless shown as their own modules) and View reports. The "Living as navigation" and "contextual actions on nodes" opportunities above no longer apply.

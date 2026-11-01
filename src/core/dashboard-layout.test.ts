@@ -101,3 +101,11 @@ test('rows fill edge to edge in the person’s order; widths only grow to close 
   const saved = layoutOf([{ id: 'projects', size: 'l' }]);
   assert.deepEqual(normalizeLayout(saved, SPECS).items, saved.items);
 });
+
+test('Open work by person is retired: no default or preset brings it back, and saved layouts drop it cleanly', () => {
+  assert.ok(!DEFAULT_ITEMS.some(item => item.id === 'people'));
+  for (const items of Object.values(PRESETS)) assert.ok(!items.some(item => item.id === 'people'));
+  const available = SPECS.filter(spec => spec.id !== 'people'); // Home no longer registers the module
+  const saved = { version: 1, items: [{ id: 'people', size: 'm' }, { id: 'up-next', size: 'm' }, { id: 'projects', size: 'l' }] };
+  assert.deepEqual(normalizeLayout(saved, available).items, [{ id: 'up-next', size: 'm' }, { id: 'projects', size: 'l' }]);
+});
