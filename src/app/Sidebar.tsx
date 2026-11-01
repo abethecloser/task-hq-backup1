@@ -139,7 +139,8 @@ function unreadIn(notes: Notification[], read: Set<string>, section?: string) {
   return notes.filter(note => (!section || note.section === section) && !read.has(note.id)).length;
 }
 
-export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, pullout, pulloutTitle, pulloutHead, settings, account, calendarAccess, navigator }: {
+export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, pullout, pulloutTitle, pulloutHead, settings, account, calendarAccess, navigator, workspaceName = 'Workspace' }: {
+  workspaceName?: string;
   calendarAccess?: ReactNode;
   control: SidebarControl;
   items: SidebarItem[];
@@ -258,13 +259,20 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
           <b>{hint.label}</b>{hint.detail && <small>{hint.detail}</small>}
         </div>
       )}
-      <aside className={`rail ${expanded ? 'is-expanded' : ''}`} aria-label="Sidebar">
+      <aside id="quest-navigation" className={`rail ${expanded ? 'is-expanded' : ''}`} aria-label="Sidebar"
+        onKeyDown={event => {
+          if (event.key === 'Escape' && expanded && !(event.target as HTMLElement).closest('[role="menu"]')) {
+            event.stopPropagation();
+            control.toggle();
+            panel.current?.ownerDocument.querySelector<HTMLButtonElement>('.rail-collapse')?.focus();
+          }
+        }}>
         <div className="rail-head">
           <div className="sidebar-brand">{brand}</div>
-          {expanded && <span className="rail-title">Workspace</span>}
-          <button type="button" className="rail-collapse" onClick={() => { setHint(null); control.toggle(); }} aria-controls="quest-sidebar" aria-expanded={expanded}
+          {expanded && <span className="rail-title" title={workspaceName}>{workspaceName}</span>}
+          <button type="button" className="rail-collapse" onClick={() => { setHint(null); control.toggle(); }} aria-controls="quest-navigation" aria-expanded={expanded}
             aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'} {...(expanded ? {} : hintFor('Expand sidebar'))}>
-            <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={expanded ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} /></svg>
+            <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg>
           </button>
         </div>
         {expanded ? <div className="rail-tree">{navigator}</div> : <nav className="nav" aria-label="Task-HQ sections">
@@ -286,11 +294,7 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
         </nav>}
         <div className="sidebar-foot">
           <RailMenu label="Settings" className="rail-settings" hint={hintFor('Settings', 'Look and workspace')} icon={<svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>}>{settings}</RailMenu>
-          <RailMenu label="Account" className="rail-account" hint={hintFor(account.label, account.detail)} icon={account.mark}>{account.menu}</RailMenu>
-          <button type="button" className="nav-toggle" onClick={control.toggle} aria-controls="quest-sidebar" aria-expanded={control.open}
-            aria-label={control.open ? 'Collapse sidebar' : 'Expand sidebar'} {...hintFor(control.open ? 'Collapse sidebar' : 'Expand sidebar')}>
-            <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={control.open ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} /></svg>
-          </button>
+          <RailMenu label="Account" className="rail-account" hint={hintFor(account.label, account.detail)} icon={account.mark} text={expanded ? { label: account.label, detail: account.detail } : undefined}>{account.menu}</RailMenu>
         </div>
       </aside>
 
@@ -343,7 +347,7 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
 type HintHandlers = { onMouseEnter: (event: { currentTarget: HTMLElement }) => void; onFocus: (event: { currentTarget: HTMLElement }) => void; onMouseLeave: () => void; onBlur: () => void };
 
 /** A menu at the foot of the rail. It is fixed beside its button so the rail's scroll never clips it. */
-function RailMenu({ label, className, hint, icon, children }: { label: string; className: string; hint: HintHandlers; icon: ReactNode; children: (close: () => void) => ReactNode }) {
+function RailMenu({ label, className, hint, icon, text, children }: { label: string; className: string; hint: HintHandlers; icon: ReactNode; text?: { label: string; detail: string }; children: (close: () => void) => ReactNode }) {
   const [at, setAt] = useState<{ left: number; bottom: number } | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -357,6 +361,7 @@ function RailMenu({ label, className, hint, icon, children }: { label: string; c
     <>
       <button ref={button} type="button" className={`nav-item ${className} ${at ? 'is-active' : ''}`} aria-label={label} aria-haspopup="menu" aria-expanded={!!at} onClick={toggle} {...hint}>
         <span className="nav-icon">{icon}</span>
+        {text && <span className="rail-account-copy"><strong>{text.label}</strong><small>{text.detail}</small></span>}
       </button>
       {at && <div ref={menu} className="top-menu rail-menu" role="menu" aria-label={label} style={{ left: at.left, bottom: at.bottom }}>{children(close)}</div>}
     </>

@@ -1,3 +1,4 @@
+import { companyReport } from '../core/reports.ts';
 import { useMomentum } from '../ui/useMomentum.ts';
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -5,7 +6,7 @@ import type { QuestEvent, QuestState } from '../core/contract.ts';
 import { compose } from '../core/compose.ts';
 import { ago, atRisk, homeMetrics, performance, recentActivity } from '../core/dashboard.ts';
 import { DEFAULT_ITEMS } from '../core/dashboard-layout.ts';
-import type { DashboardLayout, ModuleSize } from '../core/dashboard-layout.ts';
+import type { DashboardLayout } from '../core/dashboard-layout.ts';
 import { Dashboard } from './dashboard/Dashboard.tsx';
 import type { DashboardModule } from './dashboard/Dashboard.tsx';
 import { HOME_PERIODS, HOME_PERIOD_LABELS, inHomePeriod, loadHomePeriod, riskInPeriod, saveHomePeriod } from '../core/home-period.ts';
@@ -143,12 +144,12 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
         </section>
     </> },
     { id: 'projects', name: 'Projects and Team Overview', description: 'Progress by project and person', sizes: ['m', 'l', 'xl'], defaultSize: 'l',
-      render: ({ layout }) => <ProjectTeam quest={quest} company={company} onOpen={onOpen} focusTaskId={focusTaskId} onClearFocus={onClearFocus} onReports={onReports}
-        omit={{ people: shown(layout, 'people'), needsHand: shown(layout, 'needs-hand'), nextActions: shown(layout, 'next-actions') }} /> },
-    ...(company ? [{ id: 'people', name: 'Open work by person', description: 'Who holds open work', sizes: ['s', 'm', 'l'] as ModuleSize[], defaultSize: 'm' as ModuleSize,
-      render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} only="people" /> }] : []),
+      render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} focusTaskId={focusTaskId} onClearFocus={onClearFocus}
+        omit={{ people: true, needsHand: true, nextActions: true }} /> },
     { id: 'needs-hand', name: 'Needs a hand', description: 'Overdue and blocked work', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} only="needs-hand" /> },
     { id: 'next-actions', name: 'Next actions', description: 'Open work ready to move', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} only="next-actions" /> },
+    { id: 'reports', name: 'Reports', description: 'Completion and delivery measures', sizes: ['s', 'm', 'l'], defaultSize: 'm',
+      render: () => <ReportsModule quest={quest} company={company} onReports={onReports} /> },
     { id: 'culture', name: 'Quest Culture', description: 'Culture spotlight', sizes: ['s', 'm', 'l', 'xl'], defaultSize: 's',
       // Video and Team Moments are tabs here unless they're shown as their own modules.
       render: ({ layout }) => <CultureSpotlight items={culture} slots={CULTURE_SLOTS.map(slot => slot.id).filter(id => id === 'culture' || !shown(layout, id))} /> },
@@ -162,6 +163,20 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
       <Dashboard pageId="home" scope={state.workspace.tenantId} actor={actor} modules={modules} defaultItems={DEFAULT_ITEMS} />
     </div>
   );
+}
+
+/** Same scoped report model as the full Reports page. */
+function ReportsModule({ quest, company, onReports }: { quest: Quest; company: boolean; onReports?: () => void }) {
+  const report = companyReport(quest.state, quest.actor, quest.now, 'month', company);
+  return <section className="hd-panel" aria-labelledby="hd-reports">
+    <PanelHead id="hd-reports" title="Reports" sub={`${company ? 'Visible company work' : 'Your work'} · last 30 days for completions`} tone="neutral" icon={<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />}
+      more={onReports ? { label: 'Open reports', onClick: onReports } : undefined} />
+    <dl className="hd-report-summary">
+      <div><dt>Completed</dt><dd>{report.completed}</dd></div>
+      <div><dt>Overdue now</dt><dd>{report.overdue}</dd></div>
+      <div><dt>On-time rate</dt><dd>{report.onTimeRate == null ? 'No dated completions' : `${report.onTimeRate}%`}</dd></div>
+    </dl>
+  </section>;
 }
 
 /** Recent activity on the work you can see (the same feed the dock and Activity page read). */

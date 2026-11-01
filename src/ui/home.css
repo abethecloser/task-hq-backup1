@@ -805,3 +805,8 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
   .dash-tool, .dash-tool select { flex: 1 1 100%; max-width: none; width: 100%; }
   .dash-expand { display: none; } /* one column on phones: width has no effect */
 }
+
+.hd-report-summary { display: grid; gap: 12px; margin: 16px 0 0; }
+.hd-report-summary > div { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.hd-report-summary dt { color: var(--muted); }
+.hd-report-summary dd { margin: 0; text-align: right; font-weight: 650; }

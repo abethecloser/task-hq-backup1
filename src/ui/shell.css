@@ -503,3 +503,91 @@
 .work-nav-fold:hover { background: var(--sunk, #f2f2f4); color: var(--ink); }
 .work-nav-fold .icon { width: 14px; height: 14px; transition: transform .15s; }
 .work-nav-fold.is-open .icon { transform: rotate(90deg); }
+
+/* Living reference options replace the old two project envelopes. */
+.lv-visual { min-width: 0; }
+.lv-options { margin-bottom: 12px; }
+.lv-options button,.lv-project-key button { min-height: 44px; }
+.lv .lv-reference { max-height: 560px; aspect-ratio: 1; overflow: hidden; }
+.lg-pick,.lg-task { cursor: pointer; }
+.lg-pick:focus-visible,.lg-task:focus-visible,.lg-task.is-picked { outline: none; stroke: var(--ink); stroke-width: 2; }
+.lg-pick:hover,.lg-task:hover { filter: brightness(.92); }
+.lg-total { fill: var(--ink); font-size: 24px; font-weight: 650; }
+.lg-caption { fill: var(--muted); font-size: 11px; }
+.lg-project-name { fill: #172e35; font-size: 12px; font-weight: 650; pointer-events: none; }
+.lv-graphic-key { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.lv-project-key { display: flex; flex-wrap: wrap; gap: 6px; }
+@container (max-width: 640px) { .lv .lv-reference { max-height: 460px; } }
+
+/* Collapsed navigation is a quiet instrument rail; expanded navigation keeps its panel treatment. */
+@media (min-width: 761px) {
+  :root .shell .rail:not(.is-expanded) {
+    border: 0;
+    box-shadow: none;
+    background: var(--bg);
+  }
+  .rail:not(.is-expanded) .rail-head { gap: 0; margin-bottom: 10px; }
+  .rail:not(.is-expanded) .rail-collapse {
+    width: 40px;
+    height: 32px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    box-shadow: none;
+  }
+  .rail:not(.is-expanded) .rail-collapse:hover { background: var(--sunk); color: var(--ink); }
+  .rail-collapse:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .rail:not(.is-expanded) .rail-group { gap: 4px; }
+  .rail:not(.is-expanded) .rail-group + .rail-group { margin-top: 12px; }
+  :root .shell .rail:not(.is-expanded) .nav-item {
+    position: relative;
+    min-height: 44px;
+    border: 0;
+    box-shadow: none;
+  }
+  :root .shell .rail:not(.is-expanded) .nav-item.is-active {
+    color: var(--accent-ink);
+    background: var(--accent-pale);
+    box-shadow: none;
+  }
+  .rail:not(.is-expanded) .nav-item[aria-current="page"]::before {
+    content: '';
+    position: absolute;
+    left: -5px;
+    top: 13px;
+    bottom: 13px;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+  .rail:not(.is-expanded) .sidebar-foot { border: 0; padding-top: 12px; gap: 6px; }
+}
+
+.pt-project-picker { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 24px; }
+.pt-project-picker .btn { min-height: 44px; max-width: 100%; white-space: normal; text-align: left; }
+.pt-project-picker .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-pale); }
+.pt-grid.pt-cohesive { grid-template-columns: minmax(0, 1fr); }
+.pt-cohesive .pt-ring { width: min(100%, 440px); justify-self: center; }
+.pt-cohesive .pt-stages { width: 100%; }
+
+.lv.lv-minimal { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 12px; }
+.lv-minimal .lv-reference { width: min(100%, 440px); max-height: 440px; }
+.lv-minimal .lg-total { font-size: 48px; font-weight: 550; letter-spacing: -.04em; }
+.lv-minimal .lg-caption { font-size: 15px; }
+.lv-selection { min-height: 44px; display: grid; align-items: center; text-align: center; color: var(--muted); font-size: 13px; max-width: 100%; }
+.lv-selection button { min-height: 44px; overflow-wrap: anywhere; }
+.lv-compact-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 16px; padding-bottom: 12px; font-size: 12px; color: var(--muted); }
+.lv-compact-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.lv-compact-legend i { width: 8px; height: 8px; border-radius: 50%; background: #d5d8dd; }
+.lv-compact-legend i[data-status=working] { background: #438bb3; }.lv-compact-legend i[data-status=review] { background: #9d8ac2; }.lv-compact-legend i[data-status=blocked] { background: #df6862; }.lv-compact-legend i[data-status=done] { background: #5bb59c; }
+
+/* Keep collapsed targets centered on the 56px rail; one header control, no separate tile. */
+@media (min-width: 761px) {
+  .rail:not(.is-expanded) .rail-head { margin-bottom: 4px; }
+  .rail:not(.is-expanded) .rail-collapse { width: 44px; height: 44px; margin-top: -4px; }
+  .rail:not(.is-expanded) .rail-collapse .icon { width: 14px; height: 14px; }
+  :root .shell .rail:not(.is-expanded) .nav-item { width: 44px; margin-inline: -2px; }
+  .rail:not(.is-expanded) .sidebar-foot { padding-bottom: 2px; }
+  .rail:not(.is-expanded) .nav-item[aria-current="page"]::before { left: 0; }
+}

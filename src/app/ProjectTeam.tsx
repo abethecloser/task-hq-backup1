@@ -9,7 +9,6 @@ type PtView = 'standard' | 'living';
 const VIEW_KEY = 'quest-overview-view';
 const loadView = (): PtView => { try { return localStorage.getItem(VIEW_KEY) === 'living' ? 'living' : 'standard'; } catch { return 'standard'; } };
 
-const STAGES = [['working', 'In progress'], ['review', 'In review'], ['blocked', 'Blocked'], ['ready', 'Not started'], ['done', 'Done']] as const;
 
 /** Projects and Team Overview: task completion for a selection, the projects and people behind it, and what needs a hand next.
  * Standard (ring and lists) is the default; Living shows the same records as packed project bubbles. Both share one selection:
@@ -35,7 +34,7 @@ export function ProjectTeam({ quest, company, onOpen, focusTaskId = null, onClea
   // A new dock focus replaces an older project pick so the focused project is what the overview shows.
   useEffect(() => { if (focusProjectId != null) setProjectId(null); }, [focusTaskId]); // eslint-disable-line react-hooks/exhaustive-deps
   const global = useMemo(() => projectIntel(state, actor, now, company), [state, actor, now, company]);
-  const intel = useMemo(() => projectIntel(state, actor, now, company, { projectId, person }), [state, actor, now, company, projectId, person]);
+  const intel = useMemo(() => projectIntel(state, actor, now, company, { projectId: projectId ?? focusProjectId, person }), [state, actor, now, company, projectId, focusProjectId, person]);
   const today = localDate(now);
   const selection = [projectId != null && (intel.projects.find(item => item.id === projectId)?.name ?? 'Project'), person && firstName(state, person)].filter(Boolean).join(' · ');
   const scope = company ? 'All work you can see' : 'Your work';
@@ -106,7 +105,13 @@ export function ProjectTeam({ quest, company, onOpen, focusTaskId = null, onClea
         {onClearFocus && <button type="button" className="link" onClick={onClearFocus}>Clear focus</button>}
       </p>}
 
-      <div className={`pt-grid ${view === 'living' ? 'is-living' : ''}`}>
+      <div className="pt-project-picker" role="group" aria-label="Select project">
+        <button type="button" className="btn" aria-pressed={projectId == null && focusProjectId == null} onClick={() => { setProjectId(null); onClearFocus?.(); }}>All projects</button>
+        {global.projects.map(item => <button type="button" className="btn" key={item.id || 'none'} aria-pressed={(projectId ?? focusProjectId) === item.id}
+          onClick={() => { onClearFocus?.(); setProjectId(projectId === item.id ? null : item.id); }}>{item.name} · {item.total}</button>)}
+      </div>
+
+      <div className={`pt-grid pt-cohesive ${view === 'living' ? 'is-living' : ''}`}>
         {view === 'living' ? <div className="pt-living">
           <LivingView quest={quest} company={company} projectId={projectId} person={person} focusProjectId={focusProjectId}
             onProject={setProjectId} onPerson={setPerson} onOpen={onOpen} />
@@ -117,28 +122,8 @@ export function ProjectTeam({ quest, company, onOpen, focusTaskId = null, onClea
           </svg>
           <div className="pt-ring-label" aria-hidden="true"><b>{intel.tasks.percent}<i>%</i></b><small>tasks done</small></div>
           <p className="pt-ring-sub">{intel.tasks.done} of {intel.tasks.total} tasks</p>
-          <ul className="pt-stages" aria-label="Tasks by stage">
-            {STAGES.map(([key, label]) => <li key={key}><i className={`s-${key}`} aria-hidden="true" />{label}<b>{intel.stages[key]}</b></li>)}
-          </ul>
-          <p className="pt-projects-done"><b>{intel.projectsComplete.complete} of {intel.projectsComplete.total}</b> projects complete<small>A project is complete when every task in it is done.</small></p>
-        </div>}
 
-        <div className="pt-col">
-          <p className="pt-label">Projects</p>
-          {intel.projects.length === 0 ? <p className="hd-quiet">No tasks yet.</p> : <ul className="pt-list">
-            {intel.projects.map(item => (
-              <li key={item.id || 'none'}>
-                <button type="button" className={`pt-row ${projectId === item.id ? 'is-on' : ''}`} aria-pressed={projectId === item.id}
-                  aria-label={`${item.name}: ${item.percent}% of tasks done, ${item.done} of ${item.total}${item.overdue ? `, ${item.overdue} overdue` : ''}${item.blocked ? `, ${item.blocked} blocked` : ''}${item.waiting ? `, ${item.waiting} waiting on a dependency` : ''}`}
-                  onClick={() => setProjectId(projectId === item.id ? null : item.id)}>
-                  <span className="pt-row-top"><span className="pt-name">{item.name}</span><b>{item.percent}%</b></span>
-                  <span className="pt-bar" aria-hidden="true"><span style={{ width: `${item.percent}%` }} /></span>
-                  <small>{item.done}/{item.total} done{item.overdue ? <em className="is-late"> · {item.overdue} overdue</em> : null}{item.blocked ? <em className="is-blocked"> · {item.blocked} blocked</em> : null}{item.waiting ? <em className="is-blocked"> · {item.waiting} waiting</em> : null}</small>
-                </button>
-              </li>
-            ))}
-          </ul>}
-        </div>
+        </div>}
 
         {company && !omit.people && <div className="pt-col">
           {peopleList}

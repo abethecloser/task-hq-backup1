@@ -6,6 +6,7 @@ import type { ModuleSpec } from './dashboard-layout.ts';
 const SPECS: ModuleSpec[] = [
   { id: 'welcome', sizes: ['xl'], defaultSize: 'xl' }, { id: 'performance', sizes: ['l', 'xl'], defaultSize: 'xl' },
   { id: 'up-next', sizes: ['s', 'm', 'l'], defaultSize: 'm' }, { id: 'at-risk', sizes: ['s', 'm', 'l'], defaultSize: 'm' },
+  { id: 'reports', sizes: ['s', 'm', 'l'], defaultSize: 'm' },
   { id: 'projects', sizes: ['l', 'xl'], defaultSize: 'l' }, { id: 'culture', sizes: ['s', 'm'], defaultSize: 's' },
   { id: 'video', sizes: ['s', 'm'], defaultSize: 's' }, { id: 'moments', sizes: ['s', 'm'], defaultSize: 's' },
   { id: 'people', sizes: ['s', 'm'], defaultSize: 'm' }, { id: 'needs-hand', sizes: ['s', 'm'], defaultSize: 's' },
@@ -90,4 +91,13 @@ test('rows fill edge to edge in the person’s order; widths only grow to close 
   // Every row sums to the grid width.
   const spans = fillRows([{ id: 'a', span: 4 }, { id: 'b', span: 8 }, { id: 'c', span: 6 }, { id: 'd', span: 4 }, { id: 'e', span: 12 }]);
   assert.deepEqual(spans, { a: 4, b: 8, c: 7, d: 5, e: 12 });
+});
+
+ test('default action sections are independent modules and saved choices remain intact', () => {
+  const layout = normalizeLayout(null, SPECS);
+  assert.equal(layout.items.filter(item => item.id === 'needs-hand').length, 1);
+  assert.equal(layout.items.filter(item => item.id === 'next-actions').length, 1);
+  assert.equal(layout.items.filter(item => item.id === 'reports').length, 1);
+  const saved = layoutOf([{ id: 'projects', size: 'l' }]);
+  assert.deepEqual(normalizeLayout(saved, SPECS).items, saved.items);
 });

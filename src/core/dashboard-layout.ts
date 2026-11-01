@@ -23,6 +23,7 @@ export const PRESET_LABELS: Record<PresetId, string> = { balanced: 'Balanced (de
 export const DEFAULT_ITEMS: LayoutItem[] = [
   { id: 'welcome', size: 'xl' }, { id: 'performance', size: 'xl' }, { id: 'up-next', size: 'm' }, { id: 'at-risk', size: 'm' },
   { id: 'projects', size: 'l' }, { id: 'culture', size: 's' },
+  { id: 'needs-hand', size: 'm' }, { id: 'next-actions', size: 'm' }, { id: 'reports', size: 'm' },
 ];
 export const PRESETS: Record<PresetId, LayoutItem[]> = {
   balanced: DEFAULT_ITEMS,
