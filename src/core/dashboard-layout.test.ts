@@ -57,3 +57,20 @@ test('saving one page in one workspace never touches any other saved layout', ()
   assert.ok(!('home' in cleared.orgA!)); assert.deepEqual(cleared.orgB, { home: { y: 2 } });
   for (const junk of [null, 'x', [1], 5]) assert.deepEqual(withSavedLayout(junk, 'o', 'home', mine), { o: { home: mine } });
 });
+
+test('height is separate from width: Auto by default, stored only when chosen, kept through moves and resizes', async () => {
+  const { setHeight, setArrangement, heightOf } = await import('./dashboard-layout.ts');
+  let layout = normalizeLayout(null, SPECS);
+  assert.ok(layout.items.every(item => heightOf(item) === 'auto' && !('height' in item)), 'old and default layouts read as Auto');
+  assert.equal(layout.arrangement, 'packed');
+  layout = setHeight(layout, 'at-risk', 'compact');
+  layout = resizeItem(layout, 'at-risk', 'l', SPECS.find(s => s.id === 'at-risk')!);
+  layout = moveItem(layout, 'at-risk', 0);
+  assert.deepEqual(layout.items[0], { id: 'at-risk', size: 'l', height: 'compact' });
+  assert.deepEqual(setHeight(layout, 'at-risk', 'auto').items[0], { id: 'at-risk', size: 'l' });
+  layout = setArrangement(layout, 'aligned');
+  // Round-trips through saving; junk heights and arrangements fall back.
+  assert.deepEqual(normalizeLayout(JSON.parse(JSON.stringify(layout)), SPECS), layout);
+  const junk = normalizeLayout({ version: 1, arrangement: 'diagonal', items: [{ id: 'up-next', size: 'm', height: 'huge' }] }, SPECS);
+  assert.deepEqual(junk, { version: 1, arrangement: 'packed', items: [{ id: 'up-next', size: 'm' }] });
+});
