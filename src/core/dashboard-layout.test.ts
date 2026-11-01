@@ -74,3 +74,20 @@ test('height is separate from width: Auto by default, stored only when chosen, k
   const junk = normalizeLayout({ version: 1, arrangement: 'diagonal', items: [{ id: 'up-next', size: 'm', height: 'huge' }] }, SPECS);
   assert.deepEqual(junk, { version: 1, arrangement: 'packed', items: [{ id: 'up-next', size: 'm' }] });
 });
+
+test('rows fill edge to edge in the person’s order; widths only grow to close a gap', async () => {
+  const { fillRows } = await import('./dashboard-layout.ts');
+  // Default desktop: already full rows, unchanged.
+  assert.deepEqual(fillRows([{ id: 'welcome', span: 12 }, { id: 'up', span: 6 }, { id: 'risk', span: 6 }, { id: 'projects', span: 8 }, { id: 'culture', span: 4 }]),
+    { welcome: 12, up: 6, risk: 6, projects: 8, culture: 4 });
+  // Up next expanded (8) no longer fits beside At risk (6): each row closes its own gap; order kept.
+  assert.deepEqual(fillRows([{ id: 'up', span: 8 }, { id: 'risk', span: 6 }, { id: 'projects', span: 8 }, { id: 'culture', span: 4 }]),
+    { up: 12, risk: 12, projects: 8, culture: 4 });
+  // Three smalls share a row; a lone small at the end takes the whole row.
+  assert.deepEqual(fillRows([{ id: 'a', span: 4 }, { id: 'b', span: 4 }, { id: 'c', span: 4 }, { id: 'd', span: 4 }]), { a: 4, b: 4, c: 4, d: 12 });
+  // Proportional sharing: 4 + 6 → 5 + 7 (12 columns, rounded, the last takes the remainder).
+  assert.deepEqual(fillRows([{ id: 'a', span: 4 }, { id: 'b', span: 6 }]), { a: 5, b: 7 });
+  // Every row sums to the grid width.
+  const spans = fillRows([{ id: 'a', span: 4 }, { id: 'b', span: 8 }, { id: 'c', span: 6 }, { id: 'd', span: 4 }, { id: 'e', span: 12 }]);
+  assert.deepEqual(spans, { a: 4, b: 8, c: 7, d: 5, e: 12 });
+});

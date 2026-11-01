@@ -767,13 +767,9 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .dash-item.size-l { grid-column: span 8; }
 .dash-item.size-xl { grid-column: span 12; }
 /* Panels get their card frame from the cell (the wallboard theme draws panels borderless). */
-.dash-item:not([data-module="welcome"]):not([data-module="performance"]) { overflow: hidden; border: 1px solid var(--hair, #e5e7eb); border-radius: 12px; background: var(--card, #fff); box-shadow: 0 1px 2px rgb(17 24 39 / 4%); }
+.dash-item:not([data-module="welcome"]):not([data-module="performance"]) { overflow: hidden; border: 1px solid var(--wb-line, #e5e7eb); border-radius: var(--wb-radius, 12px); background: var(--card, #fff); box-shadow: var(--wb-shadow, 0 1px 2px rgb(17 24 39 / 4%)); }
 .dash-cell { display: flex; flex-direction: column; flex: 0 0 auto; min-height: 0; }
 .dash-cell > * { flex: 1 1 auto; box-sizing: border-box; }
-/* Heights, separate from width. Auto follows the content; fixed heights scroll inside, never clip. */
-.dash-item.h-compact > .dash-cell { flex: none; height: 260px; overflow-y: auto; overscroll-behavior: contain; }
-.dash-item.h-standard > .dash-cell { flex: none; height: 400px; overflow-y: auto; overscroll-behavior: contain; }
-.dash-item.h-tall > .dash-cell { flex: none; height: 600px; overflow-y: auto; overscroll-behavior: contain; }
 /* Compact empty states and spotlight on the dashboard, so an empty module doesn't stand tall. */
 .dash .hd-empty { padding: 14px 12px !important; gap: 2px !important; }
 .dash .hd-empty-mark { width: 34px; height: 34px; margin-bottom: 2px; border-radius: 10px; }
@@ -783,12 +779,6 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 /* Editing: a quiet frame, a handle and controls; the module itself can't be clicked. */
 .dash-item.is-edit { position: relative; overflow: visible !important; outline: 1px dashed var(--line-2, #d1d5db); outline-offset: 3px; border-radius: 12px; }
 .dash-item.is-edit > .dash-cell { overflow: hidden; border-radius: 0 0 12px 12px; }
-.dash-item.is-edit:has(.dash-menu) { z-index: 5; }
-.dash-menu-wrap { position: relative; }
-.dash-menu { right: 0; min-width: 220px; }
-.dash-menu .menu-note { margin: 6px 10px 2px; color: var(--muted); font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; }
-.dash-menu button[aria-checked="true"] { background: var(--accent-pale); color: var(--accent-ink); }
-.dash-menu small { color: var(--muted); font-size: 12.5px; font-weight: 500; }
 .dash-expand { gap: 6px; min-height: 30px; }
 .dash-expand .icon { width: 15px; height: 15px; }
 .dash-item.is-edit > .dash-cell { opacity: .92; }
