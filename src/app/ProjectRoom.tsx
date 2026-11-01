@@ -28,7 +28,7 @@ export function ProjectRoom({ quest, projectId, company, onBack, onOpenTask, onA
 
   if (!project) return <div className="view"><button type="button" className="btn btn-ghost btn-sm" onClick={onBack}>← Projects</button><p className="hd-quiet">This project no longer exists.</p></div>;
   return (
-    <div className="view project-room">
+    <div className={`view project-room ${project.archivedAt ? 'is-archived-record' : ''}`}>
       <nav className="tp-bar" aria-label="Project">
         <button type="button" className="btn btn-ghost btn-sm tp-back" onClick={onBack}><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>Projects</button>
         <span className="tp-bar-actions">

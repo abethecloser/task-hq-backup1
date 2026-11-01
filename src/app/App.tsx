@@ -13,7 +13,7 @@ import type { Lens, RegistryQuery } from '../core/registry.ts';
 import { LEGACY_LENSES, LENSES, LENS_LABELS, completedQuery, isCompletedQuery, lensCounts, queryTasks } from '../core/registry.ts';
 import { canCreateTask } from '../core/permissions.ts';
 import { insights, insightsFor } from '../core/rules.ts';
-import { activeGrant, activeLeads, activeProjects, inFocus, leadBucket, myTasks, person, taskById, withoutLegacyArchived } from '../core/selectors.ts';
+import { activeGrant, activeLeads, activeProjects, inFocus, isOpen, leadBucket, myTasks, person, taskById, withoutLegacyArchived } from '../core/selectors.ts';
 import { LookSwitch, ModeChip, BrandMark, ToastBar, CtaArrow } from '../ui/components.tsx';
 import { useQuest } from '../ui/useQuest.ts';
 import type { Quest } from '../ui/useQuest.ts';
@@ -368,6 +368,16 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   for (let i = navigation.length - 1; i >= 0; i--) if (ARCHIVED_PAGES.includes(navigation[i]!.id as AppPageId)) navigation.splice(i, 1);
 
   const selected = taskId ? taskById(whole.state, taskId) : undefined;
+  // One labelled hierarchy for every destination: the expanded panel on wide screens, the menu on
+  // phones. The rail is its collapsed form, built from the same `navigation` list.
+  const workNavigator = <WorkNavigator
+    sections={navigation.map(item => ({ ...item, active: view === item.id && !(selected && item.id !== 'all-tasks') && !(item.id === 'company-work' && roomId) }))}
+    lenses={taskTabs.map(tab => ({ ...tab, active: tab.active && !selected }))}
+    projects={activeProjects(state).map(project => ({ id: project.id, name: project.name, open: state.tasks.filter(task => task.projectId === project.id && isOpen(task)).length }))}
+    activeProjectId={view === 'company-work' ? roomId : null}
+    onSelect={id => { if (id === 'all-tasks') openLens(registryView.lens); else go(id as View); sidebar.afterNavigate(); }}
+    onLens={id => { if (id === 'completed') openCompleted(); else openLens(id as Lens); sidebar.afterNavigate(); }}
+    onProject={id => { location.hash = `#/company-work/${encodeURIComponent(id)}`; sidebar.afterNavigate(); }} />;
   const contextAllowed = selected && (!focused || selected.id === state.focus?.taskId || !!grant);
   // The everyday sections sit in the top navigation on wide screens; the rail keeps the rest.
   // Phones keep the full list in the menu (the top navigation is hidden there).
@@ -461,7 +471,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   const contextOffset = !sidebar.isMobile && rightPanelOpen ? rightPanelWidth : 0;
   // The full Calendar is the page's primary workspace: the left quick view (a second grid) steps aside there.
   const calendarPage = view === 'calendar' && !sidebar.isMobile;
-  const leftReserved = pullouts.calendar && !calendarPage ? sidebar.width : 0;
+  const leftReserved = pullouts.calendar ? sidebar.width : 0;
   const today = localDate(now);
   const dueToday = state.tasks.filter(task => task.status !== 'done' && task.due === today && (company || task.owner === actor)).length;
 
@@ -484,10 +494,12 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
           {!live && onExitDemo && <button type="button" role="menuitem" onClick={() => { close(); onExitDemo(); }}>Sign in to Task HQ</button>}
         </>}
         account={{ label: me.name && !me.name.includes('@') ? me.name : live?.email ?? me.name, detail: live ? ROLE_LABELS[live.role] : me.title, mark: <AccountMark quest={quest} />, menu: close => <AccountMenu quest={quest} close={close} /> }}
-        pulloutTitle={calendarAllowed ? 'Calendar' : 'Your work'}
+        pulloutTitle="Workspace"
+        navigator={workNavigator}
         pullout={<div className="left-stack">
+          {/* The calendar page already shows the calendar; the quick view would only repeat it. */}
           {calendarAllowed && view !== 'calendar' && <CalendarPullout quest={quest} company={company} dayList={false} onOpenTask={openTask} onExpandCalendar={() => go('calendar')} onCreate={canCreate ? due => createOn(due) : undefined} />}
-          {view !== 'calendar' && <WorkNavigator lenses={taskTabs} projects={activeProjects(state)} onLens={id => { if (id === 'completed') openCompleted(); else openLens(id as Lens); }} onProjects={() => go('company-work')} />}
+          {workNavigator}
         </div>}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
         items={railItems.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: item.id === 'calendar' && !sidebar.isMobile ? pullouts.calendar : view === item.id, info: item.id === 'calendar' && !sidebar.isMobile ? 'Quick view · opens beside the page' : info[item.id] }))}
@@ -613,11 +625,11 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
       </div>
       {/* Edge toggles sit on each panel's inner border and stay visible when it's collapsed. */}
       {!sidebar.isMobile && <>
-        {!calendarPage && <button type="button" className="seam seam-left" aria-controls="quest-sidebar" aria-expanded={pullouts.calendar}
-          aria-label={pullouts.calendar ? 'Close the calendar panel' : 'Open the calendar panel'}
-          title={pullouts.calendar ? 'Close panel' : 'Calendar and your work'} onClick={toggleLeft}>
+        <button type="button" className="seam seam-left" aria-controls="quest-sidebar" aria-expanded={pullouts.calendar}
+          aria-label={pullouts.calendar ? 'Close the workspace panel' : 'Open the workspace panel'}
+          title={pullouts.calendar ? 'Close panel' : 'Workspace: navigation and calendar'} onClick={toggleLeft}>
           <Icon d={pullouts.calendar ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} />
-        </button>}
+        </button>
         <button type="button" className="seam seam-right" aria-controls="right-edge-drawer" aria-expanded={rightPanelOpen}
           aria-label={rightPanelOpen ? 'Close the right panel' : 'Open notifications'} title={rightPanelOpen ? 'Close panel' : 'Notifications'}
           onClick={() => (rightPanelOpen ? closeRightPanel() : askOpenLast && !focused ? toggleAsk() : toggleNotifications())}>

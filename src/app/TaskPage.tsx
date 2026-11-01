@@ -63,7 +63,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
   }
 
   return (
-    <article {...feedback} data-feedback-record={task.id} className={`view task-page status-${task.status}`} aria-labelledby="task-page-title" onKeyDown={onKeyDown}>
+    <article {...feedback} data-feedback-record={task.id} className={`view task-page status-${task.status} ${task.archivedAt && !draft ? 'is-archived-record' : ''}`} aria-labelledby="task-page-title" onKeyDown={onKeyDown}>
       <nav className="tp-bar" aria-label="Task">
         <button ref={back} type="button" className="btn btn-ghost btn-sm tp-back" onClick={onClose}>
           <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>{draft ? 'Cancel' : 'Back'}
@@ -92,7 +92,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
           : <p className="ctx-sub">Created by {nameOf(state, task.createdBy, 'someone')}{created ? ` · ${when(created.at)}` : ''} · updated {when(task.updatedAt)}</p>}
         <div className="ctx-tags"><TaskTags state={state} task={task} now={quest.now} /></div>
       </header>
-      {legacy && <LegacyArchived quest={quest} task={task} />}
+      {task.archivedAt && !draft && <ArchivedBanner quest={quest} task={task} />}
 
 
       <dl className="tp-facts" aria-label="Status, assigned, priority and due date">
@@ -293,16 +293,20 @@ function QuickActions({ quest, task, compact = false }: { quest: Quest; task: Ta
 }
 const QIcon = ({ d }: { d: string }) => <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={d} /></svg>;
 
-/** Unfinished work archived as legacy: not completed, status kept, restorable by a coordinator. */
-function LegacyArchived({ quest, task }: { quest: Quest; task: Task }) {
+/** Shown on any archived task, above the grayed-out page. Unfinished work archived as legacy keeps
+ * its status; completed work stays completed. Restore follows the same permissions as archiving. */
+function ArchivedBanner({ quest, task }: { quest: Quest; task: Task }) {
   const { state, actor, dispatch } = quest;
   const [error, setError] = useState('');
-  const canRestore = coordinates(state.people.find(item => item.id === actor)) && quest.backend.supports?.legacyArchive !== false;
+  const done = task.status === 'done';
+  const canRestore = done
+    ? canReopenTask(state, task, actor) && quest.backend.supports?.taskArchive !== false
+    : coordinates(state.people.find(item => item.id === actor)) && quest.backend.supports?.legacyArchive !== false;
   const restore = async () => { const result = await dispatch({ type: 'task/unarchive', id: task.id }); setError(result.ok ? '' : result.error); };
   return (
     <div className="ctx-done is-archived tp-legacy" role="status">
-      <p className="ctx-done-state"><b>Archived as legacy · not completed</b></p>
-      <p className="muted">Status kept: {STATUS_LABELS[task.status]}. Archived {when(task.archivedAt!)}{task.archivedBy ? ` · ${nameOf(state, task.archivedBy, 'someone')}` : ''}. Out of active work; its comments and history are kept.</p>
+      <p className="ctx-done-state"><b>{done ? 'Archived · completed' : 'Archived as legacy · not completed'}</b></p>
+      <p className="muted">{done ? 'Completed work.' : `Status kept: ${STATUS_LABELS[task.status]}.`} Archived {when(task.archivedAt!)}{task.archivedBy ? ` · ${nameOf(state, task.archivedBy, 'someone')}` : ''}. Out of active work; its comments and history are kept.</p>
       {canRestore && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void restore()}>Restore from archive</button>}
       {error && <p className="form-error" role="alert">{error}</p>}
     </div>
@@ -356,7 +360,6 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
   }
   const by = completion.actor || finish?.actor || '';
   const approved = finish?.kind === 'approval';
-  const archiveAvailable = backend.supports?.taskArchive !== false && allowed;
   return (
     <div className={`ctx-done ${task.archivedAt ? 'is-archived' : ''}`}>
       <p className="ctx-done-state" role="status"><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
@@ -370,7 +373,6 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
           <span className="offer-form-actions"><button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>Cancel</button><button className="btn btn-primary btn-sm" disabled={!note.trim()}>Reopen</button></span>
         </form>
       )}
-      {archiveAvailable && !open && task.archivedAt && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void dispatch({ type: 'task/unarchive', id: task.id })}>Restore from archive</button>}
       {allowed && !reopenAvailable && !canUndo && <p className="muted">Reopening finished work arrives with the next server release. Until then, create a follow-up task.</p>}
     </div>
   );

@@ -137,7 +137,7 @@ function unreadIn(notes: Notification[], read: Set<string>, section?: string) {
   return notes.filter(note => (!section || note.section === section) && !read.has(note.id)).length;
 }
 
-export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, pullout, pulloutTitle, pulloutHead, settings, account, calendarAccess }: {
+export function Sidebar({ control, items, brand, onSelect, create, footer, notifications, pullout, pulloutTitle, pulloutHead, settings, account, calendarAccess, navigator }: {
   calendarAccess?: ReactNode;
   control: SidebarControl;
   items: SidebarItem[];
@@ -150,6 +150,8 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
   /** The left pullout's body (the calendar quick view), shown on desktop only. */
   pullout: ReactNode;
   pulloutTitle: string;
+  /** The labelled workspace navigator; phones open it as the menu (wide screens get it inside `pullout`). */
+  navigator: ReactNode;
   /** Wide screens: replaces the title with a control (the panel's tab switch); the title stays as its label. */
   pulloutHead?: ReactNode;
   /** The settings menu at the foot of the rail; `close` dismisses it after a choice. */
@@ -194,15 +196,6 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
       </button>
     );
   };
-  const panelItem = (item: SidebarItem) => (
-    <button key={item.id} type="button" className={item.active ? 'is-active' : ''} aria-current={item.active ? 'page' : undefined}
-      aria-label={item.preview || (item.count && item.countLabel) ? `${item.label}${item.preview ? ', preview' : ''}${item.count && item.countLabel ? `, ${item.count} ${item.countLabel}` : ''}` : item.label}
-      onClick={() => { onSelect(item.id); control.afterNavigate(); }}>
-      {item.icon}<span>{item.label}</span>
-      {item.count ? <span className={`panel-count ${item.hot ? 'is-hot' : ''}`} title={item.countLabel ? `${item.count} ${item.countLabel}` : undefined}>{item.count}</span> : null}
-    </button>
-  );
-
   useEffect(() => {
     const node = panel.current;
     if (!node) return;
@@ -317,17 +310,7 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
               <button type="button" className="nav-create panel-create" disabled={!create.enabled} onClick={() => { create.onCreate(); control.afterNavigate(); }}>
                 <span aria-hidden="true">+</span> New task
               </button>
-              {everyday.map(panelItem)}
-              {previews.length > 0 && (
-                <>
-                  <button type="button" className={`panel-group-toggle ${showPreviews ? 'is-open' : ''}`} aria-expanded={showPreviews} aria-controls="panel-previews"
-                    onClick={() => setPreviewsOpen(open => !open)}>
-                    <span>Previews <small>not ready for daily use</small></span>
-                    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={showPreviews ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} /></svg>
-                  </button>
-                  {showPreviews && <div id="panel-previews" className="panel-previews" role="group" aria-label="Previews">{previews.map(panelItem)}</div>}
-                </>
-              )}
+              {navigator}
             </nav>
           )}
           {!isMobile && pullout}

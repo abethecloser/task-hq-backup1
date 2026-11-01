@@ -45,6 +45,18 @@
 .work-nav-item:hover { background: var(--sunk); color: var(--ink); }
 .work-nav-item.is-active { background: var(--accent-pale); color: var(--accent-ink); }
 .work-nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Workspace navigator hierarchy (panel on wide screens, menu on phones). */
+.work-nav-group { display: grid; gap: 2px; }
+.work-nav-item.is-section { justify-content: flex-start; }
+.work-nav-item .work-nav-text { flex: 1 1 auto; min-width: 0; }
+.work-nav-icon { display: inline-grid; flex: none; place-items: center; width: 22px; color: var(--muted); }
+.work-nav-icon .icon { width: 18px; height: 18px; }
+.work-nav-item.is-active .work-nav-icon { color: var(--accent-ink); }
+.work-sub { margin: 1px 0 4px 21px !important; padding-left: 10px !important; border-left: 1px solid var(--hair); }
+.work-sub .work-nav-item { min-height: 32px; font-size: 15px; font-weight: 600; }
+.work-sub .work-nav-item.is-more { color: var(--muted); }
+.work-nav-toggle { display: flex; align-items: baseline; gap: 6px; padding: 0; border: 0; background: none; cursor: pointer; font: inherit; }
+.work-nav-toggle small { color: var(--faint); font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none; }
 
 /* ── Phones: five tab bar items (Calendar joins) ───────────────────────────────────────── */
 @media (max-width: 760px) { .tabbar { grid-template-columns: repeat(5, 1fr); } }
@@ -434,3 +446,7 @@
 .lv-involved { margin: 0; overflow-wrap: anywhere; font-size: 14px; }
 .lv-involved .pt-label { display: block; margin-bottom: 2px; }
 @container (max-width: 640px) { .lv-stage { max-height: 300px; } }
+/* Long project names truncate instead of widening the panel (which scrolled it sideways). */
+.work-nav, .work-nav-group, .work-list, .work-sub, .work-list li { min-width: 0; }
+.work-nav ul { grid-template-columns: minmax(0, 1fr); }
+#quest-sidebar .panel-scroll { overflow-x: hidden; }

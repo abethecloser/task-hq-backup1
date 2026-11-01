@@ -554,8 +554,8 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
   :root .cal-filters .cal-filter { flex: none; }
   .cal-controls .cal-today + .btn, .cal-controls .cal-step + .btn { margin-left: 0; }
 }
-/* The full Calendar replaces the left quick view: no second grid beside it. */
-@media (min-width: 761px) { .shell.is-calendar-page .workspace-panel { display: none; } }
+/* The left panel is the workspace navigator, so it stays available on the Calendar page; only its
+   calendar quick view is left out there (App.tsx), since the page already is the calendar. */
 
 /* Tasks: the lens filters sit in the page header, beside My work / Company (not in the top bar). */
 .registry > .view-head > div:first-child { flex: 1 1 auto; min-width: 0; }

@@ -1327,3 +1327,10 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .bulk-result { margin: 0 0 8px; color: var(--ink-2); }
 .bulk-bar select { flex: 0 1 auto; width: auto; min-width: 140px; max-width: 220px; }
 @media (max-width: 600px) { .bulk-bar select { flex: 1 1 140px; max-width: none; } }
+
+/* Archived records: the page is grayed out under its Archived banner, which stays in full colour
+   with Restore. Everything stays readable and its history usable. */
+.is-archived-record { --archived-tint: color-mix(in srgb, var(--ink) 4%, transparent); background-image: repeating-linear-gradient(135deg, var(--archived-tint) 0 1px, transparent 1px 14px); }
+.is-archived-record > :not(.tp-bar):not(.tp-legacy):not(.pr-archived) { filter: grayscale(1); opacity: .62; transition: opacity .2s; }
+.is-archived-record > :not(.tp-bar):not(.tp-legacy):not(.pr-archived):hover { opacity: .85; }
+.is-archived-record .tp-legacy, .is-archived-record .pr-archived { padding: 12px 14px; border: 1px dashed var(--line-2, var(--hair)); border-radius: 12px; background: var(--card); }
