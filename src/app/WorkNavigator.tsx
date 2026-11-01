@@ -5,17 +5,26 @@ import type { TopTab } from './TopBar.tsx';
 /** One destination, as the rail lists it (the same records drive both). */
 export interface NavSection { id: string; label: string; icon: ReactNode; count?: number; countLabel?: string; hot?: boolean; preview?: boolean; active?: boolean }
 
-/** How sections group in the labelled navigator; anything unlisted falls into Workspace. */
-const GROUPS: { label: string; ids: string[] }[] = [
+/** How destinations group, in order. The icon rail and the labelled navigator both use this, so
+ * the two always list the same destinations in the same order. Anything unlisted joins Workspace. */
+export const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: 'Work', ids: ['home', 'all-tasks', 'company-work', 'calendar', 'inbox'] },
   { label: 'Insights', ids: ['reports', 'needs-attention', 'executive', 'activity'] },
   { label: 'Workspace', ids: ['archive', 'people', 'settings'] },
 ];
 const PROJECT_LIMIT = 8;
 
-// The workspace navigator: every destination with its label, Tasks views and individual Projects
-// nested under their parent. The icon rail is its collapsed form and phones open it as the menu,
-// so there is one hierarchy and one set of destinations everywhere. Task views reuse the top bar's
+/** Everyday destinations in navigator order, each tagged with its group; previews stay separate. */
+export function groupSections<T extends { id: string; preview?: boolean }>(sections: T[]): { label: string; items: T[] }[] {
+  const everyday = sections.filter(item => !item.preview);
+  const groups = NAV_GROUPS.map(group => ({ label: group.label, items: group.ids.map(id => everyday.find(item => item.id === id)).filter((item): item is T => !!item) }));
+  groups[groups.length - 1]!.items.push(...everyday.filter(item => !NAV_GROUPS.some(group => group.ids.includes(item.id))));
+  return groups.filter(group => group.items.length);
+}
+
+// The workspace navigator: every destination by name, as a tree, with Tasks views and individual
+// Projects branching from their parent. Icons live only on the rail beside it (same destinations,
+// same order, from the same records), and phones open this tree as their menu. Task views reuse the top bar's
 // task filters, so counts always agree.
 export function WorkNavigator({ sections, lenses, projects, activeProjectId, onSelect, onLens, onProject }: {
   sections: NavSection[]; lenses: TopTab[];
@@ -23,12 +32,9 @@ export function WorkNavigator({ sections, lenses, projects, activeProjectId, onS
   onSelect: (id: string) => void; onLens: (id: string) => void; onProject: (id: string) => void;
 }) {
   const [previewsOpen, setPreviewsOpen] = useState(false);
-  const everyday = sections.filter(item => !item.preview);
   const previews = sections.filter(item => item.preview);
   const showPreviews = previewsOpen || previews.some(item => item.active);
-  const grouped = GROUPS.map(group => ({ ...group, items: group.ids.map(id => everyday.find(item => item.id === id)).filter((item): item is NavSection => !!item) }));
-  const rest = everyday.filter(item => !GROUPS.some(group => group.ids.includes(item.id)));
-  grouped[grouped.length - 1]!.items.push(...rest);
+  const grouped = groupSections(sections);
   const shown = projects.slice(0, PROJECT_LIMIT);
 
   // A parent whose view or project is the current page reads as "you are in here", not as a second
@@ -38,7 +44,7 @@ export function WorkNavigator({ sections, lenses, projects, activeProjectId, onS
     <button type="button" className={`work-nav-item is-section ${item.active && !childActive(item.id) ? 'is-active' : ''} ${childActive(item.id) ? 'has-active-child' : ''}`} aria-current={item.active && !childActive(item.id) ? 'page' : undefined}
       aria-label={`${item.label}${item.preview ? ', preview' : ''}${item.count && item.countLabel ? `, ${item.count} ${item.countLabel}` : ''}`}
       onClick={() => onSelect(item.id)}>
-      <span className="work-nav-icon" aria-hidden="true">{item.icon}</span><span className="work-nav-text">{item.label}</span>
+      <span className="work-nav-text">{item.label}</span>
       {item.count ? <b className={item.hot ? 'is-hot' : ''}>{item.count}</b> : null}
     </button>
   );

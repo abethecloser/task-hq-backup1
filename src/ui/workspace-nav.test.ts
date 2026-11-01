@@ -21,7 +21,9 @@ test('the calendar lives in the right panel: top-right icon, not the left panel 
   assert.doesNotMatch(read('home.css'), /is-calendar-page \.workspace-panel \{ display: none/);
   assert.equal(app.match(/<CalendarPullout /g)?.length, 1, 'one calendar quick view, in the right panel');
   assert.match(app, /<div className="right-slot right-calendar" hidden=\{!calendarShown\}>/);
-  assert.doesNotMatch(app, /item\.id === 'calendar' \|\| !topSections/, 'no Calendar icon in the rail');
+  // Calendar in the navigation (rail, tree, phone tab bar) is the full page; only the toolbar opens the drawer.
+  assert.match(app, /if \(next === 'calendar' && calOpen\) closeRightPanel\(\);/, 'going to the Calendar page closes the drawer');
+  assert.doesNotMatch(app, /item\.id === 'calendar' \? openCalendar\(\)/, 'the tab bar Calendar navigates, it does not open the drawer');
   // One right panel: opening any of Calendar, Ask or Notifications closes the other two.
   assert.match(app, /setNotifOpen\(false\); setAskOpen\(false\); setCalOpen\(true\);/);
   assert.match(app, /setNotifOpen\(false\); setCalOpen\(false\);\n\s*setAskOpen\(true\);/);
@@ -35,4 +37,17 @@ test('archived tasks and projects render grayed out under their Archived banner'
   assert.match(read('../app/TaskPage.tsx'), /task\.archivedAt && !draft \? 'is-archived-record'/);
   assert.match(read('../app/ProjectRoom.tsx'), /project\.archivedAt \? 'is-archived-record'/);
   assert.match(read('nexus.css'), /\.is-archived-record > :not\(\.tp-bar\):not\(\.tp-legacy\):not\(\.pr-archived\) \{ filter: grayscale\(1\)/);
+});
+
+test('one navigation source: the rail and the tree list the same destinations in the same groups, icons only on the rail', () => {
+  const sidebar = read('../app/Sidebar.tsx'), nav = read('../app/WorkNavigator.tsx'), app = read('../app/App.tsx');
+  assert.match(sidebar, /groupSections\(everyday\)\.map\(group => <div key=\{group\.label\} className="rail-group"/);
+  assert.match(nav, /const grouped = groupSections\(sections\);/);
+  assert.match(app, /const railItems = sidebar\.isMobile \? navigation : navigation\.filter\(item => item\.id !== 'settings'\);/, 'every destination on the rail; Settings is the foot gear');
+  assert.doesNotMatch(nav, /work-nav-icon|item\.icon\}/, 'no icons beside tree labels');
+});
+
+test('navigation always lands on the page: Home never keeps a task, project room or draft on top', () => {
+  const app = read('../app/App.tsx');
+  assert.match(app, /function go\(next: View\) \{[\s\S]{0,200}setTaskId\(null\);\n\s*setRoomId\(null\);\n\s*setCreating\(false\);/);
 });
