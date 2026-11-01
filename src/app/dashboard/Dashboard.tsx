@@ -3,12 +3,15 @@
 // Built for Home first; another page can reuse it by passing its own modules and page id.
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { DragEvent, KeyboardEvent, ReactNode } from 'react';
-import { ARRANGEMENT_LABELS, HEIGHTS, HEIGHT_LABELS, PRESETS, PRESET_LABELS, SIZE_LABELS, addItem, heightOf, layoutOf, moveItem, normalizeLayout, removeItem, resizeItem, sameLayout, setArrangement, setHeight } from '../../core/dashboard-layout.ts';
-import type { Arrangement, DashboardLayout, LayoutItem, ModuleHeight, ModuleSize, ModuleSpec, PresetId } from '../../core/dashboard-layout.ts';
+import { HEIGHTS, HEIGHT_LABELS, PRESETS, PRESET_LABELS, SIZE_LABELS, addItem, heightOf, layoutOf, moveItem, normalizeLayout, removeItem, resizeItem, sameLayout, setHeight } from '../../core/dashboard-layout.ts';
+import type { DashboardLayout, LayoutItem, ModuleHeight, ModuleSize, ModuleSpec, PresetId } from '../../core/dashboard-layout.ts';
 import { useLayoutStore } from './useLayoutStore.ts';
+import { useDropdown } from '../../ui/useDropdown.tsx';
 
 /** Packed rows are this fine (px; CSS grid-auto-rows wins), so a module's span tracks its real height; the gutter matches the columns. */
 const ROW_UNIT = 2, GUTTER = 14;
+/** Neighbours this close in height (px) line up; bigger differences pack, so no space is wasted. */
+const BALANCE = 96;
 
 export interface DashboardModule extends ModuleSpec {
   name: string;
@@ -37,25 +40,39 @@ export function Dashboard({ pageId, scope, actor, modules, defaultItems, presets
   const live = useRef<HTMLParagraphElement>(null);
   const announce = (text: string) => setNotice(text);
   const grid = useRef<HTMLDivElement>(null);
-  const arrangement: Arrangement = layout.arrangement ?? 'packed';
-
-  // Packed: each module spans as many fine grid rows as its own height (plus one gutter). Placement
-  // stays in the person's order (no dense backfill), so what you read, tab through and arranged agree,
-  // while later modules still rise into the space under short neighbours.
+  // Adaptive placement, chosen for the person: modules keep their order; each spans its natural
+  // height on fine rows, so later modules rise into space under shorter neighbours (no dense backfill,
+  // so reading, Tab and arranged order agree). Neighbours that start together and differ by less than
+  // BALANCE share the taller height, so near-equal cards line up instead of leaving ragged edges or
+  // slivers too small to use. Saved 'aligned' arrangements from earlier versions read the same way.
   useLayoutEffect(() => {
     const node = grid.current;
     if (!node) return;
     const items = [...node.querySelectorAll<HTMLElement>(':scope > .dash-item')];
-    if (arrangement !== 'packed') { for (const item of items) item.style.gridRowEnd = ''; return; }
     const fit = () => {
       const unit = parseFloat(getComputedStyle(node).gridAutoRows) || ROW_UNIT;
-      for (const item of items) item.style.gridRowEnd = `span ${Math.max(1, Math.ceil((item.getBoundingClientRect().height + GUTTER) / unit))}`;
+      const span = (height: number) => `span ${Math.max(1, Math.ceil((height + GUTTER) / unit))}`;
+      for (const item of items) item.style.minHeight = '';
+      const natural = items.map(item => item.getBoundingClientRect().height);
+      items.forEach((item, index) => { item.style.gridRowEnd = span(natural[index]!); });
+      const rows = new Map<number, number[]>();
+      items.forEach((item, index) => {
+        const top = item.offsetTop;
+        const row = [...rows.keys()].find(key => Math.abs(key - top) <= unit) ?? top;
+        rows.set(row, [...(rows.get(row) ?? []), index]);
+      });
+      for (const members of rows.values()) {
+        if (members.length < 2) continue;
+        const tallest = Math.max(...members.map(index => natural[index]!));
+        for (const index of members) if (tallest - natural[index]! <= BALANCE) { items[index]!.style.minHeight = `${tallest}px`; items[index]!.style.gridRowEnd = span(tallest); }
+      }
     };
     fit();
+    // Watch the content, not the card (balancing changes the card's height, never its content).
     const observer = new ResizeObserver(fit);
-    for (const item of items) observer.observe(item);
+    for (const item of items) for (const part of item.querySelectorAll(':scope > .dash-cell, :scope > .dash-item-bar')) observer.observe(part);
     return () => observer.disconnect();
-  }, [layout, arrangement, editing]);
+  }, [layout, editing]);
 
   const move = (id: string, to: number) => { setDraft(current => moveItem(current ?? store.layout, id, to)); };
   function onKey(event: KeyboardEvent, id: string, index: number) {
@@ -113,11 +130,6 @@ export function Dashboard({ pageId, scope, actor, modules, defaultItems, presets
                   {available.map(item => <option key={item.id} value={item.id}>{item.name} — {item.description}</option>)}
                 </select>
               </label>
-              <span className="seg dash-arrange" role="group" aria-label="Arrangement">
-                {(['packed', 'aligned'] as Arrangement[]).map(value => <button key={value} type="button" aria-pressed={arrangement === value}
-                  title={value === 'packed' ? 'Modules fill the space under shorter neighbours' : 'Cards in a row share one height'}
-                  onClick={() => { setDraft(setArrangement(layout, value)); announce(`${ARRANGEMENT_LABELS[value]} arrangement.`); }}>{ARRANGEMENT_LABELS[value]}</button>)}
-              </span>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDraft(layoutOf(normalizeLayout(null, modules, defaultItems).items)); announce('Default layout restored. Save to keep it.'); }}>Restore default</button>
               <span className="dash-tools-end">
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDraft(null); announce('Changes discarded.'); }}>Cancel</button>
@@ -127,11 +139,15 @@ export function Dashboard({ pageId, scope, actor, modules, defaultItems, presets
         <p ref={live} className={`dash-notice ${notice ? '' : 'sr-only'}`} role="status" aria-live="polite">{notice}</p>
       </div>
 
-      <div ref={grid} className={`dash-grid is-${arrangement}`} onDragOver={event => { if (dragging) event.preventDefault(); }} onDrop={onDrop}>
+      <div ref={grid} className="dash-grid is-adaptive" onDragOver={event => { if (dragging) event.preventDefault(); }} onDrop={onDrop}>
         {layout.items.map((item, index) => {
           const module = spec(item.id);
           const body = module.render({ size: item.size, layout });
           const height = heightOf(item);
+          // Expand gives the module the next width up; when it's wider than its default, Collapse returns it.
+          const larger = module.sizes[module.sizes.indexOf(item.size) + 1];
+          const expanded = module.sizes.indexOf(item.size) > module.sizes.indexOf(module.defaultSize);
+          const expand = expanded ? module.defaultSize : larger;
           if (!editing) return <div key={item.id} className={`dash-item size-${item.size} h-${height}`} data-module={item.id}><div className="dash-cell">{body}</div></div>;
           return (
             <div key={item.id} data-module={item.id}
@@ -146,15 +162,15 @@ export function Dashboard({ pageId, scope, actor, modules, defaultItems, presets
                 </button>
                 <span className="dash-item-name">{module.name}</span>
                 <span className="dash-item-actions">
-                  <button type="button" className="icon-btn" aria-label={`Move ${module.name} earlier`} disabled={index === 0} onClick={() => move(item.id, index - 1)}>↑</button>
-                  <button type="button" className="icon-btn" aria-label={`Move ${module.name} later`} disabled={index === layout.items.length - 1} onClick={() => move(item.id, index + 1)}>↓</button>
-                  {module.sizes.length > 1 && <span className="seg dash-sizes" role="group" aria-label={`${module.name} width`}>
-                    {module.sizes.map(size => <button key={size} type="button" aria-pressed={item.size === size} title={`Width: ${SIZE_LABELS[size]}`} onClick={() => setDraft(resizeItem(layout, item.id, size, module))}>{size === 'xl' ? 'Full' : size.toUpperCase()}</button>)}
-                  </span>}
-                  <select className="dash-height" aria-label={`${module.name} height`} title="Height" value={height} onChange={event => setDraft(setHeight(layout, item.id, event.target.value as ModuleHeight))}>
-                    {HEIGHTS.map(value => <option key={value} value={value}>{HEIGHT_LABELS[value]}</option>)}
-                  </select>
-                  <button type="button" className="icon-btn dash-hide" aria-label={`Hide ${module.name}`} onClick={() => { setDraft(removeItem(layout, item.id)); announce(`${module.name} hidden. Add it back from Add module.`); }}>×</button>
+                  {expand && <button type="button" className="btn btn-ghost btn-sm dash-expand" aria-pressed={expanded}
+                    aria-label={`${expanded ? 'Collapse' : 'Expand'} ${module.name}`} onClick={() => { setDraft(resizeItem(layout, item.id, expand, module)); announce(`${module.name} ${expanded ? 'collapsed' : 'expanded'}.`); }}>
+                    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={expanded ? 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' : 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'} /></svg>{expanded ? 'Collapse' : 'Expand'}
+                  </button>}
+                  <ModuleMenu name={module.name} height={height} sizes={module.sizes} size={item.size} first={index === 0} last={index === layout.items.length - 1}
+                    onHeight={value => setDraft(setHeight(layout, item.id, value))}
+                    onSize={value => setDraft(resizeItem(layout, item.id, value, module))}
+                    onMove={dir => { move(item.id, index + dir); announce(`${module.name} moved to position ${index + dir + 1} of ${layout.items.length}.`); }}
+                    onHide={() => { setDraft(removeItem(layout, item.id)); announce(`${module.name} hidden. Add it back from Add module.`); }} />
                 </span>
               </div>
               {/* The module stays visible but can't be clicked while arranging, so a drag never opens a task. */}
@@ -165,5 +181,36 @@ export function Dashboard({ pageId, scope, actor, modules, defaultItems, presets
         {editing && layout.items.length === 0 && <p className="dash-empty">No modules shown. Add one from <b>Add module</b>, or start from a layout.</p>}
       </div>
     </div>
+  );
+}
+
+/** The secondary controls: size (height), width, move for touch, hide. One button keeps the bar quiet. */
+function ModuleMenu({ name, height, sizes, size, first, last, onHeight, onSize, onMove, onHide }: {
+  name: string; height: ModuleHeight; sizes: ModuleSize[]; size: ModuleSize; first: boolean; last: boolean;
+  onHeight: (value: ModuleHeight) => void; onSize: (value: ModuleSize) => void; onMove: (dir: -1 | 1) => void; onHide: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  useDropdown({ open, onClose: () => setOpen(false), trigger: () => trigger.current, content: () => menu.current });
+  const pick = (act: () => void) => () => { act(); setOpen(false); };
+  return (
+    <span className="dash-menu-wrap">
+      <button ref={trigger} type="button" className="icon-btn dash-more" aria-haspopup="menu" aria-expanded={open} aria-label={`More options for ${name}`} onClick={() => setOpen(value => !value)}>
+        <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h.01M12 12h.01M18 12h.01" /></svg>
+      </button>
+      {open && <div ref={menu} className="top-menu dash-menu" role="menu" aria-label={`${name} options`}>
+        <p className="menu-note"><b>Size</b></p>
+        {HEIGHTS.map(value => <button key={value} type="button" role="menuitemradio" aria-checked={height === value} onClick={pick(() => onHeight(value))}>
+          {HEIGHT_LABELS[value]}<small>{value === 'auto' ? 'Fits its content' : value === 'compact' ? 'Short; scrolls if needed' : value === 'standard' ? 'Medium height' : 'Extra room'}</small>
+        </button>)}
+        {sizes.length > 1 && <><p className="menu-note"><b>Width</b></p>
+          {sizes.map(value => <button key={value} type="button" role="menuitemradio" aria-checked={size === value} onClick={pick(() => onSize(value))}>{SIZE_LABELS[value]}</button>)}</>}
+        <p className="menu-note"><b>Arrange</b></p>
+        <button type="button" role="menuitem" disabled={first} onClick={pick(() => onMove(-1))}>Move earlier</button>
+        <button type="button" role="menuitem" disabled={last} onClick={pick(() => onMove(1))}>Move later</button>
+        <button type="button" role="menuitem" onClick={pick(onHide)}>Hide {name}</button>
+      </div>}
+    </span>
   );
 }
