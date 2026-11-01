@@ -13,6 +13,11 @@ export const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: 'Workspace', ids: ['archive', 'people', 'settings'] },
 ];
 const PROJECT_LIMIT = 8;
+/** Parents with nested items; which of them are expanded is remembered on this device. */
+const PARENTS = ['all-tasks', 'company-work'];
+const OPEN_KEY = 'quest.nav.expanded';
+function loadOpen(): string[] { try { const raw = JSON.parse(localStorage.getItem(OPEN_KEY) ?? 'null'); return Array.isArray(raw) ? raw.filter((id: unknown) => typeof id === 'string') : PARENTS; } catch { return PARENTS; } }
+function saveOpen(ids: string[]) { try { localStorage.setItem(OPEN_KEY, JSON.stringify(ids)); } catch { /* this page only */ } }
 
 /** Everyday destinations in navigator order, each tagged with its group; previews stay separate. */
 export function groupSections<T extends { id: string; preview?: boolean }>(sections: T[]): { label: string; items: T[] }[] {
@@ -32,6 +37,11 @@ export function WorkNavigator({ sections, lenses, projects, activeProjectId, onS
   onSelect: (id: string) => void; onLens: (id: string) => void; onProject: (id: string) => void;
 }) {
   const [previewsOpen, setPreviewsOpen] = useState(false);
+  const [open, setOpen] = useState<string[]>(loadOpen);
+  const setExpanded = (id: string, next: boolean) => setOpen(current => {
+    const ids = next ? [...new Set([...current, id])] : current.filter(item => item !== id);
+    saveOpen(ids); return ids;
+  });
   const previews = sections.filter(item => item.preview);
   const showPreviews = previewsOpen || previews.some(item => item.active);
   const grouped = groupSections(sections);
@@ -40,14 +50,23 @@ export function WorkNavigator({ sections, lenses, projects, activeProjectId, onS
   // A parent whose view or project is the current page reads as "you are in here", not as a second
   // current page; the child carries the active highlight.
   const childActive = (id: string) => (id === 'all-tasks' && lenses.some(lens => lens.active)) || (id === 'company-work' && !!activeProjectId);
-  const row = (item: NavSection) => (
-    <button type="button" className={`work-nav-item is-section ${item.active && !childActive(item.id) ? 'is-active' : ''} ${childActive(item.id) ? 'has-active-child' : ''}`} aria-current={item.active && !childActive(item.id) ? 'page' : undefined}
+  // Tasks and Projects are folders: the row opens the page and unfolds its items; the chevron folds
+  // and unfolds without navigating. Neither ever collapses the sidebar itself.
+  const row = (item: NavSection) => {
+    const parent = PARENTS.includes(item.id), unfolded = open.includes(item.id);
+    const button = <button type="button" className={`work-nav-item is-section ${item.active && !childActive(item.id) ? 'is-active' : ''} ${childActive(item.id) ? 'has-active-child' : ''}`} aria-current={item.active && !childActive(item.id) ? 'page' : undefined}
       aria-label={`${item.label}${item.preview ? ', preview' : ''}${item.count && item.countLabel ? `, ${item.count} ${item.countLabel}` : ''}`}
-      onClick={() => onSelect(item.id)}>
+      onClick={() => { if (parent) setExpanded(item.id, true); onSelect(item.id); }}>
       <span className="work-nav-icon" aria-hidden="true">{item.icon}</span><span className="work-nav-text">{item.label}</span>
       {item.count ? <b className={item.hot ? 'is-hot' : ''}>{item.count}</b> : null}
-    </button>
-  );
+    </button>;
+    if (!parent) return button;
+    return <div className="work-nav-parent">{button}
+      <button type="button" className={`work-nav-fold ${unfolded ? 'is-open' : ''}`} aria-expanded={unfolded} aria-label={`${unfolded ? 'Hide' : 'Show'} ${item.label} items`} onClick={() => setExpanded(item.id, !unfolded)}>
+        <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+      </button>
+    </div>;
+  };
 
   return (
     <nav className="work-nav" aria-label="Workspace">
@@ -58,12 +77,12 @@ export function WorkNavigator({ sections, lenses, projects, activeProjectId, onS
             {group.items.map(item => (
               <li key={item.id}>
                 {row(item)}
-                {item.id === 'all-tasks' && lenses.length > 0 && <ul className="work-sub" aria-label="Task views">
+                {item.id === 'all-tasks' && open.includes('all-tasks') && lenses.length > 0 && <ul className="work-sub" aria-label="Task views">
                   {lenses.map(lens => <li key={lens.id}><button type="button" className={`work-nav-item ${lens.active ? 'is-active' : ''}`} aria-current={lens.active ? 'page' : undefined} onClick={() => onLens(lens.id)}>
                     <span className="work-nav-text">{lens.label}</span>{lens.count !== undefined && <b className={lens.hot ? 'is-hot' : ''}>{lens.count}</b>}
                   </button></li>)}
                 </ul>}
-                {item.id === 'company-work' && shown.length > 0 && <ul className="work-sub" aria-label="Projects">
+                {item.id === 'company-work' && open.includes('company-work') && shown.length > 0 && <ul className="work-sub" aria-label="Projects">
                   {shown.map(project => <li key={project.id}><button type="button" className={`work-nav-item ${project.id === activeProjectId ? 'is-active' : ''}`} aria-current={project.id === activeProjectId ? 'page' : undefined} onClick={() => onProject(project.id)}>
                     <span className="work-nav-text">{project.name}</span>{project.open > 0 && <b>{project.open}</b>}
                   </button></li>)}

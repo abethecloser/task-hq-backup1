@@ -644,13 +644,8 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
           </div>}
         </EdgeDrawer>
       </div>
-      {/* Edge toggles sit on each panel's inner border and stay visible when it's collapsed. */}
+      {/* The sidebar's own header chevron expands and collapses it; the right panel keeps its edge toggle. */}
       {!sidebar.isMobile && <>
-        <button type="button" className="seam seam-left" aria-controls="quest-sidebar" aria-expanded={pullouts.calendar}
-          aria-label={pullouts.calendar ? 'Close the workspace panel' : 'Open the workspace panel'}
-          title={pullouts.calendar ? 'Close panel' : 'Workspace navigation'} onClick={toggleLeft}>
-          <Icon d={pullouts.calendar ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} />
-        </button>
         <button type="button" className="seam seam-right" aria-controls="right-edge-drawer" aria-expanded={rightPanelOpen}
           aria-label={rightPanelOpen ? 'Close the right panel' : 'Open notifications'} title={rightPanelOpen ? 'Close panel' : 'Notifications'}
           onClick={() => (rightPanelOpen ? closeRightPanel() : askOpenLast && !focused ? toggleAsk() : toggleNotifications())}>

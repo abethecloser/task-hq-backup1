@@ -486,3 +486,20 @@
 .rail.is-expanded .sidebar-foot .nav-toggle { margin-left: auto; }
 .work-nav-item.is-section { gap: 10px; }
 .work-sub { margin-left: 20px !important; }
+
+/* Sidebar header: brand, title and the collapse/expand chevron, inside the sidebar itself. */
+.rail-head { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 6px; }
+.rail-head .sidebar-brand { margin-bottom: 0; }
+.rail.is-expanded .rail-head { flex-direction: row; align-items: center; gap: 10px; padding: 0 2px 0 6px; }
+.rail.is-expanded .rail-head .sidebar-brand { padding-left: 0; }
+.rail-title { flex: 1 1 auto; min-width: 0; font: 800 18px/1 var(--display, inherit); letter-spacing: -.01em; color: var(--ink); }
+.rail-collapse { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--hair); border-radius: 9px; background: var(--card); color: var(--ink-2); cursor: pointer; }
+.rail-collapse:hover { color: var(--accent-ink); border-color: var(--accent); }
+.rail-collapse .icon { width: 16px; height: 16px; }
+/* Folders: the chevron sits at the row's end and turns when unfolded. */
+.work-nav-parent { display: flex; align-items: center; gap: 2px; }
+.work-nav-parent > .work-nav-item { flex: 1 1 auto; min-width: 0; }
+.work-nav-fold { display: grid; flex: none; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
+.work-nav-fold:hover { background: var(--sunk, #f2f2f4); color: var(--ink); }
+.work-nav-fold .icon { width: 14px; height: 14px; transition: transform .15s; }
+.work-nav-fold.is-open .icon { transform: rotate(90deg); }

@@ -56,3 +56,14 @@ test('navigation always lands on the page: Home never keeps a task, project room
   const app = read('../app/App.tsx');
   assert.match(app, /function go\(next: View\) \{[\s\S]{0,200}setTaskId\(null\);\n\s*setRoomId\(null\);\n\s*setCreating\(false\);/);
 });
+
+test('the sidebar header chevron expands and collapses it; the preference and open folders are remembered', () => {
+  const sidebar = read('../app/Sidebar.tsx'), nav = read('../app/WorkNavigator.tsx'), app = read('../app/App.tsx');
+  assert.match(sidebar, /className="rail-collapse" onClick=\{\(\) => \{ setHint\(null\); control\.toggle\(\); \}\}/, 'chevron inside the sidebar header');
+  assert.doesNotMatch(app, /className="seam seam-left"/, 'no separate far-left edge toggle');
+  assert.match(sidebar, /open: typeof raw\.open === 'boolean' \? raw\.open : false,/, 'expanded/collapsed is remembered');
+  // Tasks and Projects are folders: the row unfolds and opens the page; the chevron folds without navigating.
+  assert.match(nav, /onClick=\{\(\) => \{ if \(parent\) setExpanded\(item\.id, true\); onSelect\(item\.id\); \}\}/);
+  assert.match(nav, /className=\{`work-nav-fold \$\{unfolded \? 'is-open' : ''\}`\} aria-expanded=\{unfolded\}/);
+  assert.match(nav, /const OPEN_KEY = 'quest\.nav\.expanded';/);
+});
