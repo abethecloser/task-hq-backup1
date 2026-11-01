@@ -261,3 +261,21 @@ test('a calendar filter narrows the grid and day lists to the picked tasks', () 
   assert.deepEqual(dueOn(state, actor, NOW, true, one.due!, [one]).map(task => task.id), [one.id]);
   assert.deepEqual(dueOn(state, actor, NOW, true, one.due!, []), []);
 });
+
+test('team movement: the activity feed plus completions recorded only on the task, never duplicated or invented', async () => {
+  const { seedState } = await import('./seed.ts');
+  const { teamMovement } = await import('./dashboard.ts');
+  const now = Date.UTC(2026, 10, 1, 15);
+  const state = seedState(now);
+  const done = state.tasks.filter(task => task.status === 'done' && task.completedAt);
+  const feed = teamMovement(state, 'jordan', true, 50);
+  assert.deepEqual(feed.map(entry => entry.taskId).filter(Boolean).sort(), done.map(task => task.id).sort(), 'each recorded completion once');
+  assert.ok(feed.every((entry, index) => index === 0 || feed[index - 1]!.at >= entry.at), 'newest first');
+  // Once a completion event exists, the task-level record is not repeated.
+  const task = done[0]!;
+  state.events.push({ id: 'e1', at: task.completedAt!, actor: task.owner, kind: 'task', text: `X completed “${task.title}”.`, taskId: task.id });
+  assert.equal(teamMovement(state, 'jordan', true, 50).filter(entry => entry.taskId === task.id).length, 1);
+  // Without company access, only work the viewer is involved in.
+  const outsider = teamMovement(state, 'nobody', false, 50);
+  assert.equal(outsider.length, 0);
+});

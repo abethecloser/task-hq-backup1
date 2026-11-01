@@ -1,4 +1,4 @@
-// Navigation dock (preview): which destinations live in the dock and which in the rail / phone menu.
+// Navigation dock (the default primary navigation): which destinations live in the dock and which in the rail / phone menu.
 // Pure, so the split is testable and every destination stays reachable exactly once per surface.
 
 export type NavMode = 'classic' | 'dock';
@@ -10,14 +10,19 @@ export const DOCK_HOME = 'home';
 export const DOCK_RIGHT = ['calendar', 'inbox'] as const;
 export const DOCK_IDS: string[] = [...DOCK_LEFT, DOCK_HOME, ...DOCK_RIGHT];
 
-/** `?nav=dock` turns the preview on and remembers it; `?nav=classic` turns it off. */
-export function readNavMode(search: string, storage: Pick<Storage, 'getItem' | 'setItem'> | null): NavMode {
+/** The dock is the default navigation. `?nav=classic` is a temporary rollback/testing path (remembered on
+ * this device); `?nav=dock` returns to the default. */
+export function readNavMode(search: string, storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null): NavMode {
   const asked = new URLSearchParams(search).get('nav');
-  if (asked === 'dock' || asked === 'classic') {
-    try { storage?.setItem(NAV_MODE_KEY, asked); } catch { /* private mode: this visit only */ }
-    return asked;
+  if (asked === 'classic') {
+    try { storage?.setItem(NAV_MODE_KEY, 'classic'); } catch { /* private mode: this visit only */ }
+    return 'classic';
   }
-  try { return storage?.getItem(NAV_MODE_KEY) === 'dock' ? 'dock' : 'classic'; } catch { return 'classic'; }
+  if (asked === 'dock') {
+    try { storage?.removeItem(NAV_MODE_KEY); } catch { /* private mode */ }
+    return 'dock';
+  }
+  try { return storage?.getItem(NAV_MODE_KEY) === 'classic' ? 'classic' : 'dock'; } catch { return 'dock'; }
 }
 
 /**

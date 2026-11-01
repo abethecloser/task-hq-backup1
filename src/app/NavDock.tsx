@@ -1,4 +1,4 @@
-// Navigation dock (preview, `?nav=dock`): the one primary navigation, on every screen size.
+// Navigation dock (the default; `?nav=classic` rolls back): the one primary navigation, on every screen size.
 // Exactly five destinations — Tasks, Projects, HOME (the centre anchor), Calendar, Inbox.
 // One adaptive surface (see ui/nav-dock.css): a compact floating capsule when the work area is spacious,
 // widening into flush, integrated bottom navigation as room shrinks. In the capsule, with a fine pointer,

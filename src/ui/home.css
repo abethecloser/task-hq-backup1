@@ -812,3 +812,19 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .hd-report-summary > div { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
 .hd-report-summary dt { color: var(--muted); }
 .hd-report-summary dd { margin: 0; text-align: right; font-weight: 650; }
+
+/* ── Operating desk (Home) ────────────────────────────────────────────────────────────────
+   A compact Operating Desk greeting, then the sections share one header rhythm. Signals groups its
+   rows (approvals · at risk · observations) under quiet labels rather than separate cards. */
+.home-dash .dash-item[data-module="welcome"] .hd-hero { min-height: 0; }
+.home-dash .dash-item[data-module="welcome"] .hd-hero-copy { gap: 4px; padding-block: 14px; }
+.home-dash .dash-item[data-module="welcome"] .hd-hero h1 { font-size: clamp(24px, 2.1vw, 33px); }
+.home-dash .hd-signals { gap: 8px; }
+.home-dash .hd-signal-group { display: grid; gap: 2px; }
+.home-dash .hd-signal-group + .hd-signal-group { padding-top: 8px; border-top: 1px solid var(--hair); }
+.home-dash .hd-signal-label { margin: 0 0 2px; color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.home-dash .hd-badge.is-review { background: color-mix(in srgb, #8b5cf6 12%, transparent); color: #6d28d9; }
+.home-dash .hd-obs { border-left: 3px solid var(--hair-2, #e5e7eb); padding-left: 2px; }
+.home-dash .hd-obs.tone-stop { border-left-color: color-mix(in srgb, var(--stop, #b42318) 60%, transparent); }
+.home-dash .hd-obs.tone-warn { border-left-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.home-dash .hd-obs small { white-space: normal; }

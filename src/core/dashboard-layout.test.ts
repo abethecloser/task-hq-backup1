@@ -28,10 +28,10 @@ test('saved layouts are cleaned: unknown, duplicate and unavailable modules drop
 
 test('move, resize, remove and add', () => {
   let layout = normalizeLayout(null, SPECS);
-  layout = moveItem(layout, 'culture', 0);
-  assert.equal(layout.items[0]!.id, 'culture');
-  layout = moveItem(layout, 'culture', 99);
-  assert.equal(layout.items.at(-1)!.id, 'culture');
+  layout = moveItem(layout, 'activity', 0);
+  assert.equal(layout.items[0]!.id, 'activity');
+  layout = moveItem(layout, 'activity', 99);
+  assert.equal(layout.items.at(-1)!.id, 'activity');
   const projects = SPECS.find(s => s.id === 'projects')!;
   assert.equal(resizeItem(layout, 'projects', 'xl', projects).items.find(i => i.id === 'projects')!.size, 'xl');
   assert.equal(resizeItem(layout, 'projects', 's', projects).items.find(i => i.id === 'projects')!.size, 'm', 'unsupported size refused');
@@ -96,12 +96,12 @@ test('rows fill edge to edge in the person’s order; widths only grow to close 
   assert.deepEqual(spans, { a: 4, b: 8, c: 7, d: 5, e: 12 });
 });
 
- test('default action sections are independent modules and saved choices remain intact', () => {
+test('the default is the operating desk: six sections in order, existing module ids, saved choices intact', () => {
   const layout = normalizeLayout(null, SPECS);
-  assert.equal(layout.items.filter(item => item.id === 'needs-hand').length, 1);
-  assert.equal(layout.items.filter(item => item.id === 'next-actions').length, 1);
-  assert.equal(layout.items.filter(item => item.id === 'reports').length, 1);
-  const saved = layoutOf([{ id: 'projects', size: 'l' }]);
+  assert.deepEqual(layout.items.map(item => item.id), ['welcome', 'performance', 'up-next', 'activity', 'projects', 'at-risk']);
+  assert.deepEqual(layout.items.map(item => item.size), ['xl', 'xl', 'm', 'm', 'm', 'm'], 'paired halves under the two full-width strips');
+  // Earlier defaults' modules are still available to add, and a saved layout with them is kept as saved.
+  const saved = layoutOf([{ id: 'projects', size: 'l' }, { id: 'culture', size: 'm' }, { id: 'needs-hand', size: 'm' }, { id: 'reports', size: 'm' }]);
   assert.deepEqual(normalizeLayout(saved, SPECS).items, saved.items);
 });
 

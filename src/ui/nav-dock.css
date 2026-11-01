@@ -1,4 +1,4 @@
-/* ── Navigation dock (preview, ?nav=dock) ──────────────────────────────────────────────────
+/* ── Navigation dock (default; ?nav=classic rolls back) ──────────────────────────────────────────────────
    One adaptive surface, not two modes. Everything derives from the work area's width (--nd-avail):
      spacious (≥ ~1110px)  a compact capsule, lifted 14px, rounded, softly elevated, magnifying icons;
      in between            it widens toward the work area while its lift, radius and shadow ease to zero;
@@ -21,9 +21,6 @@
 .shell.nav-dock-on.is-mobile-nav { --nd-avail: 100vw; }
 /* Content clears the dock by padding, not by a reserved band, so it scrolls behind the surface. */
 .shell.nav-dock-on.nav-dock-on > .main > .content { padding-bottom: var(--nd-reserve); }
-/* The communications panel sits above the dock when open; only its collapsed ribbon gives way. */
-.shell.nav-dock-on .collab-dock { margin-bottom: calc(var(--nd-h) + 1px + var(--nd-lift) + env(safe-area-inset-bottom)); }
-.shell.nav-dock-on .collab-dock:not(.is-open) { display: none; }
 .shell.nav-dock-on .tabbar { display: none; }
 .shell.nav-dock-on .toast { bottom: calc(var(--nd-h) + var(--nd-lift) + 16px + env(safe-area-inset-bottom)); }
 .shell.nav-dock-on .fab-create { bottom: calc(var(--nd-h) + 16px + env(safe-area-inset-bottom)); }
