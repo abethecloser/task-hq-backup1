@@ -84,7 +84,7 @@ export function createLiveBackend(client: SupabaseClient, url: string, publishab
       const full = contract >= FULL_CONTRACT;
       const archiveGate = (action.type === 'task/archive' || action.type === 'task/unarchive') && contract < ARCHIVE_CONTRACT ? 'Archiving is unavailable on the current shared server. Nothing was sent.' : null;
       const projectGate = action.type === 'project/create' && contract < PROJECT_CONTRACT ? 'Creating projects is unavailable until the server update (dispatch v7) is deployed. Nothing was sent.' : null;
-      const legacyGate = action.type === 'task/archive' && action.reason === 'legacy' && contract < LEGACY_CONTRACT ? 'Archiving unfinished work is unavailable until the server update (dispatch v8) is deployed. Nothing was sent.' : null;
+      const legacyGate = action.type === 'task/archive' && action.reason === 'legacy' && contract < LEGACY_CONTRACT ? 'Archiving unfinished work is unavailable until the server update (dispatch v8 or later) is deployed. Nothing was sent.' : null;
       const projectArchiveGate = (action.type === 'project/archive' || action.type === 'project/unarchive') && contract < PROJECT_ARCHIVE_CONTRACT ? 'Archiving projects is unavailable until the server update (dispatch v9) is deployed. Nothing was sent.' : null;
       const error = archiveGate ?? projectGate ?? legacyGate ?? projectArchiveGate ?? (full ? null : unsupported(action));
       if (error) return { ok: false, state: latest!, error };

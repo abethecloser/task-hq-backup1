@@ -11,7 +11,9 @@ import type { Task } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
 import { BOARD_ORDER, DEFAULT_QUERY, LEGACY_LENSES, LENSES, LENS_HINTS, LENS_LABELS, SORT_LABELS, boardColumns, isCompletedQuery, queryTasks, rowFlags } from '../core/registry.ts';
 import type { Lens, RegistryQuery, Scope, SortKey, StatusFilter } from '../core/registry.ts';
-import { firstName, nameOf, projectName } from '../core/selectors.ts';
+import { activeProjects, firstName, nameOf, projectName } from '../core/selectors.ts';
+import { bulkPlan, bulkSummary } from '../core/bulk.ts';
+import type { BulkKind } from '../core/bulk.ts';
 import { completionDetails } from '../core/completed.ts';
 import { localDate, shortDate } from '../core/time.ts';
 import { Avatar, Empty } from '../ui/components.tsx';
@@ -108,6 +110,13 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
   const tasks = useMemo(() => queryTasks(state, actor, minute * 60000, query), [state, actor, minute, query]);
   const filtered = !!query.search || !!query.company || activeFilterCount(query) > 0;
   const live = quest.backend.kind === 'live';
+  // Multi-select: only tasks still in the list stay selected when filters change.
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const [bulkResult, setBulkResult] = useState('');
+  const visible = useMemo(() => new Set(tasks.map(task => task.id)), [tasks]);
+  const selection = useMemo(() => [...picked].filter(id => visible.has(id)), [picked, visible]);
+  const toggle = (id: string) => setPicked(current => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const toggleAll = () => setPicked(selection.length === tasks.length ? new Set() : new Set(tasks.map(task => task.id)));
 
   return (
     <div className={`view registry ${completed ? 'is-completed' : ''}`}>
@@ -169,7 +178,11 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
           </Empty>
         : prefs.layout === 'board'
           ? <Board quest={quest} tasks={tasks} selectedId={selectedId} onSelect={onSelect} />
-          : <Table quest={quest} tasks={tasks} selectedId={selectedId} onSelect={onSelect} />}
+          : <>
+            {bulkResult && <p className="bulk-result" role="status">{bulkResult} <button type="button" className="link" onClick={() => setBulkResult('')}>Dismiss</button></p>}
+            {selection.length > 0 && <BulkBar quest={quest} ids={selection} onResult={setBulkResult} onDone={() => setPicked(new Set())} />}
+            <Table quest={quest} tasks={tasks} selectedId={selectedId} onSelect={onSelect} picked={new Set(selection)} onPick={toggle} onPickAll={toggleAll} />
+          </>}
     </div>
   );
 }
@@ -190,20 +203,25 @@ function Flags({ quest, task, priority = true }: { quest: Quest; task: Task; pri
   );
 }
 
-function Table({ quest, tasks, selectedId, onSelect }: { quest: Quest; tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void }) {
+function Table({ quest, tasks, selectedId, onSelect, picked, onPick, onPickAll }: {
+  quest: Quest; tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void;
+  picked: Set<string>; onPick: (id: string) => void; onPickAll: () => void;
+}) {
   const { state, now } = quest;
+  const all = tasks.length > 0 && tasks.every(task => picked.has(task.id));
   return (
     <div className="registry-table" role="table" aria-label="Tasks">
       <div className="registry-row is-head" role="row">
-        <span role="columnheader">Task</span><span role="columnheader">Assigned</span><span role="columnheader">Status</span><span role="columnheader">Priority</span><span role="columnheader">Due</span>
+        <span role="columnheader" className="cell-task"><input type="checkbox" className="row-pick" aria-label={all ? 'Clear selection' : `Select all ${tasks.length} tasks`} checked={all} ref={box => { if (box) box.indeterminate = !all && picked.size > 0; }} onChange={onPickAll} />Task</span><span role="columnheader">Assigned</span><span role="columnheader">Status</span><span role="columnheader">Priority</span><span role="columnheader">Due</span>
       </div>
       {tasks.map((task, index) => {
         const flags = rowFlags(state, task, now);
         return (
           <div key={task.id} role="row" style={{ ['--i' as string]: Math.min(index, 12) }}
-            {...feedbackAttributes(quest.feedback?.record(task.id))} data-feedback-record={task.id} className={`registry-row status-${task.status} ${task.id === selectedId ? 'is-selected' : ''} ${flags.overdue || flags.blocked ? 'is-alert' : ''}`}
+            {...feedbackAttributes(quest.feedback?.record(task.id))} data-feedback-record={task.id} className={`registry-row status-${task.status} ${task.id === selectedId ? 'is-selected' : ''} ${picked.has(task.id) ? 'is-picked' : ''} ${flags.overdue || flags.blocked ? 'is-alert' : ''}`}
             onClick={() => onSelect(task.id)}>
             <span role="cell" className="cell-task">
+              <input type="checkbox" className="row-pick" aria-label={`Select ${task.title}`} checked={picked.has(task.id)} onClick={event => event.stopPropagation()} onChange={() => onPick(task.id)} />
               <span className={`state-dot dot-${task.status}`} aria-hidden="true" />
               <span className="cell-task-text">
                 <button type="button" className="row-open" aria-label={`Open ${task.title}`} aria-current={task.id === selectedId || undefined} onClick={event => { event.stopPropagation(); onSelect(task.id); }}><strong>{task.title}</strong></button>
@@ -252,4 +270,50 @@ export function Board({ quest, tasks, selectedId, onSelect }: { quest: Quest; ta
 function CompletionMeta({ quest, task }: { quest: Quest; task: Task }) {
   const { actor, at } = completionDetails(quest.state, task);
   return <>Completed by {actor ? nameOf(quest.state, actor, 'Former member') : 'actor unavailable'} · {at !== null ? <time dateTime={new Date(at).toISOString()}>{new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</time> : 'time unavailable'}</>;
+}
+
+/** Actions for the selected tasks. Each task gets its own engine action and permissions check;
+ * tasks that can't take the action are skipped and named in the result. */
+function BulkBar({ quest, ids, onResult, onDone }: { quest: Quest; ids: string[]; onResult: (text: string) => void; onDone: () => void }) {
+  const { state, actor, dispatch } = quest;
+  const [busy, setBusy] = useState(false);
+  const anyArchived = ids.some(id => state.tasks.find(task => task.id === id)?.archivedAt);
+  const people = state.people.filter(item => item.role !== 'reviewer');
+
+  async function run(request: BulkKind, verb: string) {
+    const plan = bulkPlan(state, actor, ids, request);
+    setBusy(true);
+    let done = 0;
+    const failed = [...plan.skipped];
+    for (const { task, action } of plan.actions) {
+      const outcome = await dispatch(action);
+      if (outcome.ok) done += 1; else failed.push({ task, reason: outcome.error.replace(/\.$/, '') });
+    }
+    setBusy(false);
+    onResult(bulkSummary(verb, done, failed));
+    if (done && !failed.length) onDone();
+  }
+
+  return (
+    <div className="bulk-bar" role="toolbar" aria-label={`Actions for ${ids.length} selected tasks`} aria-busy={busy}>
+      <b>{ids.length} selected</b>
+      {anyArchived
+        ? <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void run({ kind: 'restore' }, 'Restored')}>Restore</button>
+        : <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void run({ kind: 'archive' }, 'Archived')}>Archive</button>}
+      <Select className="inline-select" value="" aria-label="Assign selected tasks" disabled={busy} onChange={event => { if (event.target.value) void run({ kind: 'assign', owner: event.target.value === '-' ? '' : event.target.value }, 'Reassigned'); }}>
+        <option value="">Assign to…</option>
+        {people.map(item => <option key={item.id} value={item.id}>{item.id === actor ? `${item.name} (you)` : item.name}</option>)}
+        <option value="-">Unassigned</option>
+      </Select>
+      <Select className="inline-select" value="" aria-label="Set priority of selected tasks" disabled={busy} onChange={event => { if (event.target.value) void run({ kind: 'priority', priority: event.target.value as 'normal' | 'high' }, 'Updated'); }}>
+        <option value="">Priority…</option><option value="high">High</option><option value="normal">Normal</option>
+      </Select>
+      <Select className="inline-select" value="" aria-label="Move selected tasks to a project" disabled={busy} onChange={event => { if (event.target.value) void run({ kind: 'project', projectId: event.target.value === '-' ? '' : event.target.value }, 'Moved'); }}>
+        <option value="">Move to project…</option>
+        {activeProjects(state).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+        <option value="-">No project</option>
+      </Select>
+      <button type="button" className="link" disabled={busy} onClick={onDone}>Clear</button>
+    </div>
+  );
 }
