@@ -29,3 +29,22 @@ Highest-leverage candidate: one read-only record reference and deep-link journey
 ## Verification limits
 
 Local synthetic demo only. Typecheck, 396 tests, production build and diff checks passed. Browser measurements at 1440, 1024, 375 and 430px found no document overflow; the mobile rail and desktop dock yield to existing mobile navigation. Expanded/collapsed and keyboard paths checked in the browser. No real-account, physical-device, cross-product, or production acceptance claimed. No deployment performed; production review and authorization remain separate from local build verification.
+
+## Reconciliation with `main` (radial Living, PR #44)
+
+`feature/living-graph-restoration` forked at `f10f285`, before PR #44 replaced `LivingView` with the radial view. Merged with nothing discarded:
+
+- **Living** keeps the radial composition from `main` (core progress arcs, people orbit, project sectors of packed task nodes, activity ticks, dependency chords, contextual panel). From this branch it gains the project picker as the scope control and the per-stage counts legend. `LivingGraphic.tsx` (task-stage donut) and `scripts/verify-living-options.mjs` stay in the repository, unused by the view.
+- **Standard** keeps its ring, stage breakdown, Projects list and people column. Living, as one composition, uses the branch's single-column grid.
+- **Home**: the branch's Reports module and defaults (Needs a hand, Next actions, Reports) are kept. "Open work by person" stays available. The overview leaves out any part shown as its own module, so nothing repeats.
+- **Navigation**: all of this branch's sidebar work is kept.
+
+## Functional opportunities (proposed, not built)
+
+| Opportunity | Builds on | Smallest next step |
+| --- | --- | --- |
+| Dependency-aware execution: "what this unblocks" | `blockingDeps`, `dependents`, Living dependency chords | When a task completes, show the tasks it released and their owners in the feedback bar, with one-click Start for the owner. |
+| Living as navigation | Radial sectors, people orbit, shared selection | Double-click a sector to open its project room and a person to filter Tasks by them, so the picture becomes a way to move. |
+| Contextual actions on nodes | Engine actions with UI permission predicates (`permissions.ts`) | Offer the same permitted moves (advance, ask for help, hand off) from a Living task node, through the existing dispatch. |
+| Rule-based automation (Monday-style "when / then") | `runTaskHooks`, notifications | One rule: when a task is blocked for more than N hours, notify its approver. Off by default, audited, per workspace. |
+| Multi-homing (Asana-style) | Single `projectId` per task | Explicit contract change needed (dispatch v10): secondary project memberships, with the primary project staying authoritative. Not started. |

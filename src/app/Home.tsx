@@ -6,7 +6,7 @@ import type { QuestEvent, QuestState } from '../core/contract.ts';
 import { compose } from '../core/compose.ts';
 import { ago, atRisk, homeMetrics, performance, recentActivity } from '../core/dashboard.ts';
 import { DEFAULT_ITEMS } from '../core/dashboard-layout.ts';
-import type { DashboardLayout } from '../core/dashboard-layout.ts';
+import type { DashboardLayout, ModuleSize } from '../core/dashboard-layout.ts';
 import { Dashboard } from './dashboard/Dashboard.tsx';
 import type { DashboardModule } from './dashboard/Dashboard.tsx';
 import { HOME_PERIODS, HOME_PERIOD_LABELS, inHomePeriod, loadHomePeriod, riskInPeriod, saveHomePeriod } from '../core/home-period.ts';
@@ -144,8 +144,11 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
         </section>
     </> },
     { id: 'projects', name: 'Projects and Team Overview', description: 'Progress by project and person', sizes: ['m', 'l', 'xl'], defaultSize: 'l',
-      render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} focusTaskId={focusTaskId} onClearFocus={onClearFocus}
-        omit={{ people: true, needsHand: true, nextActions: true }} /> },
+      // Parts shown as their own modules (by default Needs a hand and Next actions) aren't repeated here.
+      render: ({ layout }) => <ProjectTeam quest={quest} company={company} onOpen={onOpen} focusTaskId={focusTaskId} onClearFocus={onClearFocus} onReports={onReports}
+        omit={{ people: shown(layout, 'people'), needsHand: shown(layout, 'needs-hand'), nextActions: shown(layout, 'next-actions') }} /> },
+    ...(company ? [{ id: 'people', name: 'Open work by person', description: 'Who holds open work', sizes: ['s', 'm', 'l'] as ModuleSize[], defaultSize: 'm' as ModuleSize,
+      render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} only="people" /> }] : []),
     { id: 'needs-hand', name: 'Needs a hand', description: 'Overdue and blocked work', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} only="needs-hand" /> },
     { id: 'next-actions', name: 'Next actions', description: 'Open work ready to move', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} only="next-actions" /> },
     { id: 'reports', name: 'Reports', description: 'Completion and delivery measures', sizes: ['s', 'm', 'l'], defaultSize: 'm',

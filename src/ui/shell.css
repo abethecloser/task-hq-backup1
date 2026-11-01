@@ -591,3 +591,36 @@
   .rail:not(.is-expanded) .sidebar-foot { padding-bottom: 2px; }
   .rail:not(.is-expanded) .nav-item[aria-current="page"]::before { left: 0; }
 }
+/* Living (radial): layered rings, project sectors of packed task nodes, people orbit, activity ticks. */
+.lv-radial { max-height: 460px; }
+.lv-guide { fill: none; stroke: var(--hair); stroke-width: 1; stroke-dasharray: 2 4; }
+.lv-sector { cursor: pointer; outline: none; transition: opacity .25s; }
+.lv-sector.is-dim { opacity: .45; }
+.lv-wedge { fill: color-mix(in srgb, var(--accent) 3%, transparent); stroke: color-mix(in srgb, var(--accent) 16%, var(--hair)); stroke-width: 1; transition: fill .2s, stroke .2s; }
+.lv-sector:hover .lv-wedge { fill: color-mix(in srgb, var(--accent) 7%, transparent); }
+.lv-sector.is-on .lv-wedge { fill: color-mix(in srgb, var(--accent) 10%, transparent); stroke: var(--accent); stroke-width: 1.6; }
+.lv-sector.is-focus .lv-wedge { stroke: var(--accent); stroke-dasharray: 5 4; stroke-width: 1.6; }
+.lv-sector:focus-visible .lv-wedge { stroke: var(--ink); stroke-width: 2.2; }
+.lv-tick { stroke: #b9bcc3; stroke-width: 4; stroke-linecap: round; }
+.lv-tick.s-working { stroke: var(--act); } .lv-tick.s-review { stroke: #8b5cf6; } .lv-tick.s-blocked { stroke: var(--stop); } .lv-tick.s-done { stroke: var(--done, #16a34a); }
+.lv-link { fill: none; stroke: color-mix(in srgb, var(--ink) 22%, transparent); stroke-width: 1.2; stroke-dasharray: 3 3; }
+.lv-link.is-on { stroke: var(--accent); stroke-width: 2; stroke-dasharray: none; }
+.lv-tie { stroke: color-mix(in srgb, var(--accent) 45%, transparent); stroke-width: 1; }
+.lv-person-node { cursor: pointer; outline: none; transition: opacity .25s; }
+.lv-person-node circle { fill: var(--card, #fff); stroke: color-mix(in srgb, var(--ink) 35%, transparent); stroke-width: 1.5; }
+.lv-person-node text { fill: var(--ink-2); font-size: 10.5px; font-weight: 800; pointer-events: none; }
+.lv-person-node:hover circle { stroke: var(--accent); }
+.lv-person-node.is-on circle { fill: var(--accent-pale, #fff1e7); stroke: var(--accent); stroke-width: 2.2; }
+.lv-person-node.is-dim { opacity: .35; }
+.lv-person-node:focus-visible circle { stroke: var(--ink); stroke-width: 2.5; }
+.lv-arc-track { fill: none; stroke: var(--hair); stroke-width: 6; }
+.lv-arc { fill: none; stroke-width: 6; stroke-linecap: round; }
+.lv-arc.a-done { stroke: var(--done, #16a34a); } .lv-arc.a-working { stroke: var(--act); } .lv-arc.a-blocked { stroke: var(--stop); }
+.lv-core-n { fill: var(--ink); font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.lv-core-l { fill: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+@media (prefers-reduced-motion: reduce) { .lv-sector, .lv-person-node, .lv-wedge { transition: none; } }
+/* Living legend with stage counts (merged from the compact legend on feature/living-graph-restoration). */
+.lv-key > span { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; }
+.lv-key > span b { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.lv-key > span.is-zero { opacity: .5; }
+.lv-key-note { font-size: 11.5px; }

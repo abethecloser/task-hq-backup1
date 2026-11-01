@@ -8,6 +8,7 @@ import { LivingView } from './LivingView.tsx';
 type PtView = 'standard' | 'living';
 const VIEW_KEY = 'quest-overview-view';
 const loadView = (): PtView => { try { return localStorage.getItem(VIEW_KEY) === 'living' ? 'living' : 'standard'; } catch { return 'standard'; } };
+const STAGES = [['working', 'In progress'], ['review', 'In review'], ['blocked', 'Blocked'], ['ready', 'Not started'], ['done', 'Done']] as const;
 
 
 /** Projects and Team Overview: task completion for a selection, the projects and people behind it, and what needs a hand next.
@@ -111,7 +112,8 @@ export function ProjectTeam({ quest, company, onOpen, focusTaskId = null, onClea
           onClick={() => { onClearFocus?.(); setProjectId(projectId === item.id ? null : item.id); }}>{item.name} · {item.total}</button>)}
       </div>
 
-      <div className={`pt-grid pt-cohesive ${view === 'living' ? 'is-living' : ''}`}>
+      {/* Living is one full-width composition; Standard keeps its ring, project and people columns. */}
+      <div className={`pt-grid ${view === 'living' ? 'pt-cohesive is-living' : ''}`}>
         {view === 'living' ? <div className="pt-living">
           <LivingView quest={quest} company={company} projectId={projectId} person={person} focusProjectId={focusProjectId}
             onProject={setProjectId} onPerson={setPerson} onOpen={onOpen} />
@@ -122,10 +124,30 @@ export function ProjectTeam({ quest, company, onOpen, focusTaskId = null, onClea
           </svg>
           <div className="pt-ring-label" aria-hidden="true"><b>{intel.tasks.percent}<i>%</i></b><small>tasks done</small></div>
           <p className="pt-ring-sub">{intel.tasks.done} of {intel.tasks.total} tasks</p>
-
+          <ul className="pt-stages" aria-label="Tasks by stage">
+            {STAGES.map(([key, label]) => <li key={key}><i className={`s-${key}`} aria-hidden="true" />{label}<b>{intel.stages[key]}</b></li>)}
+          </ul>
+          <p className="pt-projects-done"><b>{intel.projectsComplete.complete} of {intel.projectsComplete.total}</b> projects complete<small>A project is complete when every task in it is done.</small></p>
         </div>}
 
-        {company && !omit.people && <div className="pt-col">
+        {view !== 'living' && <div className="pt-col">
+          <p className="pt-label">Projects</p>
+          {intel.projects.length === 0 ? <p className="hd-quiet">No tasks yet.</p> : <ul className="pt-list">
+            {intel.projects.map(item => (
+              <li key={item.id || 'none'}>
+                <button type="button" className={`pt-row ${projectId === item.id ? 'is-on' : ''}`} aria-pressed={projectId === item.id}
+                  aria-label={`${item.name}: ${item.percent}% of tasks done, ${item.done} of ${item.total}${item.overdue ? `, ${item.overdue} overdue` : ''}${item.blocked ? `, ${item.blocked} blocked` : ''}${item.waiting ? `, ${item.waiting} waiting on a dependency` : ''}`}
+                  onClick={() => setProjectId(projectId === item.id ? null : item.id)}>
+                  <span className="pt-row-top"><span className="pt-name">{item.name}</span><b>{item.percent}%</b></span>
+                  <span className="pt-bar" aria-hidden="true"><span style={{ width: `${item.percent}%` }} /></span>
+                  <small>{item.done}/{item.total} done{item.overdue ? <em className="is-late"> · {item.overdue} overdue</em> : null}{item.blocked ? <em className="is-blocked"> · {item.blocked} blocked</em> : null}{item.waiting ? <em className="is-blocked"> · {item.waiting} waiting</em> : null}</small>
+                </button>
+              </li>
+            ))}
+          </ul>}
+        </div>}
+
+        {company && !omit.people && view !== 'living' && <div className="pt-col">
           {peopleList}
         </div>}
       </div>
