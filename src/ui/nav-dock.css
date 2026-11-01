@@ -1,67 +1,55 @@
 /* ── Navigation dock (preview, ?nav=dock) ──────────────────────────────────────────────────
-   One primary navigation. Wide: a floating, labelled dock centred on the work area (between the
-   slim rail and any right panel). Phones: a full-width bottom bar with labels and safe-area padding.
-   The shell reserves the dock's height under the content, so nothing scrolls behind it unreachable. */
-.shell.nav-dock-on { --nd-reserve: 108px; }
+   Five primary destinations as one floating pill on wide screens (pointer magnification, spring
+   transitions) and a steady bottom bar on phones. The shell reserves the dock's height under the
+   content, so nothing is ever hidden behind it. */
+.shell.nav-dock-on { --nd-reserve: 104px; }
+.shell.nav-dock-on.is-mobile-nav { --nd-reserve: calc(70px + env(safe-area-inset-bottom)); }
 .shell.nav-dock-on > .main { padding-bottom: var(--nd-reserve); box-sizing: border-box; }
-/* The communications panel opens from the dock; its collapsed ribbon is replaced by the dock itself. */
+/* The communications panel stays: it opens from its contextual actions (Open in dock) and the Inbox
+   page carries the same conversations; only its collapsed ribbon gives way to the dock. */
 .shell.nav-dock-on .collab-dock:not(.is-open) { display: none; }
 .shell.nav-dock-on .tabbar { display: none; }
-
-.nav-dock { --nd-ease: cubic-bezier(.2, .9, .25, 1.2); z-index: 40; }
-.nav-dock ul { margin: 0; padding: 0; list-style: none; }
-.nd-bar { display: flex; align-items: flex-end; }
-.nd-item { position: relative; display: grid; justify-items: center; align-content: end; gap: 4px; min-width: 64px; padding: 8px 8px 7px; border: 0; border-radius: 14px; background: transparent; color: var(--muted); font: 650 11.5px/1 var(--font, inherit); letter-spacing: .01em; cursor: pointer; transition: color .15s, background .15s; -webkit-tap-highlight-color: transparent; }
-.nd-item:hover { color: var(--ink); }
-.nd-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.nd-item.is-active { color: var(--ink); }
-.nd-item.is-active::after { content: ""; position: absolute; bottom: 1px; left: 50%; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); transform: translateX(-50%); }
-.nd-icon { position: relative; display: grid; place-items: center; width: 26px; height: 26px; transition: transform .22s var(--nd-ease); }
-.nd-icon .icon { width: 22px; height: 22px; }
-.nd-label { white-space: nowrap; }
-.nd-badge { position: absolute; top: -6px; left: 16px; min-width: 18px; height: 18px; padding: 0 5px; border: 2px solid var(--card, #fff); border-radius: 10px; background: var(--ink); color: #fff; font: 800 10.5px/14px var(--font, inherit); text-align: center; box-sizing: border-box; }
-.nd-badge.is-hot { background: var(--accent); }
-.nd-dot { position: absolute; top: 0; right: -1px; width: 9px; height: 9px; border: 2px solid var(--card, #fff); border-radius: 50%; background: var(--accent); box-sizing: border-box; }
-
-/* Home: the centre anchor. */
-.nd-home .nd-icon { width: 40px; height: 40px; border-radius: 13px; background: var(--ink); color: #fff; box-shadow: 0 6px 16px rgb(17 24 39 / 22%); }
-.nd-home.is-active .nd-icon { background: var(--accent); box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 40%, transparent); }
-.nd-home .nd-icon .icon { width: 21px; height: 21px; }
-.nd-home.is-active::after { display: none; }
-
-.nd-sep { align-self: stretch; width: 1px; margin: 10px 6px; background: var(--hair, #e5e7eb); }
-.nd-more-wrap { position: relative; }
-.nd-more.is-open { color: var(--ink); background: var(--sunk); }
-.nd-menu { position: absolute; right: 0; bottom: calc(100% + 14px); display: grid; gap: 1px; width: max-content; min-width: 236px; max-width: min(320px, calc(100vw - 24px)); max-height: min(62vh, 520px); padding: 6px; overflow-y: auto; border: 1px solid var(--hair, #e5e7eb); border-radius: 14px; background: var(--card, #fff); box-shadow: 0 18px 44px rgb(17 24 39 / 16%), 0 2px 6px rgb(17 24 39 / 6%); }
-.nd-menu button { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--ink-2, var(--ink)); font: 600 14.5px/1.2 var(--font, inherit); text-align: left; cursor: pointer; }
-.nd-menu button:hover, .nd-menu button:focus-visible { background: var(--sunk); outline: none; }
-.nd-menu button.is-active { background: var(--accent-pale, #fff4ed); color: var(--ink); }
-.nd-menu .nd-icon { width: 22px; height: 22px; color: var(--muted); }
-.nd-menu .nd-icon .icon { width: 19px; height: 19px; }
-.nd-menu small { color: var(--muted); font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.nd-menu small.is-hot { color: var(--accent-ink, var(--accent)); }
-
-/* Wide: floating dock over the work area, centred between the rail and any open right panel. */
-.nav-dock.is-float { position: fixed; bottom: 14px; left: calc(var(--rail, 72px) + (100vw - var(--rail, 72px) - var(--context-offset, 0px)) / 2); transform: translateX(-50%); }
-.nav-dock.is-float .nd-bar { gap: 2px; padding: 6px 8px; border: 1px solid var(--hair, #e5e7eb); border-radius: 22px; background: color-mix(in srgb, var(--card, #fff) 84%, transparent); box-shadow: 0 12px 34px rgb(17 24 39 / 12%), 0 1px 3px rgb(17 24 39 / 6%); backdrop-filter: blur(18px) saturate(1.5); -webkit-backdrop-filter: blur(18px) saturate(1.5); }
-/* Gentle magnification: the hovered item lifts, its neighbours follow a little. */
-@media (hover: hover) and (prefers-reduced-motion: no-preference) {
-  .nav-dock.is-float .nd-bar > li:hover .nd-item:not(.nd-home) .nd-icon { transform: translateY(-4px) scale(1.18); }
-  .nav-dock.is-float .nd-bar > li:hover .nd-home .nd-icon { transform: translateY(-3px) scale(1.08); }
-  .nav-dock.is-float .nd-bar > li:has(+ li:hover) .nd-item:not(.nd-home) .nd-icon,
-  .nav-dock.is-float .nd-bar > li:hover + li .nd-item:not(.nd-home) .nd-icon { transform: translateY(-2px) scale(1.07); }
-}
-@media (max-width: 1100px) {
-  .nav-dock.is-float .nd-item { min-width: 56px; padding-inline: 5px; }
-}
-
-/* Phones: a full-width bottom bar; labels always visible; Home raised as the anchor. */
-.shell.nav-dock-on.is-mobile-nav { --nd-reserve: calc(68px + env(safe-area-inset-bottom)); }
-.nav-dock.is-mobile { position: fixed; inset: auto 0 0 0; }
-.nav-dock.is-mobile .nd-bar { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: end; padding: 4px 4px calc(6px + env(safe-area-inset-bottom)); border-top: 1px solid var(--hair, #e5e7eb); background: color-mix(in srgb, var(--card, #fff) 94%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-.nav-dock.is-mobile .nd-item { width: 100%; min-width: 0; min-height: 54px; padding: 6px 2px 5px; font-size: 11px; }
-.nav-dock.is-mobile .nd-label { overflow: hidden; max-width: 100%; text-overflow: ellipsis; }
-.nav-dock.is-mobile .nd-home .nd-icon { width: 46px; height: 46px; margin-top: -20px; border: 3px solid var(--card, #fff); border-radius: 50%; box-sizing: content-box; }
-.nav-dock.is-mobile .nd-menu { position: fixed; right: 8px; bottom: calc(76px + env(safe-area-inset-bottom)); }
 .shell.nav-dock-on .fab-create { bottom: calc(var(--nd-reserve) + 12px); }
-@media (prefers-reduced-motion: reduce) { .nd-icon { transition: none; } }
+
+.nav-dock { --nd-spring: cubic-bezier(.34, 1.56, .64, 1); --nd-tile: 40px; z-index: 40; }
+.nd-bar { display: flex; align-items: flex-end; margin: 0; padding: 0; list-style: none; }
+.nd-item { position: relative; display: grid; justify-items: center; gap: 5px; min-width: 60px; padding: 0 4px; border: 0; background: transparent; color: var(--muted); font: 650 11.5px/1 var(--font, inherit); letter-spacing: .01em; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.nd-item:focus-visible { outline: none; }
+.nd-item:focus-visible .nd-tile { box-shadow: 0 0 0 2px var(--card, #fff), 0 0 0 4px var(--accent); }
+
+/* The tile: a soft rounded square; it grows upward from its base so the bar never shifts. */
+.nd-tile { position: relative; display: grid; place-items: center; width: var(--nd-tile); height: var(--nd-tile); border-radius: 12px; background: var(--sunk, #f3f4f6); color: var(--ink-2, var(--ink)); transform: translateY(calc((var(--nd-scale, 1) - 1) * -18px)) scale(var(--nd-scale, 1)); transform-origin: 50% 100%; transition: transform .32s var(--nd-spring), background .18s, color .18s, box-shadow .18s; will-change: transform; }
+.nd-tile .icon { width: 20px; height: 20px; }
+.nd-label { transition: color .18s; white-space: nowrap; }
+@media (hover: hover) { .nd-item:hover .nd-tile, .nd-item:hover .nd-label { color: var(--ink); } }
+
+/* Active: the orange accent on tile and label, plus a small marker under the label. */
+.nd-item.is-active .nd-tile { background: var(--accent-pale, #fff1e8); color: var(--accent-ink, var(--accent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent); }
+.nd-item.is-active .nd-label { color: var(--accent-ink, var(--accent)); font-weight: 800; }
+
+/* Home: the centre anchor — a larger dark tile; active, it turns solid orange with a soft glow. */
+.nd-home .nd-item { min-width: 66px; }
+.nd-home .nd-tile { --nd-tile: 46px; border-radius: 15px; background: var(--ink, #111827); color: #fff; box-shadow: 0 6px 16px rgb(17 24 39 / 20%); }
+.nd-home .nd-tile .icon { width: 22px; height: 22px; }
+@media (hover: hover) { .nd-home .nd-item:hover .nd-tile { color: #fff; } }
+.nd-home .nd-item.is-active .nd-tile { background: var(--accent); color: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent), 0 8px 20px color-mix(in srgb, var(--accent) 38%, transparent); }
+
+.nd-badge { position: absolute; top: -5px; right: -7px; min-width: 18px; height: 18px; padding: 0 5px; border: 2px solid var(--card, #fff); border-radius: 10px; background: var(--ink); color: #fff; font: 800 10.5px/14px var(--font, inherit); text-align: center; box-sizing: border-box; }
+.nd-badge.is-hot { background: var(--accent); }
+
+/* Wide: a floating pill centred on the work area (between the rail and any open right panel). */
+.nav-dock.is-float { position: fixed; bottom: 14px; left: calc(var(--rail, 72px) + (100vw - var(--rail, 72px) - var(--context-offset, 0px)) / 2); transform: translateX(-50%); }
+.nav-dock.is-float .nd-bar { gap: 4px; padding: 8px 12px 7px; border: 1px solid color-mix(in srgb, var(--hair, #e5e7eb) 80%, transparent); border-radius: 22px; background: color-mix(in srgb, var(--card, #fff) 82%, transparent); box-shadow: 0 14px 36px rgb(17 24 39 / 12%), 0 2px 6px rgb(17 24 39 / 5%), inset 0 1px 0 rgb(255 255 255 / 70%); backdrop-filter: blur(18px) saturate(1.6); -webkit-backdrop-filter: blur(18px) saturate(1.6); }
+/* Keyboard focus lifts the focused tile like the pointer does. */
+.nav-dock.can-magnify .nd-item:focus-visible .nd-tile { --nd-scale: 1.18; }
+
+/* Phones and touch: a steady bar — same items, visible labels, 54px targets, no hover effects. */
+.nav-dock.is-mobile { position: fixed; inset: auto 0 0 0; }
+.nav-dock.is-mobile .nd-bar { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: end; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); border-top: 1px solid var(--hair, #e5e7eb); background: color-mix(in srgb, var(--card, #fff) 94%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.nav-dock.is-mobile .nd-item { width: 100%; min-width: 0; min-height: 54px; align-content: end; padding: 0 2px; font-size: 11px; }
+.nav-dock.is-mobile .nd-tile { --nd-tile: 34px; border-radius: 11px; background: transparent; transform: none; transition: background .18s, color .18s; }
+.nav-dock.is-mobile .nd-item.is-active .nd-tile { background: var(--accent-pale, #fff1e8); box-shadow: none; }
+.nav-dock.is-mobile .nd-home .nd-tile { --nd-tile: 44px; margin-top: -14px; border: 3px solid var(--card, #fff); border-radius: 15px; background: var(--ink, #111827); box-sizing: content-box; }
+.nav-dock.is-mobile .nd-home .nd-item.is-active .nd-tile { background: var(--accent); }
+.nav-dock.is-mobile .nd-label { overflow: hidden; max-width: 100%; text-overflow: ellipsis; }
+@media (prefers-reduced-motion: reduce) { .nd-tile { transition: background .18s, color .18s; } }

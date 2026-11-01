@@ -15,17 +15,13 @@ test('dock mode is opt-in, remembered, and reversible from the URL', () => {
   assert.equal(readNavMode('', null), 'classic');
 });
 
-test('every destination is reachable, and no surface repeats another', () => {
-  for (const mobile of [false, true]) {
-    const { dock, more, rail } = splitNavigation(NAV, mobile);
-    assert.deepEqual(dock, ['all-tasks', 'company-work', 'home', 'calendar', 'inbox'], 'Home is the centre anchor');
-    const all = [...dock, ...more.map(item => item.id), ...rail.map(item => item.id)];
-    assert.deepEqual([...all].sort(), NAV.map(item => item.id).sort(), mobile ? 'phone' : 'wide');
-    assert.equal(new Set(all).size, all.length, 'no duplicates');
-    assert.ok(more.some(item => item.id === 'reports'), 'Reports lives in More');
-  }
-  assert.deepEqual(splitNavigation(NAV, false).rail.map(item => item.id), ['people', 'settings']);
-  assert.deepEqual(splitNavigation(NAV, true).rail, [], 'phones have no rail');
+test('exactly five primary destinations, Home in the centre; everything else reachable once, never repeated', () => {
+  const { dock, rail } = splitNavigation(NAV);
+  assert.deepEqual(dock, ['all-tasks', 'company-work', 'home', 'calendar', 'inbox']);
+  const all = [...dock, ...rail.map(item => item.id)];
+  assert.deepEqual([...all].sort(), NAV.map(item => item.id).sort());
+  assert.equal(new Set(all).size, all.length, 'no duplicates');
+  assert.ok(rail.some(item => item.id === 'reports'), 'Reports is a rail shortcut');
   // A destination this person can't use is simply absent, not an empty slot.
-  assert.deepEqual(splitNavigation(NAV.filter(item => item.id !== 'calendar'), false).dock, ['all-tasks', 'company-work', 'home', 'inbox']);
+  assert.deepEqual(splitNavigation(NAV.filter(item => item.id !== 'calendar')).dock, ['all-tasks', 'company-work', 'home', 'inbox']);
 });

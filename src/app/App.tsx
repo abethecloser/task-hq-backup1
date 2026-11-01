@@ -38,7 +38,7 @@ import { Home } from './Home.tsx';
 import { CollabDock } from './CollabDock.tsx';
 import type { DockTab } from './CollabDock.tsx';
 import { DOCK_DEFAULT_PREF, loadDockPreference, saveDockPreference, withSnap } from '../ui/dock-size.ts';
-import { DOCK_HOME, DOCK_LEFT, DOCK_RIGHT, readNavMode, splitNavigation } from '../ui/nav-mode.ts';
+import { DOCK_HOME, DOCK_IDS, DOCK_LEFT, DOCK_RIGHT, readNavMode, splitNavigation } from '../ui/nav-mode.ts';
 import { NavDock } from './NavDock.tsx';
 import type { DockPreference } from '../ui/dock-size.ts';
 import { AskTasks } from './AskTasks.tsx';
@@ -380,7 +380,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   // One labelled hierarchy for every destination: the expanded panel on wide screens, the menu on
   // phones. The rail is its collapsed form, built from the same `navigation` list.
   const workNavigator = <WorkNavigator
-    sections={navigation.map(item => ({ ...item, active: view === item.id && !(selected && item.id !== 'all-tasks') && !(item.id === 'company-work' && roomId) }))}
+    sections={(dockNav ? navigation.filter(item => !DOCK_IDS.includes(item.id)) : navigation).map(item => ({ ...item, active: view === item.id && !(selected && item.id !== 'all-tasks') && !(item.id === 'company-work' && roomId) }))}
     lenses={taskTabs.map(tab => ({ ...tab, active: tab.active && !selected }))}
     projects={activeProjects(state).map(project => ({ id: project.id, name: project.name, open: state.tasks.filter(task => task.projectId === project.id && isOpen(task)).length }))}
     activeProjectId={view === 'company-work' ? roomId : null}
@@ -397,10 +397,13 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   // The rail is the navigator's icon form: every destination, same groups and order (Sidebar groups
   // them with the navigator's own groupSections). Settings is the gear at the rail's foot, so it
   // isn't listed twice. The calendar quick view is the right panel (top-right Calendar icon).
-  const split = splitNavigation(navigation.filter(item => item.id !== 'calendar' || !focused), sidebar.isMobile);
-  // With the dock on, the rail keeps only workspace utilities (Settings stays its gear); the dock and More hold the rest.
+  const split = splitNavigation(navigation.filter(item => item.id !== 'calendar' || !focused));
+  // With the dock on, the rail (and the phone menu) hold only what the dock doesn't: contextual shortcuts and
+  // workspace utilities. On wide screens the calendar quick view moves here from the top bar.
   const railItems = sidebar.isMobile ? navigation : navigation.filter(item => item.id !== 'settings');
-  const railShown = dockNav && !sidebar.isMobile ? split.rail.filter(item => item.id !== 'settings') : railItems;
+  const calendarShortcut: (typeof navigation)[number] = { id: 'calendar-panel' as View, label: 'Calendar quick view', icon: <Icon d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4M12 14h.01" /> };
+  const railShown = !dockNav ? railItems : sidebar.isMobile ? split.rail
+    : [...(!focused ? [calendarShortcut] : []), ...split.rail.filter(item => item.id !== 'settings')];
   const dockItem = (id: string) => {
     const item = navigation.find(entry => entry.id === id);
     return item && split.dock.includes(id) ? { id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, active: view === item.id && !(selected && contextAllowed) } : undefined;
@@ -530,8 +533,8 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
         navigator={workNavigator}
         pullout={null}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
-        items={railShown.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: view === item.id, info: info[item.id] }))}
-        onSelect={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
+        items={railShown.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: (item.id as string) === 'calendar-panel' ? calendarShown : view === item.id, info: info[item.id] }))}
+        onSelect={id => id === 'calendar-panel' ? toggleCalendar() : id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
         create={{ enabled: canCreate, onCreate: () => setCreating(true) }}
         footer={live
           ? <><ModeChip quest={quest} /><p>Signed in as {me.name && !me.name.includes('@') ? me.name : live.email} · {ROLE_LABELS[live.role]}{live.isPlatformAdmin ? ' · platform admin (separate)' : ''}</p><button type="button" className="link exit-demo" onClick={live.onSignOut}>Sign out</button></>
@@ -543,7 +546,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
           <button type="button" className="btn btn-primary cta-fill" onClick={onExitDemo}><span className="cta-fill-label">Sign in to Task HQ</span><CtaArrow /></button>
         </aside>}
         <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen} notifOpen={notifOpen}
-          calendarOpen={calendarShown} onCalendar={calendarAllowed ? toggleCalendar : undefined}
+          calendarOpen={calendarShown} onCalendar={calendarAllowed && !dockNav ? toggleCalendar : undefined}
           title={(VIEW_LABELS[view] ?? '').replace(' · Preview', '')}
           sections={dockNav ? undefined : topSections} onSection={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
           // No New task in the header: creating lives in the right panel's Task action (and N, and the phone's + button).
@@ -610,10 +613,8 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
           onOpen={openTask} onOpenLead={openLead} onActivity={() => go('activity')} onOpenInboxPage={() => go('inbox')}
           contextTaskId={selected && contextAllowed ? selected.id : null} openTask={dockTask} />}
 
-        {dockNav && <NavDock mobile={sidebar.isMobile} left={dockList(DOCK_LEFT)} home={dockItem(DOCK_HOME)} right={dockList(DOCK_RIGHT)}
-          more={split.more.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, active: view === item.id }))}
-          onSelect={id => { if (id === 'all-tasks') openLens(registryView.lens); else go(id as View); }}
-          collab={hasDock ? { open: dockOpen, unread: inboxUnread, onToggle: () => setDock(current => withSnap(current, current.snap === 'collapsed' ? current.last : 'collapsed')) } : undefined} />}
+        {dockNav && <NavDock mobile={sidebar.isMobile} items={[...dockList(DOCK_LEFT), ...dockList([DOCK_HOME]), ...dockList(DOCK_RIGHT)]}
+          onSelect={id => { if (id === 'all-tasks') openLens(registryView.lens); else go(id as View); }} />}
         <nav className="tabbar" aria-label="Task-HQ sections">
           {[
             { id: 'home' as View, label: 'Home', hot: false, icon: <Icon d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" /> },

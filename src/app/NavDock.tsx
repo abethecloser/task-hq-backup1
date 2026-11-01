@@ -1,71 +1,83 @@
-// Navigation dock (preview, `?nav=dock`): one persistent primary navigation for every screen size.
-// Wide screens: a floating dock centred on the work area — labelled icons with a gentle hover lift,
-// Home as the centre anchor, then Collaboration (opens the existing communications panel) and More.
-// Phones: the same items as a full-width bottom bar with visible labels and safe-area padding.
+// Navigation dock (preview, `?nav=dock`): the one primary navigation, on every screen size.
+// Exactly five destinations — Tasks, Projects, HOME (the centre anchor), Calendar, Inbox.
+// Wide screens with a fine pointer: a floating pill whose icons magnify with pointer proximity
+// (the hovered icon most, neighbours a little), springing back when the pointer leaves.
+// Touch and phones: a steady full-width bottom bar with the same items and labels, no hover effects.
 // It owns no navigation state: items, counts and actions come from the app's one `navigation` list.
 import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
 
 export interface DockItem { id: string; label: string; icon: ReactNode; count?: number; countLabel?: string; hot?: boolean; active: boolean }
 
-export function NavDock({ left, home, right, more, onSelect, collab, mobile }: {
-  left: DockItem[]; home?: DockItem; right: DockItem[];
-  /** Secondary destinations, listed in the More menu. */
-  more: DockItem[];
+/** Pointer distance (px) over which neighbours respond, and the largest scale (Home grows less: it is already larger). */
+const RANGE = 120, MAX = 1.34, MAX_HOME = 1.14;
+const FINE = '(hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference)';
+
+export function NavDock({ items, onSelect, mobile }: {
+  /** In order; the item with id `home` is the anchor. */
+  items: DockItem[];
   onSelect: (id: string) => void;
-  /** The communications panel (wide screens, on routes that have it). */
-  collab?: { open: boolean; unread: number; onToggle: () => void };
   mobile: boolean;
 }) {
-  const [menu, setMenu] = useState(false);
-  const root = useRef<HTMLElement>(null);
+  const bar = useRef<HTMLUListElement>(null);
+  const frame = useRef(0);
+  const [magnify, setMagnify] = useState(() => typeof matchMedia !== 'undefined' && matchMedia(FINE).matches);
   useEffect(() => {
-    if (!menu) return;
-    const away = (event: PointerEvent) => { if (!root.current?.contains(event.target as Node)) setMenu(false); };
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape') { setMenu(false); root.current?.querySelector<HTMLElement>('.nd-more')?.focus(); } };
-    document.addEventListener('pointerdown', away);
-    document.addEventListener('keydown', key);
-    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key); };
-  }, [menu]);
-  const go = (id: string) => { setMenu(false); onSelect(id); };
-  const moreActive = more.some(item => item.active);
-  const moreHot = more.some(item => item.hot);
+    const query = matchMedia(FINE);
+    const change = () => setMagnify(query.matches);
+    query.addEventListener('change', change);
+    return () => { query.removeEventListener('change', change); cancelAnimationFrame(frame.current); };
+  }, []);
+  const active = magnify && !mobile;
 
-  const button = (item: DockItem, anchor = false) => (
-    <li key={item.id}>
-      <button type="button" className={`nd-item ${anchor ? 'nd-home' : ''} ${item.active ? 'is-active' : ''}`} aria-current={item.active ? 'page' : undefined}
-        aria-label={item.count ? `${item.label}, ${item.count} ${item.countLabel ?? ''}`.trim() : item.label} onClick={() => go(item.id)}>
-        <span className="nd-icon">{item.icon}{item.count && item.id === 'inbox' ? <b className={`nd-badge ${item.hot ? 'is-hot' : ''}`}>{item.count > 99 ? '99+' : item.count}</b> : null}</span>
-        <span className="nd-label">{item.label}</span>
-      </button>
-    </li>
-  );
+  // Scale each tile by how close the pointer is to its centre (a smooth cosine falloff).
+  function track(event: PointerEvent<HTMLUListElement>) {
+    if (!active || event.pointerType !== 'mouse') return;
+    const x = event.clientX;
+    cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(() => {
+      for (const tile of bar.current?.querySelectorAll<HTMLElement>('.nd-tile') ?? []) {
+        const box = tile.getBoundingClientRect();
+        const distance = Math.abs(x - (box.left + box.width / 2));
+        const near = distance >= RANGE ? 0 : Math.cos((distance / RANGE) * (Math.PI / 2));
+        const max = tile.closest('.nd-home') ? MAX_HOME : MAX;
+        tile.style.setProperty('--nd-scale', (1 + (max - 1) * near).toFixed(3));
+      }
+    });
+  }
+  function rest() {
+    cancelAnimationFrame(frame.current);
+    for (const tile of bar.current?.querySelectorAll<HTMLElement>('.nd-tile') ?? []) tile.style.removeProperty('--nd-scale');
+  }
+  // Arrow keys move between destinations (Tab still reaches each one).
+  function keys(event: KeyboardEvent<HTMLUListElement>) {
+    const buttons = [...(bar.current?.querySelectorAll<HTMLButtonElement>('.nd-item') ?? [])];
+    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (at < 0) return;
+    const to = event.key === 'ArrowRight' ? (at + 1) % buttons.length : event.key === 'ArrowLeft' ? (at - 1 + buttons.length) % buttons.length
+      : event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : -1;
+    if (to < 0) return;
+    event.preventDefault();
+    buttons[to]!.focus();
+  }
 
   return (
-    <nav ref={root} className={`nav-dock ${mobile ? 'is-mobile' : 'is-float'}`} aria-label="Primary">
-      <ul className="nd-bar">
-        {left.map(item => button(item))}
-        {home && button(home, true)}
-        {right.map(item => button(item))}
-        {!mobile && <li className="nd-sep" aria-hidden="true" />}
-        {collab && <li>
-          <button type="button" className={`nd-item ${collab.open ? 'is-active' : ''}`} aria-pressed={collab.open} aria-controls="collab-dock"
-            aria-label={`Collaboration${collab.unread ? `, ${collab.unread} unread` : ''}`} onClick={() => { setMenu(false); collab.onToggle(); }}>
-            <span className="nd-icon"><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.5 7.2L4 20l1-4.5A8 8 0 1 1 21 12z" /></svg>{collab.unread ? <i className="nd-dot" /> : null}</span>
-            <span className="nd-label">Collab</span>
-          </button>
-        </li>}
-        {more.length > 0 && <li className="nd-more-wrap">
-          <button type="button" className={`nd-item nd-more ${moreActive ? 'is-active' : ''} ${menu ? 'is-open' : ''}`} aria-haspopup="menu" aria-expanded={menu} aria-controls="nd-more-menu" onClick={() => setMenu(open => !open)}>
-            <span className="nd-icon"><svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01" /></svg>{moreHot ? <i className="nd-dot" /> : null}</span>
-            <span className="nd-label">More</span>
-          </button>
-          {menu && <div id="nd-more-menu" className="nd-menu" role="menu" aria-label="More destinations">
-            {more.map(item => <button key={item.id} type="button" role="menuitem" className={item.active ? 'is-active' : ''} onClick={() => go(item.id)}>
-              <span className="nd-icon">{item.icon}</span><span>{item.label}</span>{item.count ? <small className={item.hot ? 'is-hot' : ''}>{item.count}</small> : null}
-            </button>)}
-          </div>}
-        </li>}
+    <nav className={`nav-dock ${mobile ? 'is-mobile' : 'is-float'} ${active ? 'can-magnify' : ''}`} aria-label="Primary">
+      <ul ref={bar} className="nd-bar" onPointerMove={track} onPointerLeave={rest} onKeyDown={keys}>
+        {items.map(item => {
+          const home = item.id === 'home';
+          const badge = item.id === 'inbox' && item.count ? (item.count > 99 ? '99+' : String(item.count)) : '';
+          return (
+            <li key={item.id} className={home ? 'nd-home' : undefined}>
+              <button type="button" className={`nd-item ${item.active ? 'is-active' : ''}`} aria-current={item.active ? 'page' : undefined}
+                aria-label={item.count && item.id === 'inbox' ? `${item.label}, ${item.count} ${item.countLabel ?? ''}`.trim() : item.label}
+                onClick={() => { rest(); onSelect(item.id); }}>
+                <span className="nd-tile" aria-hidden="true">{item.icon}{badge && <b className={`nd-badge ${item.hot ? 'is-hot' : ''}`}>{badge}</b>}</span>
+                <span className="nd-label" aria-hidden="true">{item.label}</span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );
