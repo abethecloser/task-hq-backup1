@@ -77,6 +77,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
               <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /></svg>{watching ? 'Watching' : 'Watch'}
             </button>
           )}
+          {!draft && <ArchiveTask quest={quest} task={task} />}
           {!draft && canCreate && <button type="button" className="btn btn-primary btn-sm" onClick={onCreate}>
             <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>New task
           </button>}
@@ -100,7 +101,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
         <div><dt>Priority</dt><dd><PrioritySelect quest={quest} task={task} /></dd></div>
         <div><dt>Due</dt><dd><DueInput quest={quest} task={task} overdue={isOverdue(task, quest.now)} />{task.dueTime && <small>{task.dueTime}</small>}</dd></div>
         <div><dt>Project</dt><dd>{editable
-          ? <Select className="inline-select" value={task.projectId} aria-label="Project" onChange={event => void update({ projectId: event.target.value })}><option value="">No project</option>{state.projects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</Select>
+          ? <Select className="inline-select" value={task.projectId} aria-label="Project" onChange={event => void update({ projectId: event.target.value })}><option value="">No project</option>{state.projects.filter(item => !item.archivedAt || item.id === task.projectId).map(item => <option key={item.id} value={item.id} disabled={!!item.archivedAt}>{item.name}{item.archivedAt ? ' (archived)' : ''}</option>)}</Select>
           : projectName(state, task.projectId) || '—'}</dd></div>
       </dl>
 
@@ -144,7 +145,6 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
           <details className="tp-card drawer-details">
             <summary>More details <small>lifecycle{editable ? ', time, tags, dependencies' : ''}</small></summary>
             <LifecycleReference task={task} />
-            {!draft && <ArchiveLegacy quest={quest} task={task} />}
             {editable && <>
                 <div className="roles">
                   {quest.backend.supports?.taskTaxonomy !== false && <>
@@ -309,21 +309,29 @@ function LegacyArchived({ quest, task }: { quest: Quest; task: Task }) {
   );
 }
 
-/** Coordinator-only: take unfinished work out of active views without marking it done. */
-function ArchiveLegacy({ quest, task }: { quest: Quest; task: Task }) {
-  const { state, actor, dispatch } = quest;
+/** Archive from the task header. Completed work: owner, approver or a coordinator. Unfinished work: a
+ * coordinator, as legacy, so it is never marked done and keeps its status. The server checks again. */
+function ArchiveTask({ quest, task }: { quest: Quest; task: Task }) {
+  const { state, actor, dispatch, backend } = quest;
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState('');
-  if (!canArchiveLegacy(state, task, actor) || quest.backend.supports?.legacyArchive === false) return null;
-  const archive = async () => { const result = await dispatch({ type: 'task/archive', id: task.id, reason: 'legacy' }); setError(result.ok ? '' : result.error); if (result.ok) setConfirm(false); };
+  const done = task.status === 'done';
+  const allowed = !task.archivedAt && (done
+    ? canReopenTask(state, task, actor) && backend.supports?.taskArchive !== false
+    : canArchiveLegacy(state, task, actor) && backend.supports?.legacyArchive !== false);
+  if (!allowed) return null;
+  const archive = async () => {
+    const result = await dispatch(done ? { type: 'task/archive', id: task.id } : { type: 'task/archive', id: task.id, reason: 'legacy' });
+    setError(result.ok ? '' : result.error); if (result.ok) setConfirm(false);
+  };
+  if (!confirm) return <button type="button" className="btn btn-ghost btn-sm tp-archive" onClick={() => setConfirm(true)}>Archive…</button>;
   return (
-    <div className="tp-legacy-action">
-      {confirm
-        ? <p className="offer-form-actions"><span className="muted">Archive as legacy? It is not marked done; its status ({STATUS_LABELS[task.status]}) and history are kept.</span>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirm(false)}>Cancel</button><button type="button" className="btn btn-primary btn-sm" onClick={() => void archive()}>Archive as legacy</button></p>
-        : <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirm(true)}>Archive as legacy…</button>}
-      {error && <p className="form-error" role="alert">{error}</p>}
-    </div>
+    <span className="offer-form-actions tp-archive-confirm" role="group" aria-label="Archive this task">
+      <span className="muted">{done ? 'Archive this completed task? It leaves active lists; its history stays.' : `Archive without completing? It is not marked done; its status (${STATUS_LABELS[task.status]}) and history stay.`}</span>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirm(false)}>Cancel</button>
+      <button type="button" className="btn btn-primary btn-sm" onClick={() => void archive()}>Archive</button>
+      {error && <span className="form-error" role="alert">{error}</span>}
+    </span>
   );
 }
 
@@ -362,7 +370,7 @@ function Completed({ quest, task }: { quest: Quest; task: Task }) {
           <span className="offer-form-actions"><button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>Cancel</button><button className="btn btn-primary btn-sm" disabled={!note.trim()}>Reopen</button></span>
         </form>
       )}
-      {archiveAvailable && !open && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void dispatch({ type: task.archivedAt ? 'task/unarchive' : 'task/archive', id: task.id })}>{task.archivedAt ? 'Restore from archive' : 'Archive'}</button>}
+      {archiveAvailable && !open && task.archivedAt && <button type="button" className="btn btn-ghost btn-sm" onClick={() => void dispatch({ type: 'task/unarchive', id: task.id })}>Restore from archive</button>}
       {allowed && !reopenAvailable && !canUndo && <p className="muted">Reopening finished work arrives with the next server release. Until then, create a follow-up task.</p>}
     </div>
   );

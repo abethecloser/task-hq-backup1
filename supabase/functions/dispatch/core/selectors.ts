@@ -54,6 +54,9 @@ export function projectName(state: QuestState, id: string) {
 export const isOpen = (task: Task) => task.status !== 'done' && !task.archivedAt;
 /** Archived without being completed. */
 export const isLegacyArchived = (task: Task) => task.status !== 'done' && !!task.archivedAt;
+/** Projects in active navigation and pickers: archived projects are left out (they stay in state). */
+export const activeProjects = (state: QuestState) => state.projects.filter(project => !project.archivedAt);
+export const isProjectArchived = (state: QuestState, id: string) => !!state.projects.find(project => project.id === id)?.archivedAt;
 /** The workspace as active views read it: work archived as legacy left out (it keeps its status). */
 export const withoutLegacyArchived = (state: QuestState): QuestState =>
   state.tasks.some(isLegacyArchived) ? { ...state, tasks: state.tasks.filter(task => !isLegacyArchived(task)) } : state;

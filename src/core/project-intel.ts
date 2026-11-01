@@ -3,7 +3,7 @@
 //   · task completion: tasks done ÷ tasks, for the current selection;
 //   · project completion: projects whose every task is done ÷ projects that have tasks.
 import type { QuestState, Task, TaskStatus } from './contract.ts';
-import { blockingDeps, compareTasks, firstName, isOpen, isOverdue } from './selectors.ts';
+import { blockingDeps, compareTasks, firstName, isOpen, isOverdue, isProjectArchived } from './selectors.ts';
 
 /** Tasks with no project are grouped under this id. */
 export const NO_PROJECT = '';
@@ -47,7 +47,8 @@ export function projectIntel(state: QuestState, actor: string, now: number, comp
 
   // Project rows follow the person filter (never the project filter) so the list stays selectable.
   const forProjects = visible.filter(byPerson);
-  const ids = [...new Set(forProjects.map(task => task.projectId || NO_PROJECT))];
+  // Archived projects leave the project rows; their tasks still count in the totals above.
+  const ids = [...new Set(forProjects.map(task => task.projectId || NO_PROJECT))].filter(id => !isProjectArchived(state, id));
   const projects = ids.map(id => {
     const tasks = forProjects.filter(task => (task.projectId || NO_PROJECT) === id);
     const open = tasks.filter(isOpen);

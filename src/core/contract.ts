@@ -34,6 +34,9 @@ export interface Person {
 export interface Project {
   id: string;
   name: string;
+  /** Archived projects leave active navigation and pickers; their tasks keep their status and history. */
+  archivedAt?: number | null;
+  archivedBy?: string | null;
 }
 
 export interface Blocker {
@@ -385,6 +388,9 @@ export type ActionBody =
   | { type: 'lead/receive'; lead: SimulatedLeadInput }
   | { type: 'roles/label'; personId?: string; label: string }
   | { type: 'project/create'; name: string }
+  /** Supervisors, admins and owners. The default project (General) can't be archived. */
+  | { type: 'project/archive'; id: string }
+  | { type: 'project/unarchive'; id: string }
   | { type: 'lead/tags'; id: string; tags: string[] }
   | { type: 'lead/claim'; id: string }
   | { type: 'lead/assign'; id: string; to: string }

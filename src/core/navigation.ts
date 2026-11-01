@@ -3,14 +3,14 @@ export type PageStatus = 'live' | 'preview';
 
 export const APP_PAGE_IDS = [
   'home', 'reports', 'all-tasks', 'inbox', 'tools', 'company-work', 'needs-attention', 'leads',
-  'executive', 'people', 'feedback', 'activity', 'settings', 'agents', 'relationships', 'calendar', 'workbook',
+  'executive', 'people', 'feedback', 'activity', 'settings', 'agents', 'relationships', 'calendar', 'workbook', 'archive',
 ] as const;
 export type AppPageId = typeof APP_PAGE_IDS[number];
 
 /** Pages whose current interface is explicitly a preview rather than a complete live feature. */
 export const PAGE_STATUS: Readonly<Record<AppPageId, PageStatus>> = {
   home: 'live', 'all-tasks': 'live', calendar: 'live', inbox: 'live', 'needs-attention': 'live',
-  'company-work': 'live', people: 'live', reports: 'live', activity: 'live', settings: 'live', executive: 'live',
+  'company-work': 'live', people: 'live', reports: 'live', activity: 'live', settings: 'live', executive: 'live', archive: 'live',
   workbook: 'preview', tools: 'preview', leads: 'preview', relationships: 'preview', feedback: 'preview', agents: 'preview',
 };
 

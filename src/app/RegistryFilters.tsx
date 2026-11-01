@@ -11,7 +11,7 @@ import type { QuestState } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
 import { BOARD_ORDER, asList } from '../core/registry.ts';
 import type { DueFilter, PriorityFilter, RegistryQuery, StatusFilter } from '../core/registry.ts';
-import { nameOf, projectName } from '../core/selectors.ts';
+import { activeProjects, nameOf, projectName } from '../core/selectors.ts';
 
 /** The panel's view of the query: chip groups as lists ([] = any), people and project as one id. */
 export interface FilterFields { status: StatusFilter[]; priority: PriorityFilter[]; due: DueFilter[]; owner: string; project: string }
@@ -94,7 +94,7 @@ export function FilterSection({ id, open, state, actor, draft, pending, onDraft,
               options={[{ id: '', name: 'Any Owner' }, { id: 'none', name: 'No Owner' }, ...state.people.filter(item => item.role !== 'reviewer').map(item => ({ id: item.id, name: item.id === actor ? `${item.name} (you)` : item.name }))]}
               onPick={owner => onDraft({ owner })} />
             <SearchSelector key={`project-${open}`} title="Project" placeholder="Search projects…" value={draft.project}
-              options={[{ id: '', name: 'Any Project' }, { id: 'none', name: 'No Project' }, ...state.projects]}
+              options={[{ id: '', name: 'Any Project' }, { id: 'none', name: 'No Project' }, ...activeProjects(state)]}
               onPick={project => onDraft({ project })} />
           </div>
           <footer className="filter-section-foot">

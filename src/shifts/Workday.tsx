@@ -12,6 +12,7 @@ import type { OrgRole } from '../app/LiveContext.tsx';
 import { ShiftModule } from './ShiftModule.tsx';
 import type { ShiftStatus } from './ShiftModule.tsx';
 import { liveShiftBackend } from './backend.ts';
+import { activeProjects } from '../core/selectors.ts';
 import type { Shift, ShiftContext } from './types.ts';
 
 export interface Workday {
@@ -66,7 +67,7 @@ export function WorkdayGate({ client, org, userId, email, role, backend, onSignO
 
   const context: ShiftContext = {
     org, actor: userId, manager, canCheckIn,
-    tasks: work?.tasks ?? [], projects: work?.projects ?? [], events: work?.events ?? [],
+    tasks: work?.tasks ?? [], projects: work ? activeProjects(work) : [], events: work?.events ?? [],
   };
   const workday = useMemo<Workday>(() => ({ shift: status?.open ?? null, open: () => setPhase('panel') }), [status?.open]);
 
