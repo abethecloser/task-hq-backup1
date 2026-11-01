@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { APP_PAGE_IDS, ARCHIVED_PAGES, EVERYDAY_PAGES, PAGE_ALIASES, PAGE_STATUS, PREVIEW_PAGES, canonicalPage, pageStatus } from './navigation.ts';
 
 test('every existing application page remains a destination with an explicit live or preview state', () => {
-  const expected = ['home', 'reports', 'all-tasks', 'inbox', 'tools', 'company-work', 'needs-attention', 'leads', 'executive', 'people', 'feedback', 'activity', 'settings', 'agents', 'relationships', 'calendar', 'workbook', 'archive'];
+  const expected = ['home', 'reports', 'all-tasks', 'inbox', 'tools', 'company-work', 'needs-attention', 'leads', 'executive', 'people', 'feedback', 'activity', 'settings', 'agents', 'relationships', 'calendar', 'workbook', 'archive', 'team'];
   assert.deepEqual([...APP_PAGE_IDS], expected);
   assert.deepEqual(Object.keys(PAGE_STATUS).sort(), [...expected].sort());
   assert.ok(expected.every(view => pageStatus(view) === 'live' || pageStatus(view) === 'preview'));

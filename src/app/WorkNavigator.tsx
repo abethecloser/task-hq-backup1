@@ -9,7 +9,7 @@ export interface NavSection { id: string; label: string; icon: ReactNode; count?
  * the two always list the same destinations in the same order. Anything unlisted joins Workspace. */
 export const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: 'Work', ids: ['home', 'all-tasks', 'company-work', 'calendar', 'inbox'] },
-  { label: 'Insights', ids: ['reports', 'needs-attention', 'executive', 'activity'] },
+  { label: 'Insights', ids: ['team', 'reports', 'needs-attention', 'executive', 'activity'] },
   { label: 'Workspace', ids: ['archive', 'people', 'settings'] },
 ];
 const PROJECT_LIMIT = 8;

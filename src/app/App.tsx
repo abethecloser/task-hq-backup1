@@ -40,6 +40,10 @@ import type { DockTab } from './CollabDock.tsx';
 import { DOCK_DEFAULT_PREF, loadDockPreference, saveDockPreference, withSnap } from '../ui/dock-size.ts';
 import { DOCK_HOME, DOCK_IDS, DOCK_LEFT, DOCK_RIGHT, readNavMode, splitNavigation } from '../ui/nav-mode.ts';
 import { NavDock } from './NavDock.tsx';
+import { Team } from './Team.tsx';
+import { canSeeTeamOverview } from '../core/team.ts';
+/** Optional exact lock for the Team overview: comma-separated account ids (replaces the name rule). */
+const TEAM_OVERVIEW_USERS = String(import.meta.env.VITE_TEAM_OVERVIEW_USERS ?? '').split(',').map(item => item.trim()).filter(Boolean);
 import type { DockPreference } from '../ui/dock-size.ts';
 import { AskTasks } from './AskTasks.tsx';
 import { AccountMark, AccountMenu, TopBar } from './TopBar.tsx';
@@ -83,7 +87,7 @@ export type View = AppPageId;
 
 const VIEW_LABELS: Record<View, string> = {
   workbook: 'Operations Workbook · Preview', home: 'Home', calendar: 'Calendar', reports: 'Reports', relationships: 'Relationship Vault', 'all-tasks': 'Tasks', inbox: 'Inbox', tools: 'Estimates & Proposals', 'company-work': 'Projects', 'needs-attention': 'Needs Attention', leads: 'First Response',
-  executive: 'Owner overview', people: 'People & Access', feedback: 'Feedback', activity: 'Activity', settings: 'Settings', agents: 'Agent pilot', archive: 'Archive',
+  executive: 'Owner overview', people: 'People & Access', feedback: 'Feedback', activity: 'Activity', settings: 'Settings', agents: 'Agent pilot', archive: 'Archive', team: 'Team',
 };
 
 /** Views where the Instrument Deck (signals, calendar, insights) is useful beside the canvas. */
@@ -348,6 +352,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
     go(noteView ?? 'needs-attention');
   }
 
+  const teamAllowed = canSeeTeamOverview(state, actor, { allow: TEAM_OVERVIEW_USERS, demo: !live });
   const archivedCount = whole.state.projects.filter(item => item.archivedAt).length + whole.state.tasks.filter(task => task.archivedAt).length;
   const navigation: { id: View; label: string; count?: number; countLabel?: string; hot?: boolean; preview?: boolean; icon: ReactNode }[] = [
     // Everyday work. Reports (company measures) and Owner overview (decisions) are separate pages.
@@ -355,6 +360,8 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
     { id: 'calendar', label: 'Calendar', icon: <Icon d="M4 5h16v16H4zM4 10h16M8 3v4M16 3v4" /> },
     { id: 'all-tasks', label: 'Tasks', count: counts.all, countLabel: 'open tasks', icon: <Icon d="M4 5h16v4H4zM4 11h16v4H4zM4 17h16v2H4z" /> },
     { id: 'inbox', label: 'Inbox', count: inboxUnread, countLabel: 'unread updates', hot: inboxUnread > 0, icon: <Icon d="M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6H3v-6z" /> },
+    // Management overview, shown only to the people core/team.ts allows (initially Abraham).
+    ...(teamAllowed ? [{ id: 'team' as View, label: 'Team', icon: <Icon d="M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6" /> }] : []),
     { id: 'reports', label: 'Reports', icon: <Icon d="M4 20V10M10 20V4M16 20v-7M22 20H2" /> },
     { id: 'needs-attention', label: 'Needs Attention', count: attention.length, countLabel: 'conditions', hot: myAttention > 0, icon: <Icon d="M12 4 21 20H3zM12 10v4M12 17v.5" /> },
     { id: 'company-work', label: 'Projects', count: openCompany.length, countLabel: 'open tasks', icon: <Icon d="M3 8h18v12H3zM8 8V5h8v3M3 13h18" /> },
@@ -588,6 +595,8 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
             : view === 'tools' ? <Tools quest={quest} store={toolsStore} tools={tools} onOpenTask={openTask} />
             : view === 'reports' ? <Reports quest={quest} company={company} onOpenTask={openTask} onLens={lens => openLens(lens)} onCompleted={() => openCompleted('company')} />
             : view === 'executive' ? <ExecutiveDesk quest={quest} onOpenTask={openTask} onOpenLead={openLead} />
+            : view === 'team' ? (teamAllowed ? <Team quest={quest} onOpenTask={openTask} onManagePeople={() => go('people')} />
+              : <PagePreview title="Team" detail="The Team overview isn’t available to your account yet. Ask your workspace owner if you need it." />)
             : view === 'relationships' ? <Relationships quest={quest} onOpen={openTask} />
             : view === 'people' ? <People quest={quest} />
             : view === 'calendar' ? <CalendarPage quest={quest} company={company} onOpenTask={openTask} onCreate={canCreate ? createOn : undefined}
