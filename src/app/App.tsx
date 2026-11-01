@@ -38,6 +38,8 @@ import { Home } from './Home.tsx';
 import { CollabDock } from './CollabDock.tsx';
 import type { DockTab } from './CollabDock.tsx';
 import { DOCK_DEFAULT_PREF, loadDockPreference, saveDockPreference, withSnap } from '../ui/dock-size.ts';
+import { DOCK_HOME, DOCK_LEFT, DOCK_RIGHT, readNavMode, splitNavigation } from '../ui/nav-mode.ts';
+import { NavDock } from './NavDock.tsx';
 import type { DockPreference } from '../ui/dock-size.ts';
 import { AskTasks } from './AskTasks.tsx';
 import { AccountMark, AccountMenu, TopBar } from './TopBar.tsx';
@@ -181,6 +183,9 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   /** An explicit "Open in dock" request from a task page (nonce repeats a request for the same task). */
   const [dockTask, setDockTask] = useState<{ id: string; nonce: number } | null>(null);
   const [dockTab, setDockTab] = useState<DockTab>('inbox');
+  // Navigation dock preview: `?nav=dock` (remembered on this device), `?nav=classic` to return.
+  const [navMode] = useState(() => readNavMode(location.search, (() => { try { return localStorage; } catch { return null; } })()));
+  const dockNav = navMode === 'dock';
   /** Notifications drawer (right). Session-only: it always starts closed. The calendar pullout (left) is `sidebar.open`. */
   const [notifOpen, setNotifOpen] = useState(false);
 
@@ -392,7 +397,14 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   // The rail is the navigator's icon form: every destination, same groups and order (Sidebar groups
   // them with the navigator's own groupSections). Settings is the gear at the rail's foot, so it
   // isn't listed twice. The calendar quick view is the right panel (top-right Calendar icon).
-  const railItems = sidebar.isMobile ? navigation : navigation.filter(item => item.id !== 'settings');
+  const split = splitNavigation(navigation.filter(item => item.id !== 'calendar' || !focused), sidebar.isMobile);
+  // With the dock on, the rail keeps only workspace utilities (Settings stays its gear); the dock and More hold the rest.
+  const railItems = sidebar.isMobile ? navigation : dockNav ? split.rail.filter(item => item.id !== 'settings') : navigation.filter(item => item.id !== 'settings');
+  const dockItem = (id: string) => {
+    const item = navigation.find(entry => entry.id === id);
+    return item && split.dock.includes(id) ? { id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, active: view === item.id && !(selected && contextAllowed) } : undefined;
+  };
+  const dockList = (ids: readonly string[]) => ids.map(dockItem).filter(item => !!item);
 
   // Left and right panels keep independent open state (core/layout.ts): opening one never closes the other.
   // Short on room, the left panel narrows first; a right panel that still can't dock becomes a drawer.
@@ -498,7 +510,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   const hasDock = DOCK_VIEWS.includes(view) && !focused && !sidebar.isMobile;
 
   return (
-    <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'} ${hasDock ? 'has-dock' : ''} ${calendarPage ? 'is-calendar-page' : ''}`}
+    <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'} ${hasDock ? 'has-dock' : ''} ${calendarPage ? 'is-calendar-page' : ''} ${dockNav ? `nav-dock-on ${sidebar.isMobile ? 'is-mobile-nav' : ''}` : ''}`}
       style={{ ...sidebar.shellStyle, ...(sidebar.isMobile ? {} : { ['--panel-offset' as string]: `${leftReserved}px` }), ['--context-offset' as string]: `${contextOffset}px` }}
       data-sidebar={sidebar.isMobile ? undefined : sidebar.open ? 'open' : 'closed'} data-context={contextOffset ? 'open' : 'closed'} data-dock={hasDock ? (dockOpen ? 'open' : 'closed') : undefined} data-resizing={sidebar.resizing || undefined}>
       <Sidebar
@@ -532,7 +544,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
         <TopBar quest={quest} demo={!live} focused={focused} unread={inboxUnread} askOpen={askOpen} notifOpen={notifOpen}
           calendarOpen={calendarShown} onCalendar={calendarAllowed ? toggleCalendar : undefined}
           title={(VIEW_LABELS[view] ?? '').replace(' · Preview', '')}
-          sections={topSections} onSection={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
+          sections={dockNav ? undefined : topSections} onSection={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}
           // No New task in the header: creating lives in the right panel's Task action (and N, and the phone's + button).
           search={<TopSearch quest={whole} data={inboxData} tools={tools} onOpen={openSearchResult} />} onAsk={toggleAsk} onBell={toggleNotifications}
           onMenu={() => {
@@ -597,6 +609,10 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
           onOpen={openTask} onOpenLead={openLead} onActivity={() => go('activity')} onOpenInboxPage={() => go('inbox')}
           contextTaskId={selected && contextAllowed ? selected.id : null} openTask={dockTask} />}
 
+        {dockNav && <NavDock mobile={sidebar.isMobile} left={dockList(DOCK_LEFT)} home={dockItem(DOCK_HOME)} right={dockList(DOCK_RIGHT)}
+          more={split.more.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, active: view === item.id }))}
+          onSelect={id => { if (id === 'all-tasks') openLens(registryView.lens); else go(id as View); }}
+          collab={hasDock ? { open: dockOpen, unread: inboxUnread, onToggle: () => setDock(current => withSnap(current, current.snap === 'collapsed' ? current.last : 'collapsed')) } : undefined} />}
         <nav className="tabbar" aria-label="Task-HQ sections">
           {[
             { id: 'home' as View, label: 'Home', hot: false, icon: <Icon d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" /> },
