@@ -3,12 +3,11 @@
 // needs no migration. A copy in this browser paints the layout instantly before the account answers.
 // Demo: this browser only, per demo person. Anything missing or malformed falls back to the default.
 import { useCallback, useEffect, useState } from 'react';
-import { normalizeLayout } from '../../core/dashboard-layout.ts';
-import type { DashboardLayout, ModuleSpec } from '../../core/dashboard-layout.ts';
+import { normalizeLayout, withSavedLayout } from '../../core/dashboard-layout.ts';
+import type { DashboardLayout, ModuleSpec, SavedLayouts } from '../../core/dashboard-layout.ts';
 import { useLive } from '../LiveContext.tsx';
 
 const META_KEY = 'taskhq_layouts';
-type Saved = Record<string, Record<string, unknown>>; // orgId → pageId → layout
 const cacheKey = (scope: string, actor: string, pageId: string) => `quest.layout.v1.${scope}.${actor}.${pageId}`;
 const readCache = (key: string): unknown => { try { return JSON.parse(localStorage.getItem(key) ?? 'null'); } catch { return null; } };
 const writeCache = (key: string, layout: DashboardLayout | null) => { try { if (layout) localStorage.setItem(key, JSON.stringify(layout)); else localStorage.removeItem(key); } catch { /* this page only */ } };
@@ -26,7 +25,7 @@ export function useLayoutStore(pageId: string, scope: string, actor: string, spe
     let current = true;
     void live.client.auth.getUser().then(({ data }) => {
       if (!current) return;
-      const saved = (data.user?.user_metadata?.[META_KEY] as Saved | undefined)?.[live.org.id]?.[pageId];
+      const saved = (data.user?.user_metadata?.[META_KEY] as SavedLayouts | undefined)?.[live.org.id]?.[pageId];
       setRaw(saved ?? null); writeCache(key, saved ? normalizeLayout(saved, specs) : null);
     }).catch(() => { /* keep this browser's copy */ });
     return () => { current = false; };
@@ -44,10 +43,7 @@ export function useLayoutStore(pageId: string, scope: string, actor: string, spe
       // Read-modify-write of this person's own metadata, touching only this org and page.
       const { data, error: readError } = await live.client.auth.getUser();
       if (readError) throw readError;
-      const all: Saved = { ...((data.user?.user_metadata?.[META_KEY] as Saved | undefined) ?? {}) };
-      const pages = { ...(all[live.org.id] ?? {}) };
-      if (next) pages[pageId] = next; else delete pages[pageId];
-      all[live.org.id] = pages;
+      const all = withSavedLayout(data.user?.user_metadata?.[META_KEY], live.org.id, pageId, next);
       const { error } = await live.client.auth.updateUser({ data: { [META_KEY]: all } });
       if (error) throw error;
       setStatus('idle');

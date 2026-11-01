@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_ITEMS, PRESETS, addItem, moveItem, normalizeLayout, removeItem, resizeItem } from './dashboard-layout.ts';
+import { DEFAULT_ITEMS, PRESETS, addItem, layoutOf, moveItem, normalizeLayout, removeItem, resizeItem, withSavedLayout } from './dashboard-layout.ts';
 import type { ModuleSpec } from './dashboard-layout.ts';
 
 const SPECS: ModuleSpec[] = [
@@ -43,4 +43,17 @@ test('move, resize, remove and add', () => {
 
 test('every preset is a valid starting point', () => {
   for (const [id, items] of Object.entries(PRESETS)) assert.deepEqual(normalizeLayout({ version: 1, items }, SPECS).items, items, id);
+});
+
+test('saving one page in one workspace never touches any other saved layout', () => {
+  const mine = layoutOf([{ id: 'at-risk', size: 'm' }]);
+  const before = { orgA: { home: { version: 1, items: [] }, reports: { x: 1 } }, orgB: { home: { y: 2 } } };
+  const after = withSavedLayout(before, 'orgA', 'home', mine);
+  assert.deepEqual(after.orgA!.home, mine);
+  assert.deepEqual(after.orgA!.reports, { x: 1 });
+  assert.deepEqual(after.orgB, { home: { y: 2 } });
+  assert.deepEqual(before.orgA.home, { version: 1, items: [] }, 'input not mutated');
+  const cleared = withSavedLayout(after, 'orgA', 'home', null);
+  assert.ok(!('home' in cleared.orgA!)); assert.deepEqual(cleared.orgB, { home: { y: 2 } });
+  for (const junk of [null, 'x', [1], 5]) assert.deepEqual(withSavedLayout(junk, 'o', 'home', mine), { o: { home: mine } });
 });

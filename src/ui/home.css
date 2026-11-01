@@ -757,7 +757,7 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .dash-tools-title { margin-right: 4px; color: var(--accent-ink); }
 .dash-tool select { min-height: 32px; max-width: 240px; padding: 0 8px; border: 1px solid var(--hair); border-radius: 8px; background: var(--card, #fff); font: inherit; font-size: 14px; }
 .dash-tools-end { display: flex; gap: 8px; margin-left: auto; }
-.dash-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.dash-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; align-items: start; }
 .dash-item { min-width: 0; }
 .dash-item.size-s { grid-column: span 4; }
 .dash-item.size-m { grid-column: span 6; }

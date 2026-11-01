@@ -66,3 +66,14 @@ export const removeItem = (layout: DashboardLayout, id: string): DashboardLayout
 export const addItem = (layout: DashboardLayout, spec: ModuleSpec): DashboardLayout =>
   layout.items.some(item => item.id === spec.id) ? layout : { ...layout, items: [...layout.items, { id: spec.id, size: spec.defaultSize }] };
 export const sameLayout = (a: DashboardLayout, b: DashboardLayout) => JSON.stringify(a.items) === JSON.stringify(b.items);
+
+/** Saved layouts in a person's own account metadata: orgId → pageId → layout. */
+export type SavedLayouts = Record<string, Record<string, unknown>>;
+/** Sets (or clears, with null) one org's one page, leaving every other entry exactly as it was. */
+export function withSavedLayout(all: unknown, orgId: string, pageId: string, next: DashboardLayout | null): SavedLayouts {
+  const base: SavedLayouts = all && typeof all === 'object' && !Array.isArray(all) ? { ...(all as SavedLayouts) } : {};
+  const pages = { ...(base[orgId] && typeof base[orgId] === 'object' ? base[orgId] : {}) };
+  if (next) pages[pageId] = next; else delete pages[pageId];
+  base[orgId] = pages;
+  return base;
+}
