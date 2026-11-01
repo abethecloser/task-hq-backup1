@@ -1,0 +1,88 @@
+/* ── Navigation dock (preview, ?nav=dock) ──────────────────────────────────────────────────
+   One adaptive surface, not two modes. Everything derives from the work area's width (--nd-avail):
+     spacious (≥ ~1110px)  a compact capsule, lifted 14px, rounded, softly elevated, magnifying icons;
+     in between            it widens toward the work area while its lift, radius and shadow ease to zero;
+     constrained (≤ ~760px) flush, full width, translucent with a hairline top edge — integrated navigation;
+     phones                the same flush bar with safe-area padding and steady touch targets.
+   Page content scrolls behind the translucent surface (padding keeps its end reachable), so there is
+   never a card sitting on a separate white strip. */
+.shell.nav-dock-on {
+  --nd-h: 72px; --nd-reserve: calc(var(--nd-h) + 30px + env(safe-area-inset-bottom));
+  /* The work area. NavDock replaces this with the measured width of the page column (100vw counts the
+     scrollbar on desktops with visible scrollbars, which pushed the flush bar past the edge). */
+  --nd-avail: calc(100vw - var(--rail, 72px) - var(--panel-offset, 0px) - var(--context-offset, 0px));
+  /* 0 at ≤760px of work area, growing to its maximum by ~1110px: lift, roundness and shadow follow it. */
+  --nd-lift: clamp(0px, calc((var(--nd-avail) - 760px) * .04), 14px);
+  --nd-round: clamp(0px, calc((var(--nd-avail) - 760px) * .063), 22px);
+  /* Full width when constrained, narrowing linearly to the capsule (352px) as room grows. */
+  --nd-w: min(var(--nd-avail), max(352px, calc(1646px - 1.166 * var(--nd-avail))));
+}
+/* Phones: no rail, so the work area is the whole viewport (the same formulas give a flush bar). */
+.shell.nav-dock-on.is-mobile-nav { --nd-avail: 100vw; }
+/* Content clears the dock by padding, not by a reserved band, so it scrolls behind the surface. */
+.shell.nav-dock-on.nav-dock-on > .main > .content { padding-bottom: var(--nd-reserve); }
+/* The communications panel sits above the dock when open; only its collapsed ribbon gives way. */
+.shell.nav-dock-on .collab-dock { margin-bottom: calc(var(--nd-h) + 1px + var(--nd-lift) + env(safe-area-inset-bottom)); }
+.shell.nav-dock-on .collab-dock:not(.is-open) { display: none; }
+.shell.nav-dock-on .tabbar { display: none; }
+.shell.nav-dock-on .toast { bottom: calc(var(--nd-h) + var(--nd-lift) + 16px + env(safe-area-inset-bottom)); }
+.shell.nav-dock-on .fab-create { bottom: calc(var(--nd-h) + 16px + env(safe-area-inset-bottom)); }
+
+.nav-dock {
+  --nd-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --nd-tile: 40px;
+  /* Above page content and the top bar; below scrims, drawers, the rail and its menus, and modals. */
+  position: fixed; z-index: 26; bottom: var(--nd-lift);
+  left: var(--nd-center, calc(var(--rail, 72px) + var(--panel-offset, 0px) + var(--nd-avail) / 2));
+  width: var(--nd-w); transform: translateX(-50%);
+  container: nd / inline-size;
+}
+.nd-bar {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; justify-content: center;
+  height: var(--nd-h); margin: 0; padding: 0 8px env(safe-area-inset-bottom); list-style: none; box-sizing: content-box;
+  border-top: 1px solid color-mix(in srgb, var(--hair, #e5e7eb) 55%, transparent);
+  border-radius: var(--nd-round);
+  /* Translucent: page content shows softly through; icons and labels stay fully opaque. */
+  background: color-mix(in srgb, var(--card, #fff) 62%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4); -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  /* The outline ring and elevation scale with the lift, so the flush bar keeps only its top hairline. */
+  box-shadow:
+    0 0 0 clamp(0px, calc(var(--nd-lift) * .08), 1px) color-mix(in srgb, var(--hair, #e5e7eb) 50%, transparent),
+    0 calc(var(--nd-lift) * .7) calc(var(--nd-lift) * 2.2) rgb(17 24 39 / 7%),
+    0 calc(var(--nd-lift) * .1) calc(var(--nd-lift) * .3) rgb(17 24 39 / 3%);
+}
+/* Wide surfaces keep the five destinations together in the middle, evenly spaced. */
+@container nd (min-width: 640px) { .nd-bar { grid-template-columns: repeat(5, minmax(0, 132px)); } }
+
+.nd-item { position: relative; display: grid; justify-items: center; align-content: center; gap: 5px; width: 100%; height: var(--nd-h); min-width: 0; padding: 0 2px; border: 0; background: transparent; color: var(--muted); font: 650 11.5px/1 var(--font, inherit); letter-spacing: .01em; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.nd-item:focus-visible { outline: none; }
+.nd-item:focus-visible .nd-tile { box-shadow: 0 0 0 2px var(--card, #fff), 0 0 0 4px var(--accent); }
+.nd-label { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; transition: color .18s; }
+@media (hover: hover) { .nd-item:hover .nd-tile, .nd-item:hover .nd-label { color: var(--ink); } }
+
+/* Tiles: soft squares in the capsule; in the integrated bar they recede to the icon alone. */
+.nd-tile { position: relative; display: grid; place-items: center; width: var(--nd-tile); height: var(--nd-tile); border-radius: 12px; background: var(--sunk, #f3f4f6); color: var(--ink-2, var(--ink)); transform: translateY(calc((var(--nd-scale, 1) - 1) * -16px)) scale(var(--nd-scale, 1)); transform-origin: 50% 100%; transition: transform .32s var(--nd-spring), background .2s, color .2s, box-shadow .2s; will-change: transform; }
+.nd-tile .icon { width: 20px; height: 20px; }
+@container nd (min-width: 480px) { .nd-tile { --nd-tile: 34px; background: transparent; } }
+
+/* Active: the orange accent — a pale orange tile and orange label, the same in every form. */
+.nd-item.is-active .nd-tile { background: var(--accent-pale, #fff1e8); color: var(--accent-ink, var(--accent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent); }
+.nd-item.is-active .nd-label { color: var(--accent-ink, var(--accent)); font-weight: 800; }
+
+/* Home: the centre anchor — a dark tile; active, solid orange with a soft glow. */
+.nd-home .nd-tile { --nd-tile: 44px; border-radius: 14px; background: var(--ink, #111827); color: #fff; box-shadow: 0 5px 14px rgb(17 24 39 / 18%); }
+.nd-home .nd-tile .icon { width: 22px; height: 22px; }
+@container nd (min-width: 480px) { .nd-home .nd-tile { --nd-tile: 40px; background: var(--ink, #111827); } }
+@media (hover: hover) { .nd-home .nd-item:hover .nd-tile { color: #fff; } }
+.nd-home .nd-item.is-active .nd-tile { background: var(--accent); color: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent), 0 6px 16px color-mix(in srgb, var(--accent) 34%, transparent); }
+.nd-home .nd-item { gap: 3px; }
+
+.nd-badge { position: absolute; top: -5px; right: -8px; min-width: 18px; height: 18px; padding: 0 5px; border: 2px solid var(--card, #fff); border-radius: 10px; background: var(--ink); color: #fff; font: 800 10.5px/14px var(--font, inherit); text-align: center; box-sizing: border-box; }
+.nd-badge.is-hot { background: var(--accent); }
+
+/* Phones: the same flush surface, steady targets, no motion on touch. */
+.nav-dock.is-mobile { left: var(--nd-center, 50%); }
+.nav-dock.is-mobile .nd-tile { --nd-tile: 34px; background: transparent; transform: none; transition: background .2s, color .2s; }
+.nav-dock.is-mobile .nd-home .nd-tile { --nd-tile: 42px; background: var(--ink, #111827); }
+.nav-dock.is-mobile .nd-item { min-height: 54px; font-size: 11px; }
+@media (prefers-reduced-motion: reduce) { .nd-tile { transition: background .2s, color .2s; } }
