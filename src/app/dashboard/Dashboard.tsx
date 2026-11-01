@@ -1,11 +1,14 @@
 // A personal, rearrangeable dashboard of modules. The page supplies its modules (what each one is and
 // draws); this component owns only the layout: order, size, which are shown, editing and saving.
 // Built for Home first; another page can reuse it by passing its own modules and page id.
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { DragEvent, KeyboardEvent, ReactNode } from 'react';
-import { PRESETS, PRESET_LABELS, SIZE_LABELS, addItem, layoutOf, moveItem, normalizeLayout, removeItem, resizeItem, sameLayout } from '../../core/dashboard-layout.ts';
-import type { DashboardLayout, LayoutItem, ModuleSize, ModuleSpec, PresetId } from '../../core/dashboard-layout.ts';
+import { ARRANGEMENT_LABELS, HEIGHTS, HEIGHT_LABELS, PRESETS, PRESET_LABELS, SIZE_LABELS, addItem, heightOf, layoutOf, moveItem, normalizeLayout, removeItem, resizeItem, sameLayout, setArrangement, setHeight } from '../../core/dashboard-layout.ts';
+import type { Arrangement, DashboardLayout, LayoutItem, ModuleHeight, ModuleSize, ModuleSpec, PresetId } from '../../core/dashboard-layout.ts';
 import { useLayoutStore } from './useLayoutStore.ts';
+
+/** Packed rows are this fine (px; CSS grid-auto-rows wins), so a module's span tracks its real height; the gutter matches the columns. */
+const ROW_UNIT = 2, GUTTER = 14;
 
 export interface DashboardModule extends ModuleSpec {
   name: string;
@@ -33,6 +36,26 @@ export function Dashboard({ pageId, scope, actor, modules, defaultItems, presets
   const available = modules.filter(item => !layout.items.some(entry => entry.id === item.id));
   const live = useRef<HTMLParagraphElement>(null);
   const announce = (text: string) => setNotice(text);
+  const grid = useRef<HTMLDivElement>(null);
+  const arrangement: Arrangement = layout.arrangement ?? 'packed';
+
+  // Packed: each module spans as many fine grid rows as its own height (plus one gutter). Placement
+  // stays in the person's order (no dense backfill), so what you read, tab through and arranged agree,
+  // while later modules still rise into the space under short neighbours.
+  useLayoutEffect(() => {
+    const node = grid.current;
+    if (!node) return;
+    const items = [...node.querySelectorAll<HTMLElement>(':scope > .dash-item')];
+    if (arrangement !== 'packed') { for (const item of items) item.style.gridRowEnd = ''; return; }
+    const fit = () => {
+      const unit = parseFloat(getComputedStyle(node).gridAutoRows) || ROW_UNIT;
+      for (const item of items) item.style.gridRowEnd = `span ${Math.max(1, Math.ceil((item.getBoundingClientRect().height + GUTTER) / unit))}`;
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    for (const item of items) observer.observe(item);
+    return () => observer.disconnect();
+  }, [layout, arrangement, editing]);
 
   const move = (id: string, to: number) => { setDraft(current => moveItem(current ?? store.layout, id, to)); };
   function onKey(event: KeyboardEvent, id: string, index: number) {
@@ -90,6 +113,11 @@ export function Dashboard({ pageId, scope, actor, modules, defaultItems, presets
                   {available.map(item => <option key={item.id} value={item.id}>{item.name} — {item.description}</option>)}
                 </select>
               </label>
+              <span className="seg dash-arrange" role="group" aria-label="Arrangement">
+                {(['packed', 'aligned'] as Arrangement[]).map(value => <button key={value} type="button" aria-pressed={arrangement === value}
+                  title={value === 'packed' ? 'Modules fill the space under shorter neighbours' : 'Cards in a row share one height'}
+                  onClick={() => { setDraft(setArrangement(layout, value)); announce(`${ARRANGEMENT_LABELS[value]} arrangement.`); }}>{ARRANGEMENT_LABELS[value]}</button>)}
+              </span>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDraft(layoutOf(normalizeLayout(null, modules, defaultItems).items)); announce('Default layout restored. Save to keep it.'); }}>Restore default</button>
               <span className="dash-tools-end">
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setDraft(null); announce('Changes discarded.'); }}>Cancel</button>
@@ -99,14 +127,15 @@ export function Dashboard({ pageId, scope, actor, modules, defaultItems, presets
         <p ref={live} className={`dash-notice ${notice ? '' : 'sr-only'}`} role="status" aria-live="polite">{notice}</p>
       </div>
 
-      <div className="dash-grid" onDragOver={event => { if (dragging) event.preventDefault(); }} onDrop={onDrop}>
+      <div ref={grid} className={`dash-grid is-${arrangement}`} onDragOver={event => { if (dragging) event.preventDefault(); }} onDrop={onDrop}>
         {layout.items.map((item, index) => {
           const module = spec(item.id);
           const body = module.render({ size: item.size, layout });
-          if (!editing) return <div key={item.id} className={`dash-item size-${item.size}`} data-module={item.id}>{body}</div>;
+          const height = heightOf(item);
+          if (!editing) return <div key={item.id} className={`dash-item size-${item.size} h-${height}`} data-module={item.id}><div className="dash-cell">{body}</div></div>;
           return (
             <div key={item.id} data-module={item.id}
-              className={`dash-item size-${item.size} is-edit ${dragging === item.id ? 'is-dragging' : ''} ${drop?.id === item.id ? (drop.after ? 'drop-after' : 'drop-before') : ''}`}
+              className={`dash-item size-${item.size} h-${height} is-edit ${dragging === item.id ? 'is-dragging' : ''} ${drop?.id === item.id ? (drop.after ? 'drop-after' : 'drop-before') : ''}`}
               onDragOver={event => onDragOver(event, item.id)} onDragLeave={() => setDrop(current => (current?.id === item.id ? null : current))}>
               <div className="dash-item-bar">
                 <button type="button" className="dash-handle" draggable data-dash-handle={item.id}
@@ -119,14 +148,17 @@ export function Dashboard({ pageId, scope, actor, modules, defaultItems, presets
                 <span className="dash-item-actions">
                   <button type="button" className="icon-btn" aria-label={`Move ${module.name} earlier`} disabled={index === 0} onClick={() => move(item.id, index - 1)}>↑</button>
                   <button type="button" className="icon-btn" aria-label={`Move ${module.name} later`} disabled={index === layout.items.length - 1} onClick={() => move(item.id, index + 1)}>↓</button>
-                  {module.sizes.length > 1 && <span className="seg dash-sizes" role="group" aria-label={`${module.name} size`}>
-                    {module.sizes.map(size => <button key={size} type="button" aria-pressed={item.size === size} title={SIZE_LABELS[size]} onClick={() => setDraft(resizeItem(layout, item.id, size, module))}>{size.toUpperCase()}</button>)}
+                  {module.sizes.length > 1 && <span className="seg dash-sizes" role="group" aria-label={`${module.name} width`}>
+                    {module.sizes.map(size => <button key={size} type="button" aria-pressed={item.size === size} title={`Width: ${SIZE_LABELS[size]}`} onClick={() => setDraft(resizeItem(layout, item.id, size, module))}>{size === 'xl' ? 'Full' : size.toUpperCase()}</button>)}
                   </span>}
+                  <select className="dash-height" aria-label={`${module.name} height`} title="Height" value={height} onChange={event => setDraft(setHeight(layout, item.id, event.target.value as ModuleHeight))}>
+                    {HEIGHTS.map(value => <option key={value} value={value}>{HEIGHT_LABELS[value]}</option>)}
+                  </select>
                   <button type="button" className="icon-btn dash-hide" aria-label={`Hide ${module.name}`} onClick={() => { setDraft(removeItem(layout, item.id)); announce(`${module.name} hidden. Add it back from Add module.`); }}>×</button>
                 </span>
               </div>
               {/* The module stays visible but can't be clicked while arranging, so a drag never opens a task. */}
-              <div className="dash-item-body" inert>{body}</div>
+              <div className="dash-cell" inert>{body}</div>
             </div>
           );
         })}

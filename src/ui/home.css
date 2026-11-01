@@ -757,30 +757,48 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .dash-tools-title { margin-right: 4px; color: var(--accent-ink); }
 .dash-tool select { min-height: 32px; max-width: 240px; padding: 0 8px; border: 1px solid var(--hair); border-radius: 8px; background: var(--card, #fff); font: inherit; font-size: 14px; }
 .dash-tools-end { display: flex; gap: 8px; margin-left: auto; }
-.dash-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; align-items: start; }
-.dash-item { min-width: 0; }
+.dash-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: 14px; }
+/* Packed: fine 2px rows; each module spans its own height plus one gutter (Dashboard.tsx measures it),
+   so nothing reserves dead space under a short card and later modules rise into it, in order. */
+.dash-grid.is-packed { grid-auto-rows: 2px; row-gap: 0; align-items: start; }
+/* Aligned rows: ordinary rows; cards in a row share the tallest one's height. */
+.dash-grid.is-aligned { grid-auto-rows: auto; row-gap: 14px; align-items: stretch; }
+.dash-item { display: flex; flex-direction: column; min-width: 0; }
 .dash-item.size-s { grid-column: span 4; }
 .dash-item.size-m { grid-column: span 6; }
 .dash-item.size-l { grid-column: span 8; }
 .dash-item.size-xl { grid-column: span 12; }
 /* Panels get their card frame from the cell (the wallboard theme draws panels borderless). */
 .dash-item:not([data-module="welcome"]):not([data-module="performance"]) { overflow: hidden; border: 1px solid var(--hair, #e5e7eb); border-radius: 12px; background: var(--card, #fff); box-shadow: 0 1px 2px rgb(17 24 39 / 4%); }
-.dash-item > .hd-panel, .dash-item-body > .hd-panel { height: 100%; box-sizing: border-box; }
+.dash-cell { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+.dash-cell > * { flex: 1 1 auto; box-sizing: border-box; }
+/* Heights, separate from width. Auto follows the content; fixed heights scroll inside, never clip. */
+.dash-item.h-compact > .dash-cell { flex: none; height: 260px; overflow-y: auto; overscroll-behavior: contain; }
+.dash-item.h-standard > .dash-cell { flex: none; height: 400px; overflow-y: auto; overscroll-behavior: contain; }
+.dash-item.h-tall > .dash-cell { flex: none; height: 600px; overflow-y: auto; overscroll-behavior: contain; }
+/* Compact empty states and spotlight on the dashboard, so an empty module doesn't stand tall. */
+.dash .hd-empty { padding: 14px 12px !important; gap: 2px !important; }
+.dash .hd-empty-mark { width: 34px; height: 34px; margin-bottom: 2px; border-radius: 10px; }
+.dash .hd-empty-mark .icon { width: 18px; height: 18px; }
+.dash .hd-empty h3 { font-size: 16px; }
+:root:root:root:root:root .home-dash .dash .hd-culture-frame { min-height: 150px; }
 /* Editing: a quiet frame, a handle and controls; the module itself can't be clicked. */
-.dash-item.is-edit { position: relative; display: flex; flex-direction: column; outline: 1px dashed var(--line-2, #d1d5db); outline-offset: 3px; border-radius: 12px; }
-.dash-item.is-edit .dash-item-body { flex: 1 1 auto; min-height: 0; max-height: 420px; overflow: hidden; opacity: .9; }
+.dash-item.is-edit { position: relative; outline: 1px dashed var(--line-2, #d1d5db); outline-offset: 3px; border-radius: 12px; }
+.dash-item.is-edit > .dash-cell { opacity: .92; }
 .dash-item.is-dragging { opacity: .4; }
 .dash-item.drop-before { box-shadow: -4px 0 0 var(--accent), 0 -4px 0 var(--accent); }
 .dash-item.drop-after { box-shadow: 4px 0 0 var(--accent), 0 4px 0 var(--accent); }
-.dash-item-bar { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 8px; border-bottom: 1px solid var(--hair); background: var(--surface-2, #f7f7f8); }
+.dash-item-bar { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-height: 40px; padding: 4px 8px; border-bottom: 1px solid var(--hair); background: var(--surface-2, #f7f7f8); }
 .dash-handle { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: grab; touch-action: none; }
 .dash-handle:active { cursor: grabbing; }
 .dash-handle:hover, .dash-handle:focus-visible { background: var(--card, #fff); color: var(--ink); }
 .dash-handle .icon { width: 18px; height: 18px; stroke-width: 3.2; }
 .dash-item-name { flex: 1 1 auto; min-width: 0; overflow: hidden; font-size: 14px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
-.dash-item-actions { display: flex; flex: none; align-items: center; gap: 4px; }
+.dash-item-actions { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 4px; }
 .dash-item-actions .icon-btn { min-width: 30px; min-height: 30px; }
 .dash-sizes button { min-height: 28px; padding: 0 8px; font-size: 12px; }
+.dash-height { min-height: 28px; padding: 0 6px; border: 1px solid var(--hair); border-radius: 8px; background: var(--card, #fff); font: inherit; font-size: 12.5px; }
+.dash-arrange button { min-height: 30px; padding: 0 10px; font-size: 13px; }
 .dash-empty { grid-column: 1 / -1; padding: 28px; border: 1px dashed var(--line-2, #d1d5db); border-radius: 12px; color: var(--muted); text-align: center; }
 @media (max-width: 1100px) {
   .dash-item.size-s, .dash-item.size-m { grid-column: span 6; }
