@@ -113,7 +113,8 @@ export function useSidebar(actor: string) {
       });
     },
     /** Inline style for the shell: reserves the panel's width so content reflows. */
-    shellStyle: { '--panel-offset': !isMobile && prefs.open ? `${prefs.width}px` : '0px' } as CSSProperties,
+    // One sidebar: expanded, the rail itself widens (icons with labels); there is no second panel beside it.
+    shellStyle: { '--panel-offset': '0px', ...(!isMobile && prefs.open ? { '--rail': `${prefs.width}px` } : {}) } as CSSProperties,
   };
 }
 
@@ -163,7 +164,10 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
   const { read, isMobile } = control;
   const panel = useRef<HTMLElement>(null);
   const dragging = useRef(false);
-  const panelHidden = isMobile ? !control.mobileOpen : !control.open;
+  // Desktop: the expanded sidebar is the rail itself (icons with labels), so the separate panel is
+  // only the phone menu.
+  const expanded = !isMobile && control.open;
+  const panelHidden = isMobile ? !control.mobileOpen : true;
   // Rail labels: shown instantly on hover or keyboard focus, beside the icon. Rendered
   // outside the rail (position: fixed) so its scroll container never clips them.
   const [hint, setHint] = useState<{ label: string; detail?: string; top: number } | null>(null);
@@ -254,9 +258,9 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
           <b>{hint.label}</b>{hint.detail && <small>{hint.detail}</small>}
         </div>
       )}
-      <aside className="rail" aria-label="Instrument Rail">
+      <aside className={`rail ${expanded ? 'is-expanded' : ''}`} aria-label="Sidebar">
         <div className="sidebar-brand">{brand}</div>
-        <nav className="nav" aria-label="Task-HQ sections">
+        {expanded ? <div className="rail-tree">{navigator}</div> : <nav className="nav" aria-label="Task-HQ sections">
           <div className="nav-secondary">
           {/* One icon per destination, grouped and ordered exactly like the expanded navigator. */}
           {groupSections(everyday).map(group => <div key={group.label} className="rail-group" role="group" aria-label={group.label}>{group.items.map(railItem)}</div>)}
@@ -272,7 +276,7 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
             </>
           )}
           </div>
-        </nav>
+        </nav>}
         <div className="sidebar-foot">
           <RailMenu label="Settings" className="rail-settings" hint={hintFor('Settings', 'Look and workspace')} icon={<svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>}>{settings}</RailMenu>
           <RailMenu label="Account" className="rail-account" hint={hintFor(account.label, account.detail)} icon={account.mark}>{account.menu}</RailMenu>

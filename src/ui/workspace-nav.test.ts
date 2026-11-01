@@ -9,7 +9,7 @@ const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf
 test('the panel and the phone menu share one navigator with nested task views, projects and Archive', () => {
   const app = read('../app/App.tsx'), sidebar = read('../app/Sidebar.tsx'), nav = read('../app/WorkNavigator.tsx');
   assert.match(app, /navigator=\{workNavigator\}/, 'phones get the navigator as their menu');
-  assert.match(app, /pullout=\{<div className="left-stack">\{workNavigator\}<\/div>\}/, 'the wide-screen panel shows the same navigator, and only navigation');
+  assert.match(app, /navigator=\{workNavigator\}/, 'the sidebar gets one navigator for both wide screens and phones');
   assert.match(sidebar, /\{navigator\}/);
   assert.doesNotMatch(sidebar, /panelItem/, 'no second, flat phone list');
   assert.match(nav, /'archive', 'people', 'settings'/, 'Archive is part of the hierarchy');
@@ -39,12 +39,17 @@ test('archived tasks and projects render grayed out under their Archived banner'
   assert.match(read('nexus.css'), /\.is-archived-record > :not\(\.tp-bar\):not\(\.tp-legacy\):not\(\.pr-archived\) \{ filter: grayscale\(1\)/);
 });
 
-test('one navigation source: the rail and the tree list the same destinations in the same groups, icons only on the rail', () => {
+test('one sidebar, two states: collapsed icons, expanded icon + label rows in the same place, never both', () => {
   const sidebar = read('../app/Sidebar.tsx'), nav = read('../app/WorkNavigator.tsx'), app = read('../app/App.tsx');
+  // Same records, same groups and order in both states.
   assert.match(sidebar, /groupSections\(everyday\)\.map\(group => <div key=\{group\.label\} className="rail-group"/);
   assert.match(nav, /const grouped = groupSections\(sections\);/);
-  assert.match(app, /const railItems = sidebar\.isMobile \? navigation : navigation\.filter\(item => item\.id !== 'settings'\);/, 'every destination on the rail; Settings is the foot gear');
-  assert.doesNotMatch(nav, /work-nav-icon|item\.icon\}/, 'no icons beside tree labels');
+  assert.match(app, /const railItems = sidebar\.isMobile \? navigation : navigation\.filter\(item => item\.id !== 'settings'\);/);
+  // Expanded replaces the icon column with the navigator inside the same rail; no panel beside it.
+  assert.match(sidebar, /\{expanded \? <div className="rail-tree">\{navigator\}<\/div> : <nav className="nav"/);
+  assert.match(sidebar, /const panelHidden = isMobile \? !control\.mobileOpen : true;/);
+  assert.match(sidebar, /'--panel-offset': '0px', \.\.\.\(!isMobile && prefs\.open \? \{ '--rail': `\$\{prefs\.width\}px` \} : \{\}\)/);
+  assert.match(nav, /<span className="work-nav-icon" aria-hidden="true">\{item\.icon\}<\/span><span className="work-nav-text">\{item\.label\}<\/span>/, 'expanded rows: icon with label');
 });
 
 test('navigation always lands on the page: Home never keeps a task, project room or draft on top', () => {

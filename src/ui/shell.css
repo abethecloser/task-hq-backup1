@@ -473,3 +473,16 @@
 .work-sub .work-nav-item.is-active::before { left: -1px; }
 /* Phones: the menu is the navigator tree, one full-width column (the old flat list used two). */
 #quest-sidebar .panel-nav { grid-template-columns: minmax(0, 1fr); }
+
+/* One sidebar, two states. Collapsed: the icon rail. Expanded: the rail widens in place and shows the
+   navigator, each row an icon with its label; nested views and projects branch below. */
+.rail { transition: width var(--sidebar-speed) var(--sidebar-ease); }
+.rail.is-expanded { align-items: stretch; padding: 14px 10px 12px; }
+.rail.is-expanded .sidebar-brand { padding-left: 6px; }
+.rail-tree { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; margin-top: 8px; scrollbar-width: thin; }
+.rail-tree .work-nav { padding: 0 0 12px; gap: 14px; }
+.rail-tree .work-nav-label { margin: 0 0 4px 10px; font-size: 11.5px; }
+.rail.is-expanded .sidebar-foot { display: flex; align-items: center; gap: 6px; }
+.rail.is-expanded .sidebar-foot .nav-toggle { margin-left: auto; }
+.work-nav-item.is-section { gap: 10px; }
+.work-sub { margin-left: 20px !important; }
