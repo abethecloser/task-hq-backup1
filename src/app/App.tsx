@@ -489,7 +489,8 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   const contextOffset = !sidebar.isMobile && rightPanelOpen ? rightPanelWidth : 0;
   // The full Calendar is the page's primary workspace: the left quick view (a second grid) steps aside there.
   const calendarPage = view === 'calendar' && !sidebar.isMobile;
-  const leftReserved = pullouts.calendar ? sidebar.width : 0;
+  // The expanded sidebar widens the rail itself (--rail), so nothing extra is reserved beside it.
+  const leftReserved = 0;
   const today = localDate(now);
   const dueToday = state.tasks.filter(task => task.status !== 'done' && task.due === today && (company || task.owner === actor)).length;
 
@@ -514,7 +515,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
         account={{ label: me.name && !me.name.includes('@') ? me.name : live?.email ?? me.name, detail: live ? ROLE_LABELS[live.role] : me.title, mark: <AccountMark quest={quest} />, menu: close => <AccountMenu quest={quest} close={close} /> }}
         pulloutTitle="Workspace"
         navigator={workNavigator}
-        pullout={<div className="left-stack">{workNavigator}</div>}
+        pullout={null}
         brand={<a className="brand" href="#/home" aria-label="Task-HQ — Home" onClick={event => { event.preventDefault(); go('home'); sidebar.afterNavigate(); }}><BrandMark /></a>}
         items={railItems.map(item => ({ id: item.id, label: item.label, icon: item.icon, count: item.count, countLabel: item.countLabel, hot: item.hot, preview: item.preview, active: view === item.id, info: info[item.id] }))}
         onSelect={id => id === 'all-tasks' ? openLens(registryView.lens) : go(id as View)}

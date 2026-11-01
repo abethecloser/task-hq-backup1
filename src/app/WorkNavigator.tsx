@@ -22,9 +22,9 @@ export function groupSections<T extends { id: string; preview?: boolean }>(secti
   return groups.filter(group => group.items.length);
 }
 
-// The workspace navigator: every destination by name, as a tree, with Tasks views and individual
-// Projects branching from their parent. Icons live only on the rail beside it (same destinations,
-// same order, from the same records), and phones open this tree as their menu. Task views reuse the top bar's
+// The workspace navigator: the expanded sidebar. Each destination is one row (its icon and name), with
+// Tasks views and individual Projects branching from their parent. Collapsed, the same sidebar shows
+// only the icons, from the same records in the same order; phones open this as their menu. Task views reuse the top bar's
 // task filters, so counts always agree.
 export function WorkNavigator({ sections, lenses, projects, activeProjectId, onSelect, onLens, onProject }: {
   sections: NavSection[]; lenses: TopTab[];
@@ -44,7 +44,7 @@ export function WorkNavigator({ sections, lenses, projects, activeProjectId, onS
     <button type="button" className={`work-nav-item is-section ${item.active && !childActive(item.id) ? 'is-active' : ''} ${childActive(item.id) ? 'has-active-child' : ''}`} aria-current={item.active && !childActive(item.id) ? 'page' : undefined}
       aria-label={`${item.label}${item.preview ? ', preview' : ''}${item.count && item.countLabel ? `, ${item.count} ${item.countLabel}` : ''}`}
       onClick={() => onSelect(item.id)}>
-      <span className="work-nav-text">{item.label}</span>
+      <span className="work-nav-icon" aria-hidden="true">{item.icon}</span><span className="work-nav-text">{item.label}</span>
       {item.count ? <b className={item.hot ? 'is-hot' : ''}>{item.count}</b> : null}
     </button>
   );
