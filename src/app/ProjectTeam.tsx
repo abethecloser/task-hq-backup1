@@ -9,7 +9,7 @@ const STAGES = [['working', 'In progress'], ['review', 'In review'], ['blocked',
 
 /** Projects and Team Overview: one completion ring beside the task-stage breakdown and how many projects
  * are complete, plus what needs a hand next (unless those parts are their own dashboard modules). */
-export function ProjectTeam({ quest, company, onOpen, onReports, only, omit = {} }: {
+export function ProjectTeam({ quest, company, onOpen, onReports, only, omit = {}, title = 'Projects and Team Overview', onProject }: {
   quest: Quest; company: boolean; onOpen: (taskId: string) => void;
   /** Render one part on its own (a Home dashboard module). */
   only?: 'needs-hand' | 'next-actions';
@@ -17,6 +17,10 @@ export function ProjectTeam({ quest, company, onOpen, onReports, only, omit = {}
   omit?: { needsHand?: boolean; nextActions?: boolean };
   /** Opens the full Reports page. */
   onReports?: () => void;
+  /** Heading (Home calls it Current Work). */
+  title?: string;
+  /** When given, active projects are listed with their progress (done of total); a row opens the project. */
+  onProject?: (projectId: string) => void;
 }) {
   const { state, actor, now } = quest;
   const intel = useMemo(() => projectIntel(state, actor, now, company), [state, actor, now, company]);
@@ -52,10 +56,10 @@ export function ProjectTeam({ quest, company, onOpen, onReports, only, omit = {}
   }
 
   return (
-    <section className="hd-panel pt" aria-labelledby="pt-title">
+    <section className={`hd-panel pt ${onProject ? 'has-projects' : ''}`} aria-labelledby="pt-title">
       <div className="hd-head">
         <span className="hd-tile tone-act" aria-hidden="true"><svg className="icon" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg></span>
-        <div><h2 id="pt-title">Projects and Team Overview</h2><small>{scope} · {intel.tasks.total} tasks</small></div>
+        <div><h2 id="pt-title">{title}</h2><small>{scope} · {intel.tasks.total} tasks</small></div>
       </div>
       <div className="pt-grid">
         <div className="pt-ring">
@@ -75,6 +79,16 @@ export function ProjectTeam({ quest, company, onOpen, onReports, only, omit = {}
         </div>
       </div>
 
+      {onProject && intel.projects.some(item => item.id) && <div className="pt-current">
+        <p className="pt-label">Active projects</p>
+        <ul className="pt-current-list">
+          {intel.projects.filter(item => item.id).map(item => <li key={item.id}><button type="button" onClick={() => onProject(item.id)}
+            aria-label={`${item.name}: ${item.done} of ${item.total} tasks done${item.overdue ? `, ${item.overdue} overdue` : ''}${item.blocked ? `, ${item.blocked} blocked` : ''}. Open the project.`}>
+            <strong>{item.name}</strong>
+            <small><b>{item.done}</b> of {item.total} done{item.overdue ? <em className="is-late"> · {item.overdue} overdue</em> : null}{item.blocked ? <em className="is-blocked"> · {item.blocked} blocked</em> : null}</small>
+          </button></li>)}
+        </ul>
+      </div>}
       {!(omit.needsHand && omit.nextActions) && <div className="pt-actions">
         {!omit.needsHand && <div>
           {needsHand}

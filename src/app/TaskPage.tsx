@@ -23,10 +23,8 @@ import { useWorkday } from '../shifts/Workday.tsx';
 const when = (at: number) => new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const isFormField = (target: EventTarget) => target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable="true"]');
 
-export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, onOpenDock, draft }: {
+export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, draft }: {
   quest: Quest; task: Task; canCreate: boolean; onClose: () => void; onOpen: (id: string) => void; onCreate: () => void;
-  /** Shows this task's conversation in the collaboration dock (wide screens, where the dock exists). */
-  onOpenDock?: (taskId: string) => void;
   /** Draft state of the task canvas (DraftTask): same page, editable and not yet saved; Create saves it. */
   draft?: { onCreate: () => void; busy: boolean; error: string; ready: boolean };
 }) {
@@ -170,9 +168,6 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, on
       <section className="tp-collab" aria-labelledby="tp-collab-title">
         <header className="tp-collab-head">
           <h2 id="tp-collab-title" className="ctx-label">Collaboration</h2>
-          {onOpenDock && !draft && <button type="button" className="btn btn-ghost btn-sm" onClick={() => onOpenDock(task.id)}>
-            <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 15h18M3 19h18M8 11l4-4 4 4" /></svg>Open in dock
-          </button>}
         </header>
         {draft ? <p className="muted tp-collab-draft">Comments, activity and history start once the task is created.</p> : <TaskConversation quest={quest} taskId={task.id} />}
       </section>

@@ -177,6 +177,16 @@
 .pt-mini em { font-style: normal; font-weight: 700; }
 .is-late { color: var(--stop, #b42318); }
 .is-blocked { color: var(--accent-ink); }
+/* Current Work (Home): active projects with their progress as text — no bars, one primary figure (the ring). */
+.pt-current { padding-top: 12px; border-top: 1px solid var(--hair); }
+.pt-current-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 4px 12px; margin: 0; padding: 0; list-style: none; }
+.pt-current-list button { display: grid; gap: 2px; width: 100%; padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.pt-current-list button:hover { background: var(--sunk); }
+.pt-current-list button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pt-current-list strong { overflow: hidden; font-size: 15.5px; text-overflow: ellipsis; white-space: nowrap; }
+.pt-current-list small { color: var(--muted); font-size: 13.5px; }
+.pt-current-list small b { color: var(--ink); }
+.pt-current-list em { font-style: normal; font-weight: 700; }
 .pt-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; padding-top: 12px; border-top: 1px solid var(--hair); }
 .pt-mini { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .pt-mini button { display: grid; gap: 2px; width: 100%; padding: 7px 10px; border: 0; border-radius: 9px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
@@ -350,37 +360,6 @@
   .home-dash .hd-q { grid-template-columns: auto minmax(0, 1fr); }
   .home-dash .hd-q .hd-due { grid-column: 2; }
 }
-
-/* ── Bottom collaboration dock (Home, wide screens) ─────────────────────────────────────────
-   The shell holds the viewport; the main column stacks bar · content · dock, and the content
-   scrolls inside it. Expanding the dock takes height from the content, never the document. */
-@media (min-width: 761px) {
-  .shell.has-dock { height: 100dvh; min-height: 0; overflow: hidden; }
-  /* No overflow clip on .main: the top bar deliberately spans over both side panels. */
-  .shell.has-dock > .main { display: flex; flex-direction: column; height: 100dvh; min-height: 0; }
-  .shell.has-dock > .main > :not(.content) { flex: none; }
-  .shell.has-dock > .main > .content { flex: 1 1 auto; width: 100%; min-height: 0; max-width: none; margin: 0; padding-inline: max(var(--bleed), calc((100% - 1600px) / 2 + var(--bleed))); padding-bottom: 40px; overflow-y: auto; overscroll-behavior: contain; }
-}
-
-/* ── Dock width by height (Home, wide screens) ──────────────────────────────────────────────
-   Collapsed and default: the dock stays in the center column and the side panels keep full height.
-   Above default (data-dock-wide, from CollabDock's height): the dock spans beneath both side panels (the same negative margins the top bar uses); the panels
-   end at its live height (--dock-h, published by CollabDock) and keep their own scrolling. */
-@media (min-width: 761px) {
-  :root[data-dock-wide] .shell.has-dock > .main > .collab-dock { margin-left: calc(-1 * var(--panel-offset, 0px)); margin-right: calc(-1 * var(--context-offset, 0px)); }
-  :root[data-dock-wide] .shell.has-dock .workspace-panel, :root[data-dock-wide] .shell.has-dock .notification-edge { bottom: var(--dock-h, 0px); }
-  /* With the dock at half height or more, the shortened left panel scrolls as a whole (calendar, Work Views
-     and account) so its footer can't crowd out the content. Lower, the footer stays anchored as usual. */
-  :root[data-dock-tall] .shell.has-dock .workspace-panel { overflow-y: auto; overscroll-behavior: contain; }
-  :root[data-dock-tall] .shell.has-dock .workspace-panel > .panel-scroll { flex: 1 0 auto; overflow: visible; }
-  /* Edge toggles stay centered on the visible part of the panels. */
-  :root[data-dock-wide] .shell.has-dock .seam { top: calc((var(--topbar-h, 60px) + 100dvh - var(--dock-h, 0px)) / 2); }
-  /* Full height: the dock takes the whole workspace under the header; the center and panels yield it. */
-  :root[data-dock-full] .shell.has-dock .seam,
-  :root[data-dock-full] .shell.has-dock :is(.workspace-panel, .notification-edge) { visibility: hidden; border-top-width: 0; }
-  :root[data-dock-full] .shell.has-dock > .main > .content { flex: 0 0 0; height: 0; min-height: 0; padding-block: 0; overflow: hidden; visibility: hidden; }
-}
-
 
 /* Long project names truncate instead of widening the panel (which scrolled it sideways). */
 .work-nav, .work-nav-group, .work-list, .work-sub, .work-list li { min-width: 0; }

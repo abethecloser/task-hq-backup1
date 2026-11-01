@@ -4,7 +4,8 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { QuestEvent, QuestState } from '../core/contract.ts';
 import { compose } from '../core/compose.ts';
-import { ago, atRisk, homeMetrics, performance, recentActivity } from '../core/dashboard.ts';
+import { ago, atRisk, homeMetrics, performance, systemInsights, teamMovement } from '../core/dashboard.ts';
+import type { RiskItem, SystemInsight } from '../core/dashboard.ts';
 import { DEFAULT_ITEMS } from '../core/dashboard-layout.ts';
 import type { DashboardLayout } from '../core/dashboard-layout.ts';
 import { Dashboard } from './dashboard/Dashboard.tsx';
@@ -12,7 +13,6 @@ import type { DashboardModule } from './dashboard/Dashboard.tsx';
 import { HOME_PERIODS, HOME_PERIOD_LABELS, inHomePeriod, loadHomePeriod, riskInPeriod, saveHomePeriod } from '../core/home-period.ts';
 import type { HomePeriod } from '../core/home-period.ts';
 import { DEFAULT_QUERY, queryTasks } from '../core/registry.ts';
-import type { CollabItem } from '../core/dashboard.ts';
 import { CULTURE_CONTENT, CULTURE_SLOTS } from '../core/culture.ts';
 import type { CultureItem, CultureSlot } from '../core/culture.ts';
 import type { Lens, RegistryQuery } from '../core/registry.ts';
@@ -25,8 +25,9 @@ import { BannerAdjust, BannerEditor, bannerLook, useBanner } from './HeroBanner.
 import type { Quest } from '../ui/useQuest.ts';
 import type { DeckSection } from './ContextPanel.tsx';
 
-// Home: the day at a glance. Momentum greeting; Up next · At risk; Projects & team · Culture.
-// The calendar lives in the left panel; comments, mentions and activity in the bottom dock (CollabDock).
+// Home: the operating desk. Operating Desk (greeting and next step) · KPI strip · Today's Focus ·
+// Team Activity · Current Work · Signals — each an arrangeable dashboard module over existing records.
+// Communication lives in Inbox (the dock), notifications (top bar) and each task's own conversation.
 // Everything is read from records; team-wide panels need the same access as Company Work.
 export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, onCreate, onRegistry, onDeck, onTeam, culture = CULTURE_CONTENT, onReports }: {
   quest: Quest; company: boolean; canCreate: boolean;
@@ -61,7 +62,6 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
   const greeting = useMomentum(quest, company);
   const today = localDate(minute);
   const next = queue[0];
-  const [allRisks, setAllRisks] = useState(false);
   const nextTask = next?.taskId ? taskById(state, next.taskId) : undefined;
   // These labels describe opening the situation, never performing its mutation.
   const nextLabel = next?.leadId ? 'Review next lead'
@@ -73,15 +73,15 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
   const shown = (layout: DashboardLayout, id: string) => layout.items.some(item => item.id === id);
   // Home's sections as dashboard modules: the same components and data as before, now arrangeable.
   const modules: DashboardModule[] = [
-    { id: 'welcome', name: 'Welcome', description: 'Greeting and your next step', sizes: ['l', 'xl'], defaultSize: 'xl', render: () => <>
+    { id: 'welcome', name: 'Operating Desk', description: 'Greeting, context and your next step', sizes: ['l', 'xl'], defaultSize: 'xl', render: () => <>
       <Hero eyebrow={greeting.eyebrow} primary={greeting.primary} support={greeting.support} banner={banner}>
         {next && <button type="button" className="btn btn-primary btn-sm cta-fill" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}><span className="cta-fill-label">{nextLabel}</span><CtaArrow /></button>}
       </Hero>
     </> },
-    { id: 'performance', name: 'Performance', description: 'Completed, open, due and blocked', sizes: ['m', 'l', 'xl'], defaultSize: 'xl', render: () => <>
+    { id: 'performance', name: 'KPI strip', description: 'Completed, open, due and blocked', sizes: ['m', 'l', 'xl'], defaultSize: 'xl', render: () => <>
       <section className="hd-perf" aria-labelledby="hd-perf-title">
         <div className="hd-perf-head">
-          <h2 id="hd-perf-title">Your performance</h2>
+          <h2 id="hd-perf-title">Key numbers · your work</h2>
           <div className="seg hd-period" role="group" aria-label="Dashboard period">
             {HOME_PERIODS.map(value => <button key={value} type="button" aria-pressed={period === value} onClick={() => choosePeriod(value)}>{HOME_PERIOD_LABELS[value]}</button>)}
           </div>
@@ -94,9 +94,9 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
         </div>
       </section>
     </> },
-    { id: 'up-next', name: 'Up next', description: 'Your queue by priority and due date', sizes: ['s', 'm', 'l', 'xl'], defaultSize: 'm', render: () => <>
+    { id: 'up-next', name: 'Today’s Focus', description: 'Your prioritized next actions', sizes: ['s', 'm', 'l', 'xl'], defaultSize: 'm', render: () => <>
         <section className="hd-panel" aria-labelledby="hd-next">
-          <PanelHead id="hd-next" title="Up next" sub={`Your queue · ${period === 'today' ? 'today' : 'this week'} · by priority & due date`} tone="accent" icon={<path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5" />}
+          <PanelHead id="hd-next" title={period === 'today' ? 'Today’s Focus' : 'This Week’s Focus'} sub="Your next actions · by priority & due date" tone="accent" icon={<path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5" />}
             more={queue.length > 0 ? { label: `View all (${metrics.active})`, onClick: () => onRegistry('all', { scope: 'mine' }) } : undefined} />
           {queue.length === 0
             ? <div className="hd-empty">
@@ -123,28 +123,14 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
               </ul>}
         </section>
     </> },
-    { id: 'at-risk', name: 'At risk', description: 'Work that needs attention', sizes: ['s', 'm', 'l', 'xl'], defaultSize: 'm', render: () => <>
-        <section className="hd-panel" aria-labelledby="hd-risk">
-          <PanelHead id="hd-risk" title="At risk" sub={`Needs attention · ${period === 'today' ? 'today' : 'this week'}`} tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />}
-            more={risks.length > 4 ? { label: allRisks ? 'Show fewer' : `View all (${risks.length})`, onClick: () => setAllRisks(value => !value) } : undefined} />
-          {risks.length === 0
-            ? <p className="hd-quiet">Nothing is at risk{company ? '' : ' on your work'}{allRisksInView.length ? ` ${period === 'today' ? 'today' : 'this week'}` : ''}.</p>
-            : <ul className="hd-list">
-                {(allRisks ? risks : risks.slice(0, 4)).map(({ task, reasons }) => (
-                  <li key={task.id} className="hd-row is-risk">
-                    <button type="button" className="hd-row-main" onClick={() => onOpen(task.id)}>
-                      <strong>{task.title}</strong><small>{firstName(state, task.owner)} · {reasons.join(' · ')}</small>
-                    </button>
-                    <span className={`hd-badge ${task.ultra ? 'is-ultra' : ''}`}>{task.ultra ? 'ultra' : 'at risk'}</span>
-                  </li>
-                ))}
-              </ul>}
-        </section>
-    </> },
-    { id: 'projects', name: 'Projects and Team Overview', description: 'Task completion and stages', sizes: ['m', 'l', 'xl'], defaultSize: 'm',
-      // Parts shown as their own modules (by default Needs a hand and Next actions) aren't repeated here.
-      render: ({ layout }) => <ProjectTeam quest={quest} company={company} onOpen={onOpen} onReports={onReports}
-        omit={{ needsHand: shown(layout, 'needs-hand'), nextActions: shown(layout, 'next-actions') }} /> },
+    { id: 'at-risk', name: 'Signals', description: 'Risks, approvals and observations', sizes: ['s', 'm', 'l', 'xl'], defaultSize: 'm', render: () =>
+      <Signals quest={quest} company={company} period={period} risks={risks} anyRisk={allRisksInView.length > 0} onOpen={onOpen} onRegistry={onRegistry} /> },
+    { id: 'projects', name: 'Current Work', description: 'Projects and their progress', sizes: ['m', 'l', 'xl'], defaultSize: 'm',
+      // Overdue/blocked work is in Signals and next actions in Today's Focus, so Current Work doesn't repeat them
+      // (unless Signals or Today's Focus has been removed from this layout).
+      render: ({ layout }) => <ProjectTeam quest={quest} company={company} onOpen={onOpen} onReports={onReports} title="Current Work"
+        onProject={id => { location.hash = `#/company-work/${encodeURIComponent(id)}`; }}
+        omit={{ needsHand: shown(layout, 'needs-hand') || shown(layout, 'at-risk'), nextActions: shown(layout, 'next-actions') || shown(layout, 'up-next') }} /> },
     { id: 'needs-hand', name: 'Needs a hand', description: 'Overdue and blocked work', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} only="needs-hand" /> },
     { id: 'next-actions', name: 'Next actions', description: 'Open work ready to move', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} only="next-actions" /> },
     { id: 'reports', name: 'Reports', description: 'Completion and delivery measures', sizes: ['s', 'm', 'l'], defaultSize: 'm',
@@ -154,7 +140,7 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
       render: ({ layout }) => <CultureSpotlight items={culture} slots={CULTURE_SLOTS.map(slot => slot.id).filter(id => id === 'culture' || !shown(layout, id))} /> },
     { id: 'video', name: 'Video', description: 'Video of the week', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <CultureSpotlight items={culture} slots={['video']} /> },
     { id: 'moments', name: 'Team Moments', description: 'Achievements and milestones', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <CultureSpotlight items={culture} slots={['moments']} /> },
-    { id: 'activity', name: 'Activity', description: 'Recent changes across your work', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <ActivityModule quest={quest} company={company} onOpen={onOpen} /> },
+    { id: 'activity', name: 'Team Activity', description: 'Recent movement across the team', sizes: ['s', 'm', 'l'], defaultSize: 'm', render: () => <ActivityModule quest={quest} company={company} onOpen={onOpen} /> },
   ];
 
   return (
@@ -178,18 +164,66 @@ function ReportsModule({ quest, company, onReports }: { quest: Quest; company: b
   </section>;
 }
 
-/** Recent activity on the work you can see (the same feed the dock and Activity page read). */
+/** Team movement on the work you can see: who moved what (the team activity feed; repeats collapsed). */
 function ActivityModule({ quest, company, onOpen }: { quest: Quest; company: boolean; onOpen: (id: string) => void }) {
-  const events = recentActivity(quest.state, quest.actor, company, 6);
+  const events = teamMovement(quest.state, quest.actor, company, 7);
   return (
     <section className="hd-panel" aria-labelledby="hd-activity">
-      <PanelHead id="hd-activity" title="Activity" sub="Recent changes" tone="neutral" icon={<path d="M4 12h4l3-7 3 14 3-7h3" />} />
+      <PanelHead id="hd-activity" title="Team Activity" sub={company ? 'Recent movement across the team' : 'Recent movement on your work'} tone="neutral" icon={<path d="M4 12h4l3-7 3 14 3-7h3" />} />
       {events.length === 0 ? <p className="hd-quiet">No recent activity.</p> : <ul className="hd-list hd-feed">{events.map(event => <li key={event.id}><Recent event={event} quest={quest} onOpen={onOpen} /></li>)}</ul>}
     </section>
   );
 }
 
-export const COLLAB_VERB: Record<CollabItem['kind'], string> = { comment: 'commented on', mention: 'mentioned you in', reply: 'replied on' };
+/** Signals: what needs a decision or a look — at-risk work, approvals waiting on you, and the
+ * deterministic observations from records (systemInsights). Nothing here is estimated or generated. */
+function Signals({ quest, company, period, risks, anyRisk, onOpen, onRegistry }: {
+  quest: Quest; company: boolean; period: HomePeriod; risks: RiskItem[]; anyRisk: boolean;
+  onOpen: (id: string) => void; onRegistry: (lens: Lens, changes?: Partial<RegistryQuery>) => void;
+}) {
+  const { state, actor, now } = quest;
+  const [all, setAll] = useState(false);
+  const approvals = state.tasks.filter(task => task.status === 'review' && task.approver === actor && !task.archivedAt);
+  const observations = systemInsights(state, actor, now, company).slice(0, 3);
+  const shownRisks = all ? risks : risks.slice(0, 4);
+  const openInsight = (item: SystemInsight) => {
+    const target = item.target;
+    if (!target) return undefined;
+    if ('taskId' in target) return () => onOpen(target.taskId);
+    if ('lens' in target) return () => onRegistry(target.lens, { ...(target.owner ? { owner: target.owner } : {}), ...(target.status ? { status: target.status } : {}) } as Partial<RegistryQuery>);
+    if ('owner' in target) return () => onRegistry('all', { owner: target.owner } as Partial<RegistryQuery>);
+    return undefined;
+  };
+  const total = risks.length + approvals.length + observations.length;
+  return (
+    <section className="hd-panel hd-signals" aria-labelledby="hd-signals">
+      <PanelHead id="hd-signals" title="Signals" sub={`Risks, approvals and observations · ${period === 'today' ? 'today' : 'this week'}`} tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />}
+        more={risks.length > 4 ? { label: all ? 'Show fewer' : `All risks (${risks.length})`, onClick: () => setAll(value => !value) } : undefined} />
+      {total === 0 && <p className="hd-quiet">Nothing needs attention{company ? '' : ' on your work'}{anyRisk ? ` ${period === 'today' ? 'today' : 'this week'}` : ''}.</p>}
+      {approvals.length > 0 && <div className="hd-signal-group">
+        <p className="hd-signal-label">Waiting on your approval</p>
+        <ul className="hd-list">{approvals.slice(0, 3).map(task => <li key={task.id} className="hd-row">
+          <button type="button" className="hd-row-main" onClick={() => onOpen(task.id)}><strong>{task.title}</strong><small>From {firstName(state, task.owner)}{task.projectId ? ` · ${projectName(state, task.projectId)}` : ''}</small></button>
+          <span className="hd-badge is-review">review</span>
+        </li>)}</ul>
+      </div>}
+      {risks.length > 0 && <div className="hd-signal-group">
+        <p className="hd-signal-label">At risk</p>
+        <ul className="hd-list">{shownRisks.map(({ task, reasons }) => <li key={task.id} className="hd-row is-risk">
+          <button type="button" className="hd-row-main" onClick={() => onOpen(task.id)}><strong>{task.title}</strong><small>{firstName(state, task.owner)} · {reasons.join(' · ')}</small></button>
+          <span className={`hd-badge ${task.ultra ? 'is-ultra' : ''}`}>{task.ultra ? 'ultra' : 'at risk'}</span>
+        </li>)}</ul>
+      </div>}
+      {observations.length > 0 && <div className="hd-signal-group">
+        <p className="hd-signal-label">Observations</p>
+        <ul className="hd-list">{observations.map(item => { const open = openInsight(item); const body = <><strong>{item.title}</strong><small>{item.detail}</small></>; return <li key={item.id} className={`hd-row hd-obs tone-${item.tone}`}>
+          {open ? <button type="button" className="hd-row-main" onClick={open}>{body}</button> : <div className="hd-row-main">{body}</div>}
+        </li>; })}</ul>
+      </div>}
+    </section>
+  );
+}
+
 
 /** Momentum greeting with the architectural treatment, kept to a compact height. */
 function Hero({ eyebrow, primary, support, banner, children }: { eyebrow: string; primary: string; support: string; banner: ReturnType<typeof useBanner>; children: ReactNode }) {

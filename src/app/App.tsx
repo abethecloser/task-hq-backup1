@@ -35,16 +35,12 @@ import { ExecutiveDesk } from './ExecutiveDesk.tsx';
 import { Activity, Settings } from './Settings.tsx';
 import { Archive } from './Archive.tsx';
 import { Home } from './Home.tsx';
-import { CollabDock } from './CollabDock.tsx';
-import type { DockTab } from './CollabDock.tsx';
-import { DOCK_DEFAULT_PREF, loadDockPreference, saveDockPreference, withSnap } from '../ui/dock-size.ts';
 import { DOCK_HOME, DOCK_IDS, DOCK_LEFT, DOCK_RIGHT, readNavMode, splitNavigation } from '../ui/nav-mode.ts';
 import { NavDock } from './NavDock.tsx';
 import { Team } from './Team.tsx';
 import { canSeeTeamOverview } from '../core/team.ts';
 /** Optional exact lock for the Team overview: comma-separated account ids (replaces the name rule). */
 const TEAM_OVERVIEW_USERS = String(import.meta.env.VITE_TEAM_OVERVIEW_USERS ?? '').split(',').map(item => item.trim()).filter(Boolean);
-import type { DockPreference } from '../ui/dock-size.ts';
 import { AskTasks } from './AskTasks.tsx';
 import { AccountMark, AccountMenu, TopBar } from './TopBar.tsx';
 import { NeedsAttention } from './NeedsAttention.tsx';
@@ -91,8 +87,6 @@ const VIEW_LABELS: Record<View, string> = {
 };
 
 /** Views where the Instrument Deck (signals, calendar, insights) is useful beside the canvas. */
-/** Primary routes that keep the collaboration dock. */
-const DOCK_VIEWS: View[] = ['home', 'all-tasks', 'company-work', 'calendar', 'reports', 'inbox'];
 const SIGNAL_VIEWS: View[] = ['home', 'all-tasks', 'company-work', 'needs-attention'];
 /** The canvas never gets narrower than this because of a docked panel. */
 const MIN_CANVAS = 600;
@@ -142,7 +136,7 @@ export default function App({ onExitDemo, backend }: { onExitDemo?: () => void; 
 
 function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => void }) {
   // Work archived as legacy keeps its status, so every active view (Home, Calendar, Reports, project
-  // rooms, the dock, counts) reads the workspace without it. The task page, the Tasks registry (its
+  // rooms, counts) reads the workspace without it. The task page, the Tasks registry (its
   // Archived filter), search and activity read the whole record.
   const quest = useMemo(() => ({ ...whole, state: withoutLegacyArchived(whole.state) }), [whole]);
   const { state, actor, now, dispatch } = quest;
@@ -178,16 +172,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   const sidebar = useSidebar(actor);
   const collapseSidebar = sidebar.collapse;
   const width = useViewportWidth();
-  /** Bottom collaboration dock (Home). Remembered on this device, like the calendar pullout. */
-  // Bottom dock size preference (`quest-dock-height`); storage can be unavailable, so this degrades to this page only.
-  const [dock, setDock] = useState<DockPreference>(() => { try { return loadDockPreference(localStorage); } catch { return DOCK_DEFAULT_PREF; } });
-  useEffect(() => { try { saveDockPreference(localStorage, dock); } catch { /* storage unavailable */ } }, [dock]);
-  const dockOpen = dock.snap !== 'collapsed';
-  /** The task the dock is reading, focused in the overview's Living view until cleared. */
-  /** An explicit "Open in dock" request from a task page (nonce repeats a request for the same task). */
-  const [dockTask, setDockTask] = useState<{ id: string; nonce: number } | null>(null);
-  const [dockTab, setDockTab] = useState<DockTab>('inbox');
-  // Navigation dock preview: `?nav=dock` (remembered on this device), `?nav=classic` to return.
+  // The navigation dock is the default; `?nav=classic` is a temporary rollback path (see ui/nav-mode.ts).
   const [navMode] = useState(() => readNavMode(location.search, (() => { try { return localStorage; } catch { return null; } })()));
   const dockNav = navMode === 'dock';
   /** Notifications drawer (right). Session-only: it always starts closed. The calendar pullout (left) is `sidebar.open`. */
@@ -517,13 +502,11 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   const dueToday = state.tasks.filter(task => task.status !== 'done' && task.due === today && (company || task.owner === actor)).length;
 
 
-  // Bottom dock: on every primary route (wide screens). The shell then holds the viewport and the center scrolls inside it.
-  const hasDock = DOCK_VIEWS.includes(view) && !focused && !sidebar.isMobile;
 
   return (
-    <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'} ${hasDock ? 'has-dock' : ''} ${calendarPage ? 'is-calendar-page' : ''} ${dockNav ? `nav-dock-on ${sidebar.isMobile ? 'is-mobile-nav' : ''}` : ''}`}
+    <div className={`shell ${focused ? 'is-focus' : ''} ${live ? 'is-live' : 'is-demo'} ${calendarPage ? 'is-calendar-page' : ''} ${dockNav ? `nav-dock-on ${sidebar.isMobile ? 'is-mobile-nav' : ''}` : ''}`}
       style={{ ...sidebar.shellStyle, ...(sidebar.isMobile ? {} : { ['--panel-offset' as string]: `${leftReserved}px` }), ['--context-offset' as string]: `${contextOffset}px` }}
-      data-sidebar={sidebar.isMobile ? undefined : sidebar.open ? 'open' : 'closed'} data-context={contextOffset ? 'open' : 'closed'} data-dock={hasDock ? (dockOpen ? 'open' : 'closed') : undefined} data-resizing={sidebar.resizing || undefined}>
+      data-sidebar={sidebar.isMobile ? undefined : sidebar.open ? 'open' : 'closed'} data-context={contextOffset ? 'open' : 'closed'} data-resizing={sidebar.resizing || undefined}>
       <Sidebar
         workspaceName={state.workspace.name}
         control={sidebar}
@@ -581,8 +564,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
           {creating && canCreate ? <DraftTask key="draft-task" quest={whole} due={createDue} projectId={createProjectId}
               onCancel={() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); }}
               onCreated={id => evolve(() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); openTask(id); })} />
-          : selected && contextAllowed ? <TaskPage key={selected.id} quest={whole} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)}
-            onOpenDock={hasDock ? id => { setDockTask({ id, nonce: Date.now() }); setDock(current => (current.snap === 'collapsed' ? withSnap(current, current.last) : current)); } : undefined} />
+          : selected && contextAllowed ? <TaskPage key={selected.id} quest={whole} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)} />
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
@@ -615,12 +597,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
             : <PagePreview title="Agent pilot" detail="This pilot is not connected to an agent service or workspace data. No tasks are sent and no outcomes are generated here." />}
         </section>
 
-        {/* Bottom collaboration dock: in the main column, so expanding it takes height from the center. */}
-        {hasDock && <CollabDock quest={quest} company={company} snap={dock.snap} onSnap={snap => setDock(current => withSnap(current, snap))}
-          onToggle={() => setDock(current => withSnap(current, current.snap === 'collapsed' ? current.last : 'collapsed'))} tab={dockTab} onTab={setDockTab}
-          inbox={inbox} data={inboxData} read={sidebar.read} markRead={sidebar.markRead} mentions={mentions}
-          onOpen={openTask} onOpenLead={openLead} onActivity={() => go('activity')} onOpenInboxPage={() => go('inbox')}
-          contextTaskId={selected && contextAllowed ? selected.id : null} openTask={dockTask} />}
+
 
         {dockNav && <NavDock mobile={sidebar.isMobile} items={[...dockList(DOCK_LEFT), ...dockList([DOCK_HOME]), ...dockList(DOCK_RIGHT)]}
           onSelect={id => { if (id === 'all-tasks') openLens(registryView.lens); else go(id as View); }} />}

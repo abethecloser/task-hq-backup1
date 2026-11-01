@@ -19,11 +19,13 @@ export interface DashboardLayout { version: 1; items: LayoutItem[]; arrangement?
 export type PresetId = 'balanced' | 'operations' | 'visual';
 export const PRESET_LABELS: Record<PresetId, string> = { balanced: 'Balanced (default)', operations: 'Operations first', visual: 'Visual first' };
 
-/** The default dashboard (the Balanced preset): paired halves that share one column line down the page. */
+/** The default dashboard (the Balanced preset): the operating desk — Operating Desk (welcome), KPI strip
+ * (performance), then paired halves on one column line: Today's Focus (up-next) · Team Activity (activity),
+ * Current Work (projects) · Signals (at-risk). Module ids are unchanged, so saved layouts keep working. */
 export const DEFAULT_ITEMS: LayoutItem[] = [
-  { id: 'welcome', size: 'xl' }, { id: 'performance', size: 'xl' }, { id: 'up-next', size: 'm' }, { id: 'at-risk', size: 'm' },
-  { id: 'projects', size: 'm' }, { id: 'culture', size: 'm' },
-  { id: 'needs-hand', size: 'm' }, { id: 'next-actions', size: 'm' }, { id: 'reports', size: 'm' },
+  { id: 'welcome', size: 'xl' }, { id: 'performance', size: 'xl' },
+  { id: 'up-next', size: 'm' }, { id: 'activity', size: 'm' },
+  { id: 'projects', size: 'm' }, { id: 'at-risk', size: 'm' },
 ];
 export const PRESETS: Record<PresetId, LayoutItem[]> = {
   balanced: DEFAULT_ITEMS,

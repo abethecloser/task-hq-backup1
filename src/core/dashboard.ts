@@ -302,6 +302,22 @@ export function teamActivity(state: QuestState, actor: string, company: boolean,
   return out;
 }
 
+/** Team movement for Home: the team activity feed plus completions recorded on tasks that have no logged
+ * completion event (seeded or imported work keeps who finished it and when on the task itself). Same
+ * visibility as the feed: everything with company access, otherwise work the viewer is involved in. */
+export function teamMovement(state: QuestState, actor: string, company: boolean, limit = 7): QuestEvent[] {
+  const events = teamActivity(state, actor, company, limit);
+  const logged = new Set(state.events.filter(event => !event.undone && event.taskId && /\bcompleted\b/i.test(event.text)).map(event => event.taskId));
+  const completions: QuestEvent[] = state.tasks
+    .filter(task => task.status === 'done' && task.completedAt && !logged.has(task.id) && (company || involved(task, actor)))
+    .map(task => {
+      const by = task.completedBy ?? task.owner;
+      const name = state.people.find(person => person.id === by)?.name ?? 'Someone';
+      return { id: `done:${task.id}`, at: task.completedAt!, actor: by || 'system', kind: 'task' as const, text: `${name} completed “${task.title}”.`, taskId: task.id };
+    });
+  return [...events, ...completions].sort((a, b) => b.at - a.at).slice(0, limit);
+}
+
 export interface HeatDay extends CalendarDay {
   /** Open work due that day that is overdue (past days only). */
   overdue: number;

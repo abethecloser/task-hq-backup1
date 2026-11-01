@@ -4,15 +4,18 @@ import { readNavMode, splitNavigation } from './nav-mode.ts';
 
 const NAV = ['home', 'calendar', 'all-tasks', 'inbox', 'reports', 'needs-attention', 'company-work', 'people', 'executive', 'activity', 'archive', 'settings', 'workbook'].map(id => ({ id }));
 
-test('dock mode is opt-in, remembered, and reversible from the URL', () => {
+test('the dock is the default; ?nav=classic is a remembered rollback path, ?nav=dock returns to the default', () => {
   const store = new Map<string, string>();
-  const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } };
-  assert.equal(readNavMode('', storage), 'classic');
-  assert.equal(readNavMode('?demo&nav=dock', storage), 'dock');
-  assert.equal(readNavMode('?demo', storage), 'dock', 'remembered');
-  assert.equal(readNavMode('?nav=classic', storage), 'classic');
-  assert.equal(readNavMode('', storage), 'classic');
-  assert.equal(readNavMode('', null), 'classic');
+  const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); }, removeItem: (k: string) => { store.delete(k); } };
+  assert.equal(readNavMode('', storage), 'dock');
+  assert.equal(readNavMode('?demo', storage), 'dock');
+  assert.equal(readNavMode('?demo&nav=classic', storage), 'classic');
+  assert.equal(readNavMode('', storage), 'classic', 'rollback remembered on this device');
+  assert.equal(readNavMode('?nav=dock', storage), 'dock');
+  assert.equal(readNavMode('', storage), 'dock', 'back to the default');
+  assert.equal(readNavMode('', null), 'dock');
+  const old = new Map([['taskhq.nav', 'dock']]);
+  assert.equal(readNavMode('', { getItem: k => old.get(k) ?? null, setItem: () => {}, removeItem: () => {} }), 'dock', 'earlier preview opt-in still reads as the dock');
 });
 
 test('exactly five primary destinations, Home in the centre; everything else reachable once, never repeated', () => {
