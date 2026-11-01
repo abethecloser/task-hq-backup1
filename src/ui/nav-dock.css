@@ -1,55 +1,84 @@
 /* ── Navigation dock (preview, ?nav=dock) ──────────────────────────────────────────────────
-   Five primary destinations as one floating pill on wide screens (pointer magnification, spring
-   transitions) and a steady bottom bar on phones. The shell reserves the dock's height under the
-   content, so nothing is ever hidden behind it. */
-.shell.nav-dock-on { --nd-reserve: 104px; }
-.shell.nav-dock-on.is-mobile-nav { --nd-reserve: calc(70px + env(safe-area-inset-bottom)); }
-.shell.nav-dock-on > .main { padding-bottom: var(--nd-reserve); box-sizing: border-box; }
-/* The communications panel stays: it opens from its contextual actions (Open in dock) and the Inbox
-   page carries the same conversations; only its collapsed ribbon gives way to the dock. */
+   One adaptive surface, not two modes. Everything derives from the work area's width (--nd-avail):
+     spacious (≥ ~1110px)  a compact capsule, lifted 14px, rounded, softly elevated, magnifying icons;
+     in between            it widens toward the work area while its lift, radius and shadow ease to zero;
+     constrained (≤ ~760px) flush, full width, translucent with a hairline top edge — integrated navigation;
+     phones                the same flush bar with safe-area padding and steady touch targets.
+   Page content scrolls behind the translucent surface (padding keeps its end reachable), so there is
+   never a card sitting on a separate white strip. */
+.shell.nav-dock-on {
+  --nd-h: 72px; --nd-reserve: calc(var(--nd-h) + 30px + env(safe-area-inset-bottom));
+  /* The work area: viewport minus the rail (and any docked right panel). */
+  --nd-avail: calc(100vw - var(--rail, 72px) - var(--panel-offset, 0px) - var(--context-offset, 0px));
+  /* 0 at ≤760px of work area, growing to its maximum by ~1110px: lift, roundness and shadow follow it. */
+  --nd-lift: clamp(0px, calc((var(--nd-avail) - 760px) * .04), 14px);
+  --nd-round: clamp(0px, calc((var(--nd-avail) - 760px) * .063), 22px);
+  /* Full width when constrained, narrowing linearly to the capsule (352px) as room grows. */
+  --nd-w: min(var(--nd-avail), max(352px, calc(1646px - 1.166 * var(--nd-avail))));
+}
+/* Phones: no rail, so the work area is the whole viewport (the same formulas give a flush bar). */
+.shell.nav-dock-on.is-mobile-nav { --nd-avail: 100vw; }
+/* Content clears the dock by padding, not by a reserved band, so it scrolls behind the surface. */
+.shell.nav-dock-on.nav-dock-on > .main > .content { padding-bottom: var(--nd-reserve); }
+/* The communications panel sits above the dock when open; only its collapsed ribbon gives way. */
+.shell.nav-dock-on .collab-dock { margin-bottom: calc(var(--nd-h) + 1px + var(--nd-lift) + env(safe-area-inset-bottom)); }
 .shell.nav-dock-on .collab-dock:not(.is-open) { display: none; }
 .shell.nav-dock-on .tabbar { display: none; }
-.shell.nav-dock-on .fab-create { bottom: calc(var(--nd-reserve) + 12px); }
+.shell.nav-dock-on .fab-create { bottom: calc(var(--nd-h) + 16px + env(safe-area-inset-bottom)); }
 
-.nav-dock { --nd-spring: cubic-bezier(.34, 1.56, .64, 1); --nd-tile: 40px; z-index: 40; }
-.nd-bar { display: flex; align-items: flex-end; margin: 0; padding: 0; list-style: none; }
-.nd-item { position: relative; display: grid; justify-items: center; gap: 5px; min-width: 60px; padding: 0 4px; border: 0; background: transparent; color: var(--muted); font: 650 11.5px/1 var(--font, inherit); letter-spacing: .01em; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.nav-dock {
+  --nd-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --nd-tile: 40px;
+  position: fixed; z-index: 40; bottom: var(--nd-lift);
+  left: calc(var(--rail, 72px) + var(--panel-offset, 0px) + var(--nd-avail) / 2);
+  width: var(--nd-w); transform: translateX(-50%);
+  container: nd / inline-size;
+}
+.nd-bar {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: end; justify-content: center;
+  height: var(--nd-h); margin: 0; padding: 0 8px env(safe-area-inset-bottom); list-style: none; box-sizing: content-box;
+  border-top: 1px solid color-mix(in srgb, var(--hair, #e5e7eb) 90%, transparent);
+  border-radius: var(--nd-round);
+  background: color-mix(in srgb, var(--card, #fff) 80%, transparent);
+  backdrop-filter: blur(20px) saturate(1.6); -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  /* The outline ring and elevation scale with the lift, so the flush bar keeps only its top hairline. */
+  box-shadow:
+    0 0 0 clamp(0px, calc(var(--nd-lift) * .08), 1px) color-mix(in srgb, var(--hair, #e5e7eb) 90%, transparent),
+    0 calc(var(--nd-lift) * .9) calc(var(--nd-lift) * 2.6) rgb(17 24 39 / 12%),
+    0 calc(var(--nd-lift) * .12) calc(var(--nd-lift) * .4) rgb(17 24 39 / 6%);
+}
+/* Wide surfaces keep the five destinations together in the middle, evenly spaced. */
+@container nd (min-width: 640px) { .nd-bar { grid-template-columns: repeat(5, minmax(0, 132px)); } }
+
+.nd-item { position: relative; display: grid; justify-items: center; align-content: center; gap: 5px; width: 100%; height: var(--nd-h); min-width: 0; padding: 0 2px; border: 0; background: transparent; color: var(--muted); font: 650 11.5px/1 var(--font, inherit); letter-spacing: .01em; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .nd-item:focus-visible { outline: none; }
 .nd-item:focus-visible .nd-tile { box-shadow: 0 0 0 2px var(--card, #fff), 0 0 0 4px var(--accent); }
-
-/* The tile: a soft rounded square; it grows upward from its base so the bar never shifts. */
-.nd-tile { position: relative; display: grid; place-items: center; width: var(--nd-tile); height: var(--nd-tile); border-radius: 12px; background: var(--sunk, #f3f4f6); color: var(--ink-2, var(--ink)); transform: translateY(calc((var(--nd-scale, 1) - 1) * -18px)) scale(var(--nd-scale, 1)); transform-origin: 50% 100%; transition: transform .32s var(--nd-spring), background .18s, color .18s, box-shadow .18s; will-change: transform; }
-.nd-tile .icon { width: 20px; height: 20px; }
-.nd-label { transition: color .18s; white-space: nowrap; }
+.nd-label { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; transition: color .18s; }
 @media (hover: hover) { .nd-item:hover .nd-tile, .nd-item:hover .nd-label { color: var(--ink); } }
 
-/* Active: the orange accent on tile and label, plus a small marker under the label. */
-.nd-item.is-active .nd-tile { background: var(--accent-pale, #fff1e8); color: var(--accent-ink, var(--accent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent); }
+/* Tiles: soft squares in the capsule; in the integrated bar they recede to the icon alone. */
+.nd-tile { position: relative; display: grid; place-items: center; width: var(--nd-tile); height: var(--nd-tile); border-radius: 12px; background: var(--sunk, #f3f4f6); color: var(--ink-2, var(--ink)); transform: translateY(calc((var(--nd-scale, 1) - 1) * -16px)) scale(var(--nd-scale, 1)); transform-origin: 50% 100%; transition: transform .32s var(--nd-spring), background .2s, color .2s, box-shadow .2s; will-change: transform; }
+.nd-tile .icon { width: 20px; height: 20px; }
+@container nd (min-width: 480px) { .nd-tile { --nd-tile: 34px; background: transparent; } }
+
+/* Active: the orange accent — a pale orange tile and orange label, the same in every form. */
+.nd-item.is-active .nd-tile { background: var(--accent-pale, #fff1e8); color: var(--accent-ink, var(--accent)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent); }
 .nd-item.is-active .nd-label { color: var(--accent-ink, var(--accent)); font-weight: 800; }
 
-/* Home: the centre anchor — a larger dark tile; active, it turns solid orange with a soft glow. */
-.nd-home .nd-item { min-width: 66px; }
-.nd-home .nd-tile { --nd-tile: 46px; border-radius: 15px; background: var(--ink, #111827); color: #fff; box-shadow: 0 6px 16px rgb(17 24 39 / 20%); }
+/* Home: the centre anchor — a dark tile; active, solid orange with a soft glow. */
+.nd-home .nd-tile { --nd-tile: 44px; border-radius: 14px; background: var(--ink, #111827); color: #fff; box-shadow: 0 5px 14px rgb(17 24 39 / 18%); }
 .nd-home .nd-tile .icon { width: 22px; height: 22px; }
+@container nd (min-width: 480px) { .nd-home .nd-tile { --nd-tile: 40px; background: var(--ink, #111827); } }
 @media (hover: hover) { .nd-home .nd-item:hover .nd-tile { color: #fff; } }
-.nd-home .nd-item.is-active .nd-tile { background: var(--accent); color: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent), 0 8px 20px color-mix(in srgb, var(--accent) 38%, transparent); }
+.nd-home .nd-item.is-active .nd-tile { background: var(--accent); color: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent), 0 6px 16px color-mix(in srgb, var(--accent) 34%, transparent); }
+.nd-home .nd-item { gap: 3px; }
 
-.nd-badge { position: absolute; top: -5px; right: -7px; min-width: 18px; height: 18px; padding: 0 5px; border: 2px solid var(--card, #fff); border-radius: 10px; background: var(--ink); color: #fff; font: 800 10.5px/14px var(--font, inherit); text-align: center; box-sizing: border-box; }
+.nd-badge { position: absolute; top: -5px; right: -8px; min-width: 18px; height: 18px; padding: 0 5px; border: 2px solid var(--card, #fff); border-radius: 10px; background: var(--ink); color: #fff; font: 800 10.5px/14px var(--font, inherit); text-align: center; box-sizing: border-box; }
 .nd-badge.is-hot { background: var(--accent); }
 
-/* Wide: a floating pill centred on the work area (between the rail and any open right panel). */
-.nav-dock.is-float { position: fixed; bottom: 14px; left: calc(var(--rail, 72px) + (100vw - var(--rail, 72px) - var(--context-offset, 0px)) / 2); transform: translateX(-50%); }
-.nav-dock.is-float .nd-bar { gap: 4px; padding: 8px 12px 7px; border: 1px solid color-mix(in srgb, var(--hair, #e5e7eb) 80%, transparent); border-radius: 22px; background: color-mix(in srgb, var(--card, #fff) 82%, transparent); box-shadow: 0 14px 36px rgb(17 24 39 / 12%), 0 2px 6px rgb(17 24 39 / 5%), inset 0 1px 0 rgb(255 255 255 / 70%); backdrop-filter: blur(18px) saturate(1.6); -webkit-backdrop-filter: blur(18px) saturate(1.6); }
-/* Keyboard focus lifts the focused tile like the pointer does. */
-.nav-dock.can-magnify .nd-item:focus-visible .nd-tile { --nd-scale: 1.18; }
-
-/* Phones and touch: a steady bar — same items, visible labels, 54px targets, no hover effects. */
-.nav-dock.is-mobile { position: fixed; inset: auto 0 0 0; }
-.nav-dock.is-mobile .nd-bar { display: grid; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; align-items: end; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); border-top: 1px solid var(--hair, #e5e7eb); background: color-mix(in srgb, var(--card, #fff) 94%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-.nav-dock.is-mobile .nd-item { width: 100%; min-width: 0; min-height: 54px; align-content: end; padding: 0 2px; font-size: 11px; }
-.nav-dock.is-mobile .nd-tile { --nd-tile: 34px; border-radius: 11px; background: transparent; transform: none; transition: background .18s, color .18s; }
-.nav-dock.is-mobile .nd-item.is-active .nd-tile { background: var(--accent-pale, #fff1e8); box-shadow: none; }
-.nav-dock.is-mobile .nd-home .nd-tile { --nd-tile: 44px; margin-top: -14px; border: 3px solid var(--card, #fff); border-radius: 15px; background: var(--ink, #111827); box-sizing: content-box; }
-.nav-dock.is-mobile .nd-home .nd-item.is-active .nd-tile { background: var(--accent); }
-.nav-dock.is-mobile .nd-label { overflow: hidden; max-width: 100%; text-overflow: ellipsis; }
-@media (prefers-reduced-motion: reduce) { .nd-tile { transition: background .18s, color .18s; } }
+/* Phones: the same flush surface, steady targets, no motion on touch. */
+.nav-dock.is-mobile { left: 50%; }
+.nav-dock.is-mobile .nd-tile { --nd-tile: 34px; background: transparent; transform: none; transition: background .2s, color .2s; }
+.nav-dock.is-mobile .nd-home .nd-tile { --nd-tile: 42px; background: var(--ink, #111827); }
+.nav-dock.is-mobile .nd-item { min-height: 54px; font-size: 11px; }
+@media (prefers-reduced-motion: reduce) { .nd-tile { transition: background .2s, color .2s; } }

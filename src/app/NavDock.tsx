@@ -1,8 +1,8 @@
 // Navigation dock (preview, `?nav=dock`): the one primary navigation, on every screen size.
 // Exactly five destinations — Tasks, Projects, HOME (the centre anchor), Calendar, Inbox.
-// Wide screens with a fine pointer: a floating pill whose icons magnify with pointer proximity
-// (the hovered icon most, neighbours a little), springing back when the pointer leaves.
-// Touch and phones: a steady full-width bottom bar with the same items and labels, no hover effects.
+// One adaptive surface (see ui/nav-dock.css): a compact floating capsule when the work area is spacious,
+// widening into flush, integrated bottom navigation as room shrinks. In the capsule, with a fine pointer,
+// icons magnify with pointer proximity (neighbours a little) and spring back. Touch: steady, no hover.
 // It owns no navigation state: items, counts and actions come from the app's one `navigation` list.
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent, ReactNode } from 'react';
@@ -32,7 +32,8 @@ export function NavDock({ items, onSelect, mobile }: {
 
   // Scale each tile by how close the pointer is to its centre (a smooth cosine falloff).
   function track(event: PointerEvent<HTMLUListElement>) {
-    if (!active || event.pointerType !== 'mouse') return;
+    // Magnify only in the compact capsule; the integrated (wide) bar stays steady.
+    if (!active || event.pointerType !== 'mouse' || (bar.current?.offsetWidth ?? 0) > 480) return;
     const x = event.clientX;
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(() => {

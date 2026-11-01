@@ -91,7 +91,7 @@ export function CollabDock({ quest, company, snap, onSnap, onToggle, tab, onTab,
   const measure = () => {
     const node = dock.current, content = node?.parentElement?.querySelector<HTMLElement>(':scope > .content');
     // Space the shell keeps under the column (the navigation dock, when on) isn't the dock's to take.
-    const reserved = node?.parentElement ? parseFloat(getComputedStyle(node.parentElement).paddingBottom) || 0 : 0;
+    const reserved = node?.parentElement ? (parseFloat(getComputedStyle(node.parentElement).paddingBottom) || 0) + (parseFloat(getComputedStyle(node).marginBottom) || 0) : 0;
     return content ? Math.max(DOCK_RAIL + 120, window.innerHeight - reserved - content.getBoundingClientRect().top) : window.innerHeight - 120;
   };
   const [avail, setAvail] = useState(() => window.innerHeight - 120);
