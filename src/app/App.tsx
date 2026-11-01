@@ -248,11 +248,16 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
     if (taskId !== state.focus?.taskId && !grant) setTaskId(null);
   }, [focused, grant, taskId, state.focus]);
 
+  /** Navigation changes the page: the named page, with no task, project room or draft left over on
+   * top of it. Toolbar tools (Calendar drawer, Ask, Notifications) are separate and stay as they
+   * are, except that going to the full Calendar page closes the Calendar drawer. */
   function go(next: View) {
     next = canonicalPage(next) as View;
     setRequested(next);
     setTaskId(null);
     setRoomId(null);
+    setCreating(false); // an unsaved draft stays saved in this tab and reopens from New task
+    if (next === 'calendar' && calOpen) closeRightPanel();
     history.pushState(null, '', next === 'leads' && leadId ? `#/leads/${leadId}` : `#/${next}`);
   }
   /** Creating → created: the same workspace evolves into the task. Uses a view transition where the
@@ -293,7 +298,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
 
   function openCompleted(scope = registryView.scope) {
     setPreset(current => ({ lens: 'all', changes: completedQuery(scope), nonce: (current?.nonce ?? 0) + 1 }));
-    setRequested('all-tasks'); setTaskId(null);
+    setRequested('all-tasks'); setTaskId(null); setRoomId(null); setCreating(false);
     if (location.hash !== '#/all-tasks/completed') history.pushState(null, '', '#/all-tasks/completed');
   }
 
@@ -302,7 +307,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
     setPreset(current => isCompletedQuery(registryView)
       ? { lens, changes: { ...registryView, lens, status: 'open' }, nonce: (current?.nonce ?? 0) + 1 }
       : { lens, keep: true, nonce: (current?.nonce ?? 0) + 1 });
-    setRequested('all-tasks'); setTaskId(null);
+    setRequested('all-tasks'); setTaskId(null); setRoomId(null); setCreating(false);
     if (location.hash !== `#/all-tasks/${lens}`) history.pushState(null, '', `#/all-tasks/${lens}`);
   }
 
@@ -385,8 +390,10 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
     .map(id => navigation.find(item => item.id === id)).filter(item => !!item)
     .map(item => ({ id: item.id, label: item.id === 'all-tasks' ? 'Tasks' : item.label, count: item.id === 'inbox' ? item.count : undefined, hot: item.hot, active: view === item.id && !(selected && contextAllowed) }));
   // Calendar stays in the rail on wide screens as the calendar quick view (the top bar's Calendar is the full page).
-  // The rail lists what the top navigation doesn't; the calendar lives in the right panel (top-right icon).
-  const railItems = sidebar.isMobile ? navigation : navigation.filter(item => !topSections.some(top => top.id === item.id));
+  // The rail is the navigator's icon form: every destination, same groups and order (Sidebar groups
+  // them with the navigator's own groupSections). Settings is the gear at the rail's foot, so it
+  // isn't listed twice. The calendar quick view is the right panel (top-right Calendar icon).
+  const railItems = sidebar.isMobile ? navigation : navigation.filter(item => item.id !== 'settings');
 
   // Left and right panels keep independent open state (core/layout.ts): opening one never closes the other.
   // Short on room, the left panel narrows first; a right panel that still can't dock becomes a drawer.
@@ -420,11 +427,16 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   // V5/V6 proportions: a 320px right panel on wide screens; narrower below 1280px so both panels still fit beside the center.
   const rightPanelWidth = width >= 1280 ? 320 : 272;
   const room: PulloutRoom = { viewport: width, mobile: sidebar.isMobile, calendarWidth: sidebar.width, notificationsWidth: rightPanelWidth, minCanvasBoth: MIN_CANVAS_BOTH, minCanvas: MIN_CANVAS };
+  // When both panels can't fit, the one opened last wins: expanding the navigator (rail toggle or
+  // seam) closes the right panel; opening a right panel, or the window narrowing, collapses the navigator.
+  const leftWasOpen = useRef(sidebar.open);
   useEffect(() => {
-    if (!sidebar.isMobile && rightPanelOpen && sidebar.open && !bothFit(room)) {
-      restoreCalendar.current = true;
-      sidebar.toggle();
-    }
+    const justOpenedLeft = sidebar.open && !leftWasOpen.current;
+    leftWasOpen.current = sidebar.open;
+    if (sidebar.isMobile || !rightPanelOpen || !sidebar.open || bothFit(room)) return;
+    if (justOpenedLeft) { restoreCalendar.current = false; setNotifOpen(false); setAskOpen(false); setCalOpen(false); return; }
+    restoreCalendar.current = true;
+    sidebar.toggle();
   }, [width, sidebar.width, sidebar.isMobile, rightPanelOpen, sidebar.open]);
   const pullouts: Pullouts = { calendar: !sidebar.isMobile && calendarAllowed && sidebar.open, notifications: rightPanelOpen };
   function showPullouts(next: Pullouts) {
@@ -592,8 +604,8 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
             ...(['inbox', 'needs-attention'] as View[]).map(id => navigation.find(item => item.id === id)).filter(item => !!item),
           ].map(item => {
             return (
-              <button key={item.id} type="button" className={`${view === item.id || (item.id === 'calendar' && calendarShown) ? 'is-active' : ''}`}
-                onClick={() => (item.id === 'all-tasks' ? openLens(registryView.lens) : item.id === 'calendar' ? openCalendar() : go(item.id))}>
+              <button key={item.id} type="button" className={`${view === item.id ? 'is-active' : ''}`}
+                onClick={() => (item.id === 'all-tasks' ? openLens(registryView.lens) : go(item.id))}>
                 {item.icon}<span>{item.label.replace('Owner overview', 'Overview')}</span>
                 {item.hot && <i className="tab-dot" />}
               </button>

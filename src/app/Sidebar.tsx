@@ -11,6 +11,7 @@ import type { CSSProperties, KeyboardEvent, PointerEvent, ReactNode } from 'reac
 import type { Snooze } from '../core/awareness.ts';
 import type { Notification } from './notifications.ts';
 import { useDropdown } from '../ui/useDropdown.tsx';
+import { groupSections } from './WorkNavigator.tsx';
 
 const MOBILE_QUERY = '(max-width: 760px)';
 export const PANEL_MIN = 220;
@@ -256,11 +257,9 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
       <aside className="rail" aria-label="Instrument Rail">
         <div className="sidebar-brand">{brand}</div>
         <nav className="nav" aria-label="Task-HQ sections">
-          <div className="nav-primary">
-            {everyday.filter(item => item.id === 'home' || item.id === 'calendar').map(item => item.id === 'calendar' && calendarAccess ? <div key={item.id} className="rail-calendar-access">{calendarAccess}</div> : railItem(item))}
-          </div>
           <div className="nav-secondary">
-          {everyday.filter(item => item.id !== 'home' && item.id !== 'calendar').map(railItem)}
+          {/* One icon per destination, grouped and ordered exactly like the expanded navigator. */}
+          {groupSections(everyday).map(group => <div key={group.label} className="rail-group" role="group" aria-label={group.label}>{group.items.map(railItem)}</div>)}
           {previews.length > 0 && (
             <>
               <button type="button" className={`nav-item nav-group-toggle ${showPreviews ? 'is-open' : ''}`} aria-expanded={showPreviews} aria-controls="nav-previews"
