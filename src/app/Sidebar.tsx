@@ -33,8 +33,8 @@ function loadPrefs(actor: string): Prefs {
     const raw = JSON.parse(localStorage.getItem(storageKey(actor)) ?? 'null');
     if (!raw || typeof raw !== 'object') return fallback;
     return {
-      // The calendar pullout always starts closed; width, read items, snoozes and the tab are what persist.
-      open: false,
+      // Expanded or collapsed is remembered, like width, read items, snoozes and the tab.
+      open: typeof raw.open === 'boolean' ? raw.open : false,
       width: typeof raw.width === 'number' && !OLD_DEFAULTS.includes(raw.width) ? clampWidth(raw.width) : PANEL_DEFAULT,
       read: Array.isArray(raw.read) ? raw.read.filter((id: unknown): id is string => typeof id === 'string') : [],
       tab: TABS.includes(raw.tab) ? raw.tab : 'inbox',
@@ -259,7 +259,14 @@ export function Sidebar({ control, items, brand, onSelect, create, footer, notif
         </div>
       )}
       <aside className={`rail ${expanded ? 'is-expanded' : ''}`} aria-label="Sidebar">
-        <div className="sidebar-brand">{brand}</div>
+        <div className="rail-head">
+          <div className="sidebar-brand">{brand}</div>
+          {expanded && <span className="rail-title">Workspace</span>}
+          <button type="button" className="rail-collapse" onClick={() => { setHint(null); control.toggle(); }} aria-controls="quest-sidebar" aria-expanded={expanded}
+            aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'} {...(expanded ? {} : hintFor('Expand sidebar'))}>
+            <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d={expanded ? 'M15 6l-6 6 6 6' : 'M9 6l6 6-6 6'} /></svg>
+          </button>
+        </div>
         {expanded ? <div className="rail-tree">{navigator}</div> : <nav className="nav" aria-label="Task-HQ sections">
           <div className="nav-secondary">
           {/* One icon per destination, grouped and ordered exactly like the expanded navigator. */}
