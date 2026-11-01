@@ -14,8 +14,12 @@ const STAGES = [['working', 'In progress'], ['review', 'In review'], ['blocked',
 /** Projects and Team Overview: task completion for a selection, the projects and people behind it, and what needs a hand next.
  * Standard (ring and lists) is the default; Living shows the same records as packed project bubbles. Both share one selection:
  * pick a project or person, pick another to switch, pick it again to clear. */
-export function ProjectTeam({ quest, company, onOpen, focusTaskId = null, onClearFocus, onReports }: {
+export function ProjectTeam({ quest, company, onOpen, focusTaskId = null, onClearFocus, onReports, only, omit = {} }: {
   quest: Quest; company: boolean; onOpen: (taskId: string) => void;
+  /** Render one part on its own (a Home dashboard module). */
+  only?: 'people' | 'needs-hand' | 'next-actions';
+  /** Parts shown elsewhere on the dashboard, so the overview doesn't repeat them. */
+  omit?: { people?: boolean; needsHand?: boolean; nextActions?: boolean };
   /** A task the dock is reading; its project is focused in Living until cleared. */
   focusTaskId?: string | null; onClearFocus?: () => void;
   /** Opens the full Reports page. */
@@ -37,6 +41,52 @@ export function ProjectTeam({ quest, company, onOpen, focusTaskId = null, onClea
   const scope = company ? 'All work you can see' : 'Your work';
   const r = 46, circumference = 2 * Math.PI * r;
   const maxOpen = Math.max(1, ...intel.people.map(item => item.open));
+
+  const peopleList = <>
+          <p className="pt-label">Open work by person</p>
+          {intel.people.length === 0 ? <p className="hd-quiet">Nobody has open work here.</p> : <ul className="pt-list">
+            {intel.people.map(item => (
+              <li key={item.person}>
+                <button type="button" className={`pt-row ${person === item.person ? 'is-on' : ''}`} aria-pressed={person === item.person}
+                  aria-label={`${item.name}: ${item.open} open — ${item.byStatus.working} in progress, ${item.byStatus.review} in review, ${item.byStatus.ready} not started, ${item.byStatus.blocked} blocked${item.waiting ? `, ${item.waiting} waiting on a dependency` : ''}${item.overdue ? `; ${item.overdue} overdue` : ''}`}
+                  onClick={() => setPerson(person === item.person ? null : item.person)}>
+                  <span className="pt-row-top"><span className="pt-name">{item.name}</span><b>{item.open}</b></span>
+                  <span className="pt-stack" aria-hidden="true" style={{ width: `${Math.max(10, Math.round((item.open / maxOpen) * 100))}%` }}>
+                    {(['working', 'review', 'ready', 'blocked'] as const).map(key => item.byStatus[key] > 0 && <i key={key} className={`s-${key}`} style={{ flexGrow: item.byStatus[key] }} />)}
+                  </span>
+                  {(item.overdue > 0 || item.blocked > 0 || item.waiting > 0) && <small>{[item.overdue ? <em key="o" className="is-late">{item.overdue} overdue</em> : null, item.blocked ? <em key="b" className="is-blocked">{item.blocked} blocked</em> : null, item.waiting ? <em key="w" className="is-blocked">{item.waiting} waiting</em> : null].filter(Boolean).map((part, index) => <span key={index}>{index > 0 && ' · '}{part}</span>)}</small>}
+                </button>
+              </li>
+            ))}
+          </ul>}
+          <p className="hd-fine">Counts of assigned open tasks, not hours or capacity.</p>
+  </>;
+  const needsHand = <>
+          <p className="pt-label">Needs a hand</p>
+          {intel.attention.length === 0 ? <p className="hd-quiet">Nothing overdue or blocked here.</p> : <ul className="pt-mini">
+            {intel.attention.slice(0, 3).map(({ task, reason }) => <li key={task.id}><button type="button" onClick={() => onOpen(task.id)}>
+              <strong>{task.title}</strong><small><em className={reason === 'Overdue' ? 'is-late' : 'is-blocked'}>{reason}</em> · {firstName(state, task.owner, 'Unassigned')}</small>
+            </button></li>)}
+          </ul>}
+  </>;
+  const nextActions = <>
+          <p className="pt-label">Next actions</p>
+          {intel.next.length === 0 ? <p className="hd-quiet">No open work ready to move.</p> : <ul className="pt-mini">
+            {intel.next.map(task => <li key={task.id}><button type="button" onClick={() => onOpen(task.id)}>
+              <strong>{task.nextAction || task.title}</strong><small>{task.nextAction ? `${task.title} · ` : ''}{firstName(state, task.owner, 'Unassigned')}{task.due ? ` · due ${shortDate(task.due, today)}` : ''}{task.projectId ? ` · ${projectName(state, task.projectId)}` : ''}</small>
+            </button></li>)}
+          </ul>}
+  </>;
+
+  // One part on its own, as a Home module (same data, same interactions as inside the overview).
+  if (only) {
+    const titles = { people: 'Open work by person', 'needs-hand': 'Needs a hand', 'next-actions': 'Next actions' } as const;
+    return (
+      <section className="hd-panel pt pt-part" aria-label={titles[only]}>
+        {only === 'people' ? (company ? peopleList : <p className="hd-quiet">Open work by person is shown to people who can see company work.</p>) : only === 'needs-hand' ? needsHand : nextActions}
+      </section>
+    );
+  }
 
   return (
     <section className="hd-panel pt" aria-labelledby="pt-title">
@@ -90,45 +140,19 @@ export function ProjectTeam({ quest, company, onOpen, focusTaskId = null, onClea
           </ul>}
         </div>
 
-        {company && <div className="pt-col">
-          <p className="pt-label">Open work by person</p>
-          {intel.people.length === 0 ? <p className="hd-quiet">Nobody has open work here.</p> : <ul className="pt-list">
-            {intel.people.map(item => (
-              <li key={item.person}>
-                <button type="button" className={`pt-row ${person === item.person ? 'is-on' : ''}`} aria-pressed={person === item.person}
-                  aria-label={`${item.name}: ${item.open} open — ${item.byStatus.working} in progress, ${item.byStatus.review} in review, ${item.byStatus.ready} not started, ${item.byStatus.blocked} blocked${item.waiting ? `, ${item.waiting} waiting on a dependency` : ''}${item.overdue ? `; ${item.overdue} overdue` : ''}`}
-                  onClick={() => setPerson(person === item.person ? null : item.person)}>
-                  <span className="pt-row-top"><span className="pt-name">{item.name}</span><b>{item.open}</b></span>
-                  <span className="pt-stack" aria-hidden="true" style={{ width: `${Math.max(10, Math.round((item.open / maxOpen) * 100))}%` }}>
-                    {(['working', 'review', 'ready', 'blocked'] as const).map(key => item.byStatus[key] > 0 && <i key={key} className={`s-${key}`} style={{ flexGrow: item.byStatus[key] }} />)}
-                  </span>
-                  {(item.overdue > 0 || item.blocked > 0 || item.waiting > 0) && <small>{[item.overdue ? <em key="o" className="is-late">{item.overdue} overdue</em> : null, item.blocked ? <em key="b" className="is-blocked">{item.blocked} blocked</em> : null, item.waiting ? <em key="w" className="is-blocked">{item.waiting} waiting</em> : null].filter(Boolean).map((part, index) => <span key={index}>{index > 0 && ' · '}{part}</span>)}</small>}
-                </button>
-              </li>
-            ))}
-          </ul>}
-          <p className="hd-fine">Counts of assigned open tasks, not hours or capacity.</p>
+        {company && !omit.people && <div className="pt-col">
+          {peopleList}
         </div>}
       </div>
 
-      <div className="pt-actions">
-        <div>
-          <p className="pt-label">Needs a hand</p>
-          {intel.attention.length === 0 ? <p className="hd-quiet">Nothing overdue or blocked here.</p> : <ul className="pt-mini">
-            {intel.attention.slice(0, 3).map(({ task, reason }) => <li key={task.id}><button type="button" onClick={() => onOpen(task.id)}>
-              <strong>{task.title}</strong><small><em className={reason === 'Overdue' ? 'is-late' : 'is-blocked'}>{reason}</em> · {firstName(state, task.owner, 'Unassigned')}</small>
-            </button></li>)}
-          </ul>}
-        </div>
-        <div>
-          <p className="pt-label">Next actions</p>
-          {intel.next.length === 0 ? <p className="hd-quiet">No open work ready to move.</p> : <ul className="pt-mini">
-            {intel.next.map(task => <li key={task.id}><button type="button" onClick={() => onOpen(task.id)}>
-              <strong>{task.nextAction || task.title}</strong><small>{task.nextAction ? `${task.title} · ` : ''}{firstName(state, task.owner, 'Unassigned')}{task.due ? ` · due ${shortDate(task.due, today)}` : ''}{task.projectId ? ` · ${projectName(state, task.projectId)}` : ''}</small>
-            </button></li>)}
-          </ul>}
-        </div>
-      </div>
+      {!(omit.needsHand && omit.nextActions) && <div className="pt-actions">
+        {!omit.needsHand && <div>
+          {needsHand}
+        </div>}
+        {!omit.nextActions && <div>
+          {nextActions}
+        </div>}
+      </div>}
       {onReports && <footer className="pt-foot"><button type="button" className="hd-more pt-reports" onClick={onReports}>View reports<svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg></button></footer>}
     </section>
   );

@@ -746,3 +746,50 @@ button:is(.hd-person, .hd-act):hover { background: var(--surface-2); }
 .tp-draft-status { background: var(--accent-pale); color: var(--accent-ink); }
 .task-page .tp-title::placeholder { color: var(--faint); }
 .tp-collab-draft { margin: 0; }
+
+/* Personal dashboard (app/dashboard/Dashboard.tsx): a 12-column grid; each module's size picks a span.
+   Narrow screens collapse spans so modules stay readable; phones are a single column. */
+.dash { display: grid; gap: 10px; }
+.dash-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-height: 32px; }
+.dash-edit .icon { width: 16px; height: 16px; }
+.dash-notice { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 14px; text-align: right; }
+.dash-tools { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 12px; background: var(--accent-pale, #fff4ed); }
+.dash-tools-title { margin-right: 4px; color: var(--accent-ink); }
+.dash-tool select { min-height: 32px; max-width: 240px; padding: 0 8px; border: 1px solid var(--hair); border-radius: 8px; background: var(--card, #fff); font: inherit; font-size: 14px; }
+.dash-tools-end { display: flex; gap: 8px; margin-left: auto; }
+.dash-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.dash-item { min-width: 0; }
+.dash-item.size-s { grid-column: span 4; }
+.dash-item.size-m { grid-column: span 6; }
+.dash-item.size-l { grid-column: span 8; }
+.dash-item.size-xl { grid-column: span 12; }
+/* Panels get their card frame from the cell (the wallboard theme draws panels borderless). */
+.dash-item:not([data-module="welcome"]):not([data-module="performance"]) { overflow: hidden; border: 1px solid var(--hair, #e5e7eb); border-radius: 12px; background: var(--card, #fff); box-shadow: 0 1px 2px rgb(17 24 39 / 4%); }
+.dash-item > .hd-panel, .dash-item-body > .hd-panel { height: 100%; box-sizing: border-box; }
+/* Editing: a quiet frame, a handle and controls; the module itself can't be clicked. */
+.dash-item.is-edit { position: relative; display: flex; flex-direction: column; outline: 1px dashed var(--line-2, #d1d5db); outline-offset: 3px; border-radius: 12px; }
+.dash-item.is-edit .dash-item-body { flex: 1 1 auto; min-height: 0; max-height: 420px; overflow: hidden; opacity: .9; }
+.dash-item.is-dragging { opacity: .4; }
+.dash-item.drop-before { box-shadow: -4px 0 0 var(--accent), 0 -4px 0 var(--accent); }
+.dash-item.drop-after { box-shadow: 4px 0 0 var(--accent), 0 4px 0 var(--accent); }
+.dash-item-bar { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 8px; border-bottom: 1px solid var(--hair); background: var(--surface-2, #f7f7f8); }
+.dash-handle { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: grab; touch-action: none; }
+.dash-handle:active { cursor: grabbing; }
+.dash-handle:hover, .dash-handle:focus-visible { background: var(--card, #fff); color: var(--ink); }
+.dash-handle .icon { width: 18px; height: 18px; stroke-width: 3.2; }
+.dash-item-name { flex: 1 1 auto; min-width: 0; overflow: hidden; font-size: 14px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.dash-item-actions { display: flex; flex: none; align-items: center; gap: 4px; }
+.dash-item-actions .icon-btn { min-width: 30px; min-height: 30px; }
+.dash-sizes button { min-height: 28px; padding: 0 8px; font-size: 12px; }
+.dash-empty { grid-column: 1 / -1; padding: 28px; border: 1px dashed var(--line-2, #d1d5db); border-radius: 12px; color: var(--muted); text-align: center; }
+@media (max-width: 1100px) {
+  .dash-item.size-s, .dash-item.size-m { grid-column: span 6; }
+  .dash-item.size-l, .dash-item.size-xl { grid-column: span 12; }
+}
+@media (max-width: 760px) {
+  .dash-grid { grid-template-columns: minmax(0, 1fr); }
+  .dash-item[class*="size-"] { grid-column: 1 / -1; }
+  .dash-tools-end { width: 100%; margin-left: 0; }
+  .dash-tool, .dash-tool select { flex: 1 1 100%; max-width: none; width: 100%; }
+  .dash-sizes { display: none; } /* one column on phones: size has no effect */
+}

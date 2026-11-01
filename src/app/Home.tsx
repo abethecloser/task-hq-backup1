@@ -3,7 +3,11 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { QuestEvent, QuestState } from '../core/contract.ts';
 import { compose } from '../core/compose.ts';
-import { ago, atRisk, homeMetrics, performance } from '../core/dashboard.ts';
+import { ago, atRisk, homeMetrics, performance, recentActivity } from '../core/dashboard.ts';
+import { DEFAULT_ITEMS } from '../core/dashboard-layout.ts';
+import type { DashboardLayout, ModuleSize } from '../core/dashboard-layout.ts';
+import { Dashboard } from './dashboard/Dashboard.tsx';
+import type { DashboardModule } from './dashboard/Dashboard.tsx';
 import { HOME_PERIODS, HOME_PERIOD_LABELS, inHomePeriod, loadHomePeriod, riskInPeriod, saveHomePeriod } from '../core/home-period.ts';
 import type { HomePeriod } from '../core/home-period.ts';
 import { DEFAULT_QUERY, queryTasks } from '../core/registry.ts';
@@ -67,14 +71,15 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
     : nextTask?.status === 'blocked' ? 'Review blocker'
     : 'Open next task';
 
-  return (
-    <div className="view home-dash">
-      {/* New task lives in the top bar; the banner keeps only the next step. */}
+  const shown = (layout: DashboardLayout, id: string) => layout.items.some(item => item.id === id);
+  // Home's sections as dashboard modules: the same components and data as before, now arrangeable.
+  const modules: DashboardModule[] = [
+    { id: 'welcome', name: 'Welcome', description: 'Greeting and your next step', sizes: ['l', 'xl'], defaultSize: 'xl', render: () => <>
       <Hero eyebrow={greeting.eyebrow} primary={greeting.primary} support={greeting.support} banner={banner}>
         {next && <button type="button" className="btn btn-primary btn-sm cta-fill" title={nextTask?.title || next.headline} onClick={() => next.taskId ? onOpen(next.taskId) : next.leadId && onOpenLead(next.leadId)}><span className="cta-fill-label">{nextLabel}</span><CtaArrow /></button>}
       </Hero>
-
-      {/* Your performance, scoped by the dashboard period (which also scopes Up next and At risk below). */}
+    </> },
+    { id: 'performance', name: 'Performance', description: 'Completed, open, due and blocked', sizes: ['m', 'l', 'xl'], defaultSize: 'xl', render: () => <>
       <section className="hd-perf" aria-labelledby="hd-perf-title">
         <div className="hd-perf-head">
           <h2 id="hd-perf-title">Your performance</h2>
@@ -89,10 +94,8 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
           <PerfMetric value={blockedCount} label="Blocked" tone="stop" onClick={() => onRegistry('all', { scope: 'mine', status: 'blocked' })} hint="Open your blocked work" />
         </div>
       </section>
-
-      {/* One workspace surface: queue and risk, then intel and culture. Conversation and activity live in the bottom collaboration dock. */}
-      <div className="hd-workspace">
-      <div className="hd-top">
+    </> },
+    { id: 'up-next', name: 'Up next', description: 'Your queue by priority and due date', sizes: ['s', 'm', 'l', 'xl'], defaultSize: 'm', render: () => <>
         <section className="hd-panel" aria-labelledby="hd-next">
           <PanelHead id="hd-next" title="Up next" sub={`Your queue · ${period === 'today' ? 'today' : 'this week'} · by priority & due date`} tone="accent" icon={<path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5" />}
             more={queue.length > 0 ? { label: `View all (${metrics.active})`, onClick: () => onRegistry('all', { scope: 'mine' }) } : undefined} />
@@ -120,6 +123,8 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
                 })}
               </ul>}
         </section>
+    </> },
+    { id: 'at-risk', name: 'At risk', description: 'Work that needs attention', sizes: ['s', 'm', 'l', 'xl'], defaultSize: 'm', render: () => <>
         <section className="hd-panel" aria-labelledby="hd-risk">
           <PanelHead id="hd-risk" title="At risk" sub={`Needs attention · ${period === 'today' ? 'today' : 'this week'}`} tone="stop" icon={<path d="M12 4 21 20H3zM12 10v4M12 17v.5" />}
             more={risks.length > 4 ? { label: allRisks ? 'Show fewer' : `View all (${risks.length})`, onClick: () => setAllRisks(value => !value) } : undefined} />
@@ -136,14 +141,37 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
                 ))}
               </ul>}
         </section>
-      </div>
+    </> },
+    { id: 'projects', name: 'Projects and Team Overview', description: 'Progress by project and person', sizes: ['m', 'l', 'xl'], defaultSize: 'l',
+      render: ({ layout }) => <ProjectTeam quest={quest} company={company} onOpen={onOpen} focusTaskId={focusTaskId} onClearFocus={onClearFocus} onReports={onReports}
+        omit={{ people: shown(layout, 'people'), needsHand: shown(layout, 'needs-hand'), nextActions: shown(layout, 'next-actions') }} /> },
+    ...(company ? [{ id: 'people', name: 'Open work by person', description: 'Who holds open work', sizes: ['s', 'm', 'l'] as ModuleSize[], defaultSize: 'm' as ModuleSize,
+      render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} only="people" /> }] : []),
+    { id: 'needs-hand', name: 'Needs a hand', description: 'Overdue and blocked work', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} only="needs-hand" /> },
+    { id: 'next-actions', name: 'Next actions', description: 'Open work ready to move', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <ProjectTeam quest={quest} company={company} onOpen={onOpen} only="next-actions" /> },
+    { id: 'culture', name: 'Quest Culture', description: 'Culture spotlight', sizes: ['s', 'm', 'l'], defaultSize: 's',
+      // Video and Team Moments are tabs here unless they're shown as their own modules.
+      render: ({ layout }) => <CultureSpotlight items={culture} slots={CULTURE_SLOTS.map(slot => slot.id).filter(id => id === 'culture' || !shown(layout, id))} /> },
+    { id: 'video', name: 'Video', description: 'Video of the week', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <CultureSpotlight items={culture} slots={['video']} /> },
+    { id: 'moments', name: 'Team Moments', description: 'Achievements and milestones', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <CultureSpotlight items={culture} slots={['moments']} /> },
+    { id: 'activity', name: 'Activity', description: 'Recent changes across your work', sizes: ['s', 'm', 'l'], defaultSize: 's', render: () => <ActivityModule quest={quest} company={company} onOpen={onOpen} /> },
+  ];
 
-      <div className="hd-row3 is-bottom is-intel">
-        <ProjectTeam quest={quest} company={company} onOpen={onOpen} focusTaskId={focusTaskId} onClearFocus={onClearFocus} onReports={onReports} />
-        <CultureSpotlight items={culture} />
-      </div>
-      </div>
+  return (
+    <div className="view home-dash">
+      <Dashboard pageId="home" scope={state.workspace.tenantId} actor={actor} modules={modules} defaultItems={DEFAULT_ITEMS} />
     </div>
+  );
+}
+
+/** Recent activity on the work you can see (the same feed the dock and Activity page read). */
+function ActivityModule({ quest, company, onOpen }: { quest: Quest; company: boolean; onOpen: (id: string) => void }) {
+  const events = recentActivity(quest.state, quest.actor, company, 6);
+  return (
+    <section className="hd-panel" aria-labelledby="hd-activity">
+      <PanelHead id="hd-activity" title="Activity" sub="Recent changes" tone="neutral" icon={<path d="M4 12h4l3-7 3 14 3-7h3" />} />
+      {events.length === 0 ? <p className="hd-quiet">No recent activity.</p> : <ul className="hd-list hd-feed">{events.map(event => <li key={event.id}><Recent event={event} quest={quest} onOpen={onOpen} /></li>)}</ul>}
+    </section>
   );
 }
 
@@ -197,19 +225,20 @@ function PanelHead({ id, title, sub, tone, icon, more }: { id: string; title: st
 }
 
 /** Culture, Video of the Week and Team Moments. Renders configured content only; otherwise an honest placeholder. */
-function CultureSpotlight({ items }: { items: CultureItem[] }) {
-  const [slot, setSlot] = useState<CultureSlot>('culture');
+function CultureSpotlight({ items, slots: allowed }: { items: CultureItem[]; slots?: CultureSlot[] }) {
+  const SLOTS = allowed ? CULTURE_SLOTS.filter(entry => allowed.includes(entry.id)) : CULTURE_SLOTS;
+  const [slot, setSlot] = useState<CultureSlot>(SLOTS[0]!.id);
   const [index, setIndex] = useState(0);
   const inSlot = items.filter(item => item.slot === slot);
   const item = inSlot[Math.min(index, inSlot.length - 1)];
-  const meta = CULTURE_SLOTS.find(entry => entry.id === slot)!;
+  const meta = SLOTS.find(entry => entry.id === slot) ?? SLOTS[0]!;
   const choose = (next: CultureSlot) => { setSlot(next); setIndex(0); };
   // Arrows page through this tab's items, then move on to the next tab.
   const step = (dir: 1 | -1) => {
     const next = index + dir;
     if (next >= 0 && next < inSlot.length) { setIndex(next); return; }
-    const at = CULTURE_SLOTS.findIndex(entry => entry.id === slot);
-    const target = CULTURE_SLOTS[(at + dir + CULTURE_SLOTS.length) % CULTURE_SLOTS.length]!.id;
+    const at = SLOTS.findIndex(entry => entry.id === slot);
+    const target = SLOTS[(at + dir + SLOTS.length) % SLOTS.length]!.id;
     setSlot(target);
     setIndex(dir === 1 ? 0 : Math.max(0, items.filter(entry => entry.slot === target).length - 1));
   };
@@ -217,7 +246,7 @@ function CultureSpotlight({ items }: { items: CultureItem[] }) {
     <section className="hd-panel hd-culture" aria-label="Quest Culture spotlight">
       <div className="hd-culture-head">
         <div className="hd-culture-tabs" role="tablist" aria-label="Spotlight">
-          {CULTURE_SLOTS.map(entry => <button key={entry.id} type="button" role="tab" id={`cult-${entry.id}`} aria-selected={slot === entry.id} aria-controls="cult-panel" onClick={() => choose(entry.id)}>{entry.label}</button>)}
+          {SLOTS.map(entry => <button key={entry.id} type="button" role="tab" id={`cult-${entry.id}`} aria-selected={slot === entry.id} aria-controls="cult-panel" onClick={() => choose(entry.id)}>{entry.label}</button>)}
         </div>
         <span className="hd-culture-arrows">
           <button type="button" className="icon-btn" aria-label="Previous" onClick={() => step(-1)}><Chevron left /></button>
