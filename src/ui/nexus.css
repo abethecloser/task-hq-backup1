@@ -1334,3 +1334,55 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
 .is-archived-record > :not(.tp-bar):not(.tp-legacy):not(.pr-archived) { filter: grayscale(1); opacity: .62; transition: opacity .2s; }
 .is-archived-record > :not(.tp-bar):not(.tp-legacy):not(.pr-archived):hover { opacity: .85; }
 .is-archived-record .tp-legacy, .is-archived-record .pr-archived { padding: 12px 14px; border: 1px dashed var(--line-2, var(--hair)); border-radius: 12px; background: var(--card); }
+
+/* ── Adaptive task rows: who acts now, adjustable density, opened in place ── */
+.row-signal b { color: var(--ink-2); font-weight: 650; }
+.row-signal.is-mine b { color: var(--accent-ink); }
+.row-signal.tone-stop b { color: var(--danger, #b42318); }
+.row-evidence { color: var(--faint); font-size: 14px; white-space: normal; }
+.cell-task-text { flex: 1; }
+.row-peek { display: inline-grid; flex: none; place-items: center; width: 32px; height: 32px; margin-left: auto; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; transition: background .14s, color .14s, transform .1s; }
+.row-peek:hover { background: var(--surface-3, #efefef); color: var(--ink); }
+.row-peek:active { transform: scale(.92); }
+.row-peek .icon { transition: transform .22s cubic-bezier(.2, .7, .2, 1); }
+.row-peek[aria-expanded="true"] { color: var(--accent-ink); }
+.row-peek[aria-expanded="true"] .icon { transform: rotate(180deg); }
+.registry-row.is-peeked { box-shadow: inset 3px 0 0 var(--accent); }
+.registry-row.is-peeked:hover { background: transparent; }
+
+.registry-table > .task-peek { padding-inline: var(--bleed, 16px); }
+.task-peek { display: grid; grid-template-rows: 1fr; box-shadow: inset 3px 0 0 var(--accent); view-transition-name: task-workspace; animation: task-peek-open .24s cubic-bezier(.2, .7, .2, 1); }
+.task-peek-clip { min-width: 0; min-height: 0; overflow: hidden; animation: task-peek-unclip 0s .24s forwards; }
+@keyframes task-peek-open { from { grid-template-rows: 0fr; opacity: 0; } }
+@keyframes task-peek-unclip { to { overflow: visible; } }
+.task-peek-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 28px; padding: 4px 0 16px 34px; }
+.task-peek-act { display: grid; align-content: start; gap: 12px; min-width: 0; }
+.task-peek .situation .people { display: none; } /* The card above already names them. */
+.task-peek-evidence { min-width: 0; }
+.task-peek-evidence .task-conversation-feed { max-height: 260px; overflow-y: auto; }
+.task-peek-foot { display: flex; flex-wrap: wrap; grid-column: 1 / -1; gap: 8px; padding-top: 12px; border-top: 1px solid var(--hair); }
+
+/* Compact: one line per task. Alerts stay visible through the flags and the state dot. */
+.density-compact .registry-row:not(.is-head) { min-height: 44px; padding-block: 4px; }
+.density-compact .cell-task { align-items: center; }
+.density-compact .cell-task .state-dot { margin-top: 0; }
+.density-compact .cell-task-text { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+.density-compact .cell-task-text strong { font-size: 16px; }
+.density-compact .cell-task-text > small, .density-compact .cell-project { display: none; }
+
+@container (max-width: 800px) {
+  .task-peek-body { grid-template-columns: minmax(0, 1fr); padding-left: 0; }
+}
+@container (max-width: 700px) {
+  .row-peek { width: 44px; height: 44px; margin-block: -6px; }
+  .density-compact .registry-row > :nth-child(n + 4) { display: none; }
+  .registry-meta { flex-wrap: wrap; gap: 6px 8px; }
+  .registry-meta .filters-count { flex-basis: 100%; }
+  .registry-meta .segmented button { min-height: 44px; padding-inline: 8px; }
+}
+@media (pointer: coarse) { .row-peek { width: 44px; height: 44px; } .registry-meta .segmented button { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) {
+  .task-peek, .task-peek-clip { animation: none; }
+  .task-peek-clip { overflow: visible; }
+  .row-peek, .row-peek .icon { transition: none; }
+}

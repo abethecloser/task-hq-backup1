@@ -164,7 +164,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   const [askOpenLast, setAskOpenLast] = useState(false);
   const [calOpen, setCalOpen] = useState(false);
   // Which task view and scope All Tasks is showing, for the top-bar tabs.
-  const registry = useRegistryPrefs(state.workspace.tenantId, actor);
+  const registry = useRegistryPrefs(state.workspace.tenantId, actor, person(state, actor));
   const registryView = registry.prefs.query;
   const [feedbackId, setFeedbackId] = useState<string | null>(initial.feedbackId);
   const [reviewRequest, setReviewRequest] = useState(0);

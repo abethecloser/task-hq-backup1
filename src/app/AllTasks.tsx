@@ -6,19 +6,27 @@ import { feedbackAttributes } from '../ui/Feedback.tsx';
 // and five lenses (All tasks, Urgent, Today, Overdue, Watching), dense table or
 // status board. Selecting a row opens it in the right-hand context panel; the
 // row's own control moves the work forward without leaving the list.
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Task } from '../core/contract.ts';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { flushSync } from 'react-dom';
+import type { Person, Task } from '../core/contract.ts';
 import { STATUS_LABELS } from '../core/contract.ts';
 import { BOARD_ORDER, DEFAULT_QUERY, LEGACY_LENSES, LENSES, LENS_HINTS, LENS_LABELS, SORT_LABELS, boardColumns, isCompletedQuery, queryTasks, rowFlags } from '../core/registry.ts';
 import type { Lens, RegistryQuery, Scope, SortKey, StatusFilter } from '../core/registry.ts';
-import { activeProjects, firstName, nameOf, projectName } from '../core/selectors.ts';
+import { activeGrant, activeProjects, firstName, inFocus, nameOf, projectName } from '../core/selectors.ts';
+import { DENSITIES, DENSITY_LABELS, asDensity, defaultScope, rowEvidence, rowSignal } from '../core/task-surface.ts';
+import type { Density } from '../core/task-surface.ts';
 import { bulkPlan, bulkSummary } from '../core/bulk.ts';
 import type { BulkKind } from '../core/bulk.ts';
 import { completionDetails } from '../core/completed.ts';
 import { localDate, shortDate } from '../core/time.ts';
 import { Avatar, Empty } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
+import { ResponsibilityCard } from '../ui/ResponsibilityCard.tsx';
 import { JobPicker } from './JobPicker.tsx';
+import { TaskConversation } from './TaskComments.tsx';
+import { CopyTaskLink } from './TaskPage.tsx';
+import { TaskSituation } from './WorkSurface.tsx';
 import { AssigneeSelect, DueInput, PrioritySelect, StatusMenu } from './TaskControls.tsx';
 import { ActiveFilters, FILTER_DEFAULTS, FilterSection, activeFilterCount, filterFields, sameFilters } from './RegistryFilters.tsx';
 import type { DraftEdit, FilterFields } from './RegistryFilters.tsx';
@@ -34,28 +42,31 @@ export const LENS_ICONS: Record<Lens, string> = {
 };
 const prefKey = (tenant: string, actor: string) => `quest.registry.v1.${tenant}.${actor}`;
 
-function loadPrefs(key: string): { query: RegistryQuery; layout: Layout } {
+function loadPrefs(key: string, scope: Scope): { query: RegistryQuery; layout: Layout; density: Density } {
   try {
     const raw = JSON.parse(localStorage.getItem(key) ?? 'null');
     if (raw && typeof raw === 'object') {
       const query = { ...DEFAULT_QUERY, ...raw.query, ...LEGACY_LENSES[raw.query?.lens], search: '' };
-      return { query: LENSES.includes(query.lens) ? query : { ...query, lens: 'all' }, layout: raw.layout === 'board' ? 'board' : 'table' };
+      return { query: LENSES.includes(query.lens) ? query : { ...query, lens: 'all' }, layout: raw.layout === 'board' ? 'board' : 'table', density: asDensity(raw.density) };
     }
   } catch { /* preferences are optional */ }
-  return { query: DEFAULT_QUERY, layout: 'table' };
+  return { query: { ...DEFAULT_QUERY, scope }, layout: 'table', density: 'standard' };
 }
 
 /** Owned by the shell so leaving the registry keeps the current search and filters. */
-export function useRegistryPrefs(tenant: string, actor: string) {
+export function useRegistryPrefs(tenant: string, actor: string, me?: Person) {
   const key = prefKey(tenant, actor);
-  const [stored, setStored] = useState(() => ({ key, prefs: loadPrefs(key) }));
-  const prefs = stored.key === key ? stored.prefs : loadPrefs(key);
+  const scope = defaultScope(me);
+  const [stored, setStored] = useState(() => ({ key, prefs: loadPrefs(key, scope) }));
+  const prefs = stored.key === key ? stored.prefs : loadPrefs(key, scope);
   if (stored.key !== key) setStored({ key, prefs });
   useEffect(() => { try { localStorage.setItem(key, JSON.stringify(prefs)); } catch { /* this page only */ } }, [key, prefs]);
   const setPrefs = (update: (current: typeof prefs) => typeof prefs) => {
-    setStored(current => ({ key, prefs: update(current.key === key ? current.prefs : loadPrefs(key)) }));
+    setStored(current => ({ key, prefs: update(current.key === key ? current.prefs : loadPrefs(key, scope)) }));
   };
-  return { prefs, setPrefs };
+  // The row open in place. Kept by the shell so Back from the full task returns to it; never stored.
+  const [peek, setPeek] = useState<string | null>(null);
+  return { prefs, setPrefs, peek, setPeek };
 }
 
 /** A jump into the registry from elsewhere: lens plus filters, applied once per nonce. Scope is kept unless the changes set it.
@@ -161,6 +172,9 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
         <span className="registry-meta">
           <span className="filters-count">{tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}</span>
           {filtered && <button type="button" className="link" onClick={() => { set({ ...DEFAULT_QUERY, scope: query.scope, lens: query.lens, sort: query.sort }); setPendingDraft(null); }}>Clear filters</button>}
+          {prefs.layout === 'table' && <span className="segmented registry-density" role="group" aria-label="Density">
+            {DENSITIES.map(density => <button key={density} type="button" aria-pressed={prefs.density === density} className={prefs.density === density ? 'is-on' : ''} onClick={() => setPrefs(current => ({ ...current, density }))}>{DENSITY_LABELS[density]}</button>)}
+          </span>}
           <span className="segmented" role="group" aria-label="Layout">
             <button type="button" aria-pressed={prefs.layout === 'table'} className={prefs.layout === 'table' ? 'is-on' : ''} onClick={() => setPrefs(current => ({ ...current, layout: 'table' }))}>List</button>
             <button type="button" aria-pressed={prefs.layout === 'board'} className={prefs.layout === 'board' ? 'is-on' : ''} onClick={() => setPrefs(current => ({ ...current, layout: 'board' }))}>Board</button>
@@ -181,7 +195,7 @@ export function AllTasks({ quest, selectedId, onSelect, onCreate, canCreate, pre
           : <>
             {bulkResult && <p className="bulk-result" role="status">{bulkResult} <button type="button" className="link" onClick={() => setBulkResult('')}>Dismiss</button></p>}
             {selection.length > 0 && <BulkBar quest={quest} ids={selection} onResult={setBulkResult} onDone={() => setPicked(new Set())} />}
-            <Table quest={quest} tasks={tasks} selectedId={selectedId} onSelect={onSelect} picked={new Set(selection)} onPick={toggle} onPickAll={toggleAll} />
+            <Table quest={quest} tasks={tasks} selectedId={selectedId} onSelect={onSelect} picked={new Set(selection)} onPick={toggle} onPickAll={toggleAll} density={prefs.density} peek={registry.peek} onPeek={registry.setPeek} />
           </>}
     </div>
   );
@@ -203,22 +217,74 @@ function Flags({ quest, task, priority = true }: { quest: Quest; task: Task; pri
   );
 }
 
-function Table({ quest, tasks, selectedId, onSelect, picked, onPick, onPickAll }: {
+/** Opening the full task grows out of the open row: the same surface, where the browser can show it. */
+function openWithMotion(open: () => void) {
+  const doc = document as Document & { startViewTransition?: (update: () => void) => unknown };
+  if (!doc.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) { open(); return; }
+  doc.startViewTransition(() => flushSync(open));
+}
+
+/** One row, opened in place: who holds the work and the moves this person may make, beside the
+ * conversation and history. The engine's offers decide the actions, exactly as on the full task. */
+function TaskPeek({ quest, task, onOpen, onClose }: { quest: Quest; task: Task; onOpen: (id: string) => void; onClose: () => void }) {
+  const onKeyDown = (event: ReactKeyboardEvent) => {
+    if (event.key !== 'Escape' || event.defaultPrevented || (event.target as HTMLElement).closest('input, textarea, select, [contenteditable="true"]')) return;
+    event.stopPropagation();
+    onClose();
+  };
+  return (
+    <div role="row" id={`peek-${task.id}`} className="task-peek" onKeyDown={onKeyDown}>
+      <div role="cell" className="task-peek-clip">
+        <div className="task-peek-body">
+          <section className="task-peek-act" aria-label={`What happens next on ${task.title}`}>
+            <ResponsibilityCard state={quest.state} task={task} actor={quest.actor} />
+            <TaskSituation quest={quest} taskId={task.id} onOpen={id => openWithMotion(() => onOpen(id))} />
+          </section>
+          <section className="task-peek-evidence" aria-label={`Comments and history of ${task.title}`}>
+            <TaskConversation quest={quest} taskId={task.id} compact />
+          </section>
+          <footer className="task-peek-foot">
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => openWithMotion(() => onOpen(task.id))}>Open full task</button>
+            <CopyTaskLink quest={quest} taskId={task.id} />
+          </footer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Table({ quest, tasks, selectedId, onSelect, picked, onPick, onPickAll, density, peek, onPeek }: {
   quest: Quest; tasks: Task[]; selectedId: string | null; onSelect: (id: string) => void;
   picked: Set<string>; onPick: (id: string) => void; onPickAll: () => void;
+  density: Density; peek: string | null; onPeek: (id: string | null) => void;
 }) {
-  const { state, now } = quest;
+  const { state, now, actor } = quest;
   const all = tasks.length > 0 && tasks.every(task => picked.has(task.id));
+  // Only Ultra Focus narrows what opens, the same rule as the full task page.
+  const focused = inFocus(state, actor) && !activeGrant(state, actor, now);
+  const canPeek = (task: Task) => !focused || task.id === state.focus?.taskId;
+  const toggleFor = (id: string) => document.getElementById(`peek-toggle-${id}`);
+  const closePeek = (id: string) => { onPeek(null); toggleFor(id)?.focus(); };
+  // Back from the full task: return to the open row instead of the top of the list.
+  useEffect(() => {
+    if (!peek) return;
+    toggleFor(peek)?.scrollIntoView({ block: 'center' });
+    toggleFor(peek)?.focus({ preventScroll: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
-    <div className="registry-table" role="table" aria-label="Tasks">
+    <div className={`registry-table density-${density}`} role="table" aria-label="Tasks">
       <div className="registry-row is-head" role="row">
         <span role="columnheader" className="cell-task"><input type="checkbox" className="row-pick" aria-label={all ? 'Clear selection' : `Select all ${tasks.length} tasks`} checked={all} ref={box => { if (box) box.indeterminate = !all && picked.size > 0; }} onChange={onPickAll} />Task</span><span role="columnheader">Assigned</span><span role="columnheader">Status</span><span role="columnheader">Priority</span><span role="columnheader">Due</span>
       </div>
       {tasks.map((task, index) => {
         const flags = rowFlags(state, task, now);
+        const signal = rowSignal(state, task, actor);
+        const opened = peek === task.id && canPeek(task);
         return (
-          <div key={task.id} role="row" style={{ ['--i' as string]: Math.min(index, 12) }}
-            {...feedbackAttributes(quest.feedback?.record(task.id))} data-feedback-record={task.id} className={`registry-row status-${task.status} ${task.id === selectedId ? 'is-selected' : ''} ${picked.has(task.id) ? 'is-picked' : ''} ${flags.overdue || flags.blocked ? 'is-alert' : ''}`}
+          <Fragment key={task.id}>
+          <div role="row" style={{ ['--i' as string]: Math.min(index, 12) }}
+            {...feedbackAttributes(quest.feedback?.record(task.id))} data-feedback-record={task.id} className={`registry-row status-${task.status} ${task.id === selectedId ? 'is-selected' : ''} ${picked.has(task.id) ? 'is-picked' : ''} ${flags.overdue || flags.blocked ? 'is-alert' : ''} ${opened ? 'is-peeked' : ''}`}
             onClick={() => onSelect(task.id)}>
             <span role="cell" className="cell-task">
               <input type="checkbox" className="row-pick" aria-label={`Select ${task.title}`} checked={picked.has(task.id)} onClick={event => event.stopPropagation()} onChange={() => onPick(task.id)} />
@@ -226,15 +292,25 @@ function Table({ quest, tasks, selectedId, onSelect, picked, onPick, onPickAll }
               <span className="cell-task-text">
                 <button type="button" className="row-open" aria-label={`Open ${task.title}`} aria-current={task.id === selectedId || undefined} onClick={event => { event.stopPropagation(); onSelect(task.id); }}><strong>{task.title}</strong></button>
                 {task.projectId && <span className="cell-project">{projectName(state, task.projectId)}</span>}
-                <small>{task.status === 'blocked' ? `Blocked: ${task.blocker?.note ?? ''}` : task.status === 'done' ? <CompletionMeta quest={quest} task={task} /> : task.nextAction ? `Next: ${task.nextAction}` : 'No next action yet'}</small>
+                {task.status === 'done'
+                  ? <small><CompletionMeta quest={quest} task={task} /></small>
+                  : <small className={`row-signal tone-${signal.tone} ${signal.mine ? 'is-mine' : ''}`}><b>{signal.label}</b> · {signal.text}</small>}
                 <span className="cell-flags"><Flags quest={quest} task={task} priority={false} /></span>
+                {density === 'detailed' && <small className="row-evidence">{rowEvidence(state, task, now).join(' · ')}</small>}
               </span>
+              {canPeek(task) && <button type="button" id={`peek-toggle-${task.id}`} className="row-peek" aria-expanded={opened} aria-controls={opened ? `peek-${task.id}` : undefined}
+                aria-label={`${opened ? 'Hide' : 'Show'} next steps and history for ${task.title}`} title={opened ? 'Hide' : 'Next steps and history'}
+                onClick={event => { event.stopPropagation(); onPeek(opened ? null : task.id); }}>
+                <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+              </button>}
             </span>
             <span role="cell" className="cell-owner"><Avatar state={state} id={task.owner} size="sm" /><AssigneeSelect quest={quest} task={task} short /></span>
             <span role="cell" className="cell-status"><StatusMenu quest={quest} task={task} /></span>
             <span role="cell" className="cell-priority"><PrioritySelect quest={quest} task={task} /></span>
             <span role="cell" className={`cell-due ${flags.overdue ? 'text-danger' : ''}`}><DueInput quest={quest} task={task} overdue={flags.overdue} />{task.dueTime && <small className="cell-time"> {task.dueTime}</small>}</span>
           </div>
+          {opened && <TaskPeek quest={quest} task={task} onOpen={onSelect} onClose={() => closePeek(task.id)} />}
+          </Fragment>
         );
       })}
     </div>
