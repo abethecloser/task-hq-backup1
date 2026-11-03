@@ -12,6 +12,7 @@ import { supabase } from './auth/client.ts';
 import { isExtensionContext } from './adapter/store.ts';
 import { entryMode, saveMode } from './auth/mode.ts';
 import { PRODUCT } from './core/workspace.ts';
+import { authRoute, destinationFrom, parseTaskRoute } from './core/task-link.ts';
 import './ui/quest.css';
 import './ui/nexus.css';
 import './ui/studio.css';
@@ -37,7 +38,7 @@ function readMode(): 'demo' | 'auth' {
 }
 
 function authViewFromHash(): AuthView {
-  const [, first, second] = location.hash.split('/');
+  const [, first, second] = location.hash.split('?')[0]!.split('/');
   return first === 'auth' && AUTH_VIEWS.includes(second as AuthView) ? second as AuthView : 'sign-in';
 }
 
@@ -51,14 +52,14 @@ function Root() {
   useEffect(() => {
     const onHash = () => {
       setView(authViewFromHash());
-      if (!isExtensionContext() && location.hash.startsWith('#/auth/')) { saveMode('auth'); setMode('auth'); }
+      if (!isExtensionContext() && (location.hash.startsWith('#/auth/') || parseTaskRoute(location.hash)?.orgId)) { saveMode('auth'); setMode('auth'); }
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
   useEffect(() => { if (session.recovery) { saveMode('auth'); setMode('auth'); setView('reset'); } }, [session.recovery]);
   // Signed in by magic link: offer (once, skippable) to set a password for next time.
-  useEffect(() => { if (session.offerPassword) { saveMode('auth'); setMode('auth'); history.replaceState(null, '', '#/auth/set-password'); setView('set-password'); } }, [session.offerPassword]);
+  useEffect(() => { if (session.offerPassword) { saveMode('auth'); setMode('auth'); history.replaceState(null, '', authRoute('set-password', destinationFrom(location.hash))); setView('set-password'); } }, [session.offerPassword]);
   // An email link that couldn't be used lands on the page it chose (sign-in or forgot), with its notice.
   useEffect(() => { if (session.notice) setView(authViewFromHash()); }, [session.notice]);
   useEffect(() => {
@@ -85,7 +86,7 @@ function Root() {
     setMode('auth');
   }
   function go(next: AuthView) {
-    history.replaceState(null, '', `#/auth/${next}`);
+    history.replaceState(null, '', authRoute(next, destinationFrom(location.hash)));
     setView(next);
   }
 
@@ -104,7 +105,8 @@ function Root() {
   if (mode === 'demo') return <App onExitDemo={isExtensionContext() ? undefined : exitDemo} />;
   if (!session.ready) return null;
   if (session.email && client && view !== 'reset' && view !== 'set-password') {
-    return <LiveRoot key={session.email} client={client} onSignOut={() => { history.replaceState(null, '', '#/auth/sign-in'); void client.auth.signOut({ scope: 'local' }); }} onDemo={enterDemo} />;
+    return <LiveRoot key={session.email} client={client} onSignOut={() => { history.replaceState(null, '', '#/auth/sign-in'); void client.auth.signOut({ scope: 'local' }); }} onDemo={enterDemo}
+      onSwitchAccount={() => { setView('sign-in'); history.replaceState(null, '', authRoute('sign-in', destinationFrom(location.hash))); void client.auth.signOut({ scope: 'local' }); }} />;
   }
   return <AuthScreen view={view} go={go} onDemo={enterDemo} notice={session.notice} />;
 }

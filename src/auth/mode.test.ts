@@ -19,6 +19,14 @@ test('explicit auth, recovery, magic links, errors and badge scans override save
   }
   assert.equal(entryMode(origin, false, true, fixture().storage), 'auth');
 });
+test('a link to a real workspace task overrides saved demo; a task address with no workspace does not', () => {
+  const linked = fixture();
+  assert.equal(entryMode(`${origin}/#/task/abc?org=roofing`, false, false, linked.storage), 'auth');
+  assert.equal(linked.data.has('tmhq.mode'), false);
+  assert.equal(entryMode(`${origin}/#/task/abc`, false, false, fixture().storage), 'demo');
+  assert.equal(entryMode(`${origin}/#/task/abc?org=roofing`, true, false, fixture().storage), 'demo', 'the extension stays demo-only');
+});
+
 test('leaving demo preserves account/session and demo data; refresh stays outside demo', () => {
   const { data, storage } = fixture();
   saveMode('auth', storage);

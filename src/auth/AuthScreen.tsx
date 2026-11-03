@@ -6,6 +6,7 @@ import brandMark from '../assets/brand/mark.png';
 import type { FormEvent, ReactNode } from 'react';
 import { backendConfigured, redirectUrl, supabase } from './client.ts';
 import { handleAuthCallback, rememberMagicLink } from './callback.ts';
+import { authRoute, destinationFrom } from '../core/task-link.ts';
 import './auth.css';
 
 export type AuthView = 'sign-in' | 'magic' | 'sign-up' | 'forgot' | 'reset' | 'set-password' | 'request';
@@ -156,7 +157,7 @@ function MagicLink({ go }: { go: (view: AuthView) => void }) {
       (): Errors => { const m = emailError(email); return m ? { email: m } : {}; },
       async client => {
         rememberMagicLink();
-        const { error } = await client.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: false, emailRedirectTo: redirectUrl('#/') } });
+        const { error } = await client.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: false, emailRedirectTo: redirectUrl(destinationFrom(location.hash) ?? '#/') } });
         if (error) throw error;
         form.setSent({ title: 'Check your email', text: `If ${email.trim()} has an account, a one-time sign-in link is on its way.` });
       })}>
@@ -190,7 +191,7 @@ function Forgot({ go }: { go: (view: AuthView) => void }) {
     <form noValidate onSubmit={event => void form.submit(event,
       (): Errors => { const m = emailError(email); return m ? { email: m } : {}; },
       async client => {
-        const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: redirectUrl('#/auth/reset') });
+        const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: redirectUrl(authRoute('reset', destinationFrom(location.hash))) });
         if (error) throw error;
         form.setSent({ title: 'Check your email', text: `If ${email.trim()} has an account, a password reset link is on its way.` });
       })}>

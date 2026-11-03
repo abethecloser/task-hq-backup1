@@ -19,8 +19,22 @@ import { AssigneeSelect, DueInput, PrioritySelect, StatusMenu } from './TaskCont
 import { TaskSituation } from './WorkSurface.tsx';
 import { TaskConversation } from './TaskComments.tsx';
 import { useWorkday } from '../shifts/Workday.tsx';
+import { useLive } from './LiveContext.tsx';
+import { taskUrl } from '../core/task-link.ts';
 
 const when = (at: number) => new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+/** Copies this task's address. Anyone opening it still needs their own access to the workspace. */
+function CopyTaskLink({ quest, taskId }: { quest: Quest; taskId: string }) {
+  const live = useLive();
+  const copy = () => navigator.clipboard.writeText(taskUrl(`${location.origin}${location.pathname}`, taskId, live?.org.id))
+    .then(() => quest.say(live ? 'Task link copied. It opens for people in this workspace.' : 'Task link copied. Sample work opens only in this browser.'));
+  return (
+    <button type="button" className="btn btn-ghost btn-sm tp-copy-link" onClick={() => { void (async () => { try { await copy(); } catch { quest.say('Couldn’t copy the link. Copy it from the address bar instead.', 'error'); } })(); }}>
+      <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" /></svg>Copy link
+    </button>
+  );
+}
+
 const isFormField = (target: EventTarget) => target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable="true"]');
 
 export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, draft }: {
@@ -70,6 +84,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, dr
         <span className={`ctx-verify ${quest.backend.kind === 'live' ? 'is-live' : ''}`} title={quest.backend.kind === 'live' ? 'Every change is checked again by the server before it is saved.' : 'Demo: every change is checked by the same rules engine, on this device.'}>{quest.backend.kind === 'live' ? 'Server-enforced' : 'Local · engine-checked'}</span>
         <span className="tp-bar-actions">
           {draft && <button type="button" className="btn btn-primary btn-sm" disabled={!draft.ready || draft.busy} aria-busy={draft.busy} onClick={draft.onCreate}>{draft.busy ? 'Creating…' : 'Create task'}</button>}
+          {!draft && <CopyTaskLink quest={quest} taskId={task.id} />}
           {!draft && !reviewer && !legacy && (
             <button type="button" className={`btn btn-sm ${watching ? 'is-on' : 'btn-ghost'} tp-watch`} aria-pressed={watching} onClick={() => void update({ watchers: toggle(task.watchers, actor) })}>
               <svg className="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /></svg>{watching ? 'Watching' : 'Watch'}

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanUrl, linkProblem, parseAuthCallback, rememberMagicLink, takeMagicLink } from './callback.ts';
+import { cleanUrl, landingAfterLink, linkProblem, parseAuthCallback, rememberMagicLink, takeMagicLink } from './callback.ts';
 
 const PROD = 'https://task-hq-three.vercel.app';
 
@@ -40,4 +40,14 @@ test('a magic-link sign-in offers a password once, within two hours, only in the
   assert.equal(takeMagicLink(storage, t0 + 3 * 60 * 60_000), false, 'a stale request is ignored');
   // Template links say what they are; only magic links get the offer.
   assert.deepEqual(parseAuthCallback(`${PROD}/?token_hash=abc&type=magiclink#/`), { kind: 'token-hash', tokenHash: 'abc', type: 'magiclink' });
+});
+
+test('a task link inside an email link is where the person lands', () => {
+  const task = '#/task/abc?org=roofing';
+  assert.equal(landingAfterLink(`${PROD}/?token_hash=x&type=magiclink${task}`, false), task);
+  assert.equal(landingAfterLink(`${PROD}/?token_hash=x&type=magiclink#/`, false), '#/');
+  assert.equal(landingAfterLink(`${PROD}/?token_hash=x&type=recovery#/auth/reset`, true), '#/auth/reset');
+  assert.equal(landingAfterLink(`${PROD}/?token_hash=x&type=recovery#/auth/reset?next=${encodeURIComponent(task)}`, true), `#/auth/reset?next=${encodeURIComponent(task)}`);
+  assert.deepEqual(parseAuthCallback(`${PROD}/?code=xyz${task}`), { kind: 'code' });
+  assert.deepEqual(parseAuthCallback(`${PROD}/${task}`), { kind: 'none' });
 });

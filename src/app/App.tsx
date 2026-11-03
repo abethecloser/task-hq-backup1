@@ -55,6 +55,7 @@ import { SpeedToLead } from './SpeedToLead.tsx';
 import { CriticalFocus, GrantBar } from './UltraFocus.tsx';
 import { FeedbackInbox, ReviewLayer, ReviewerWelcome } from './Review.tsx';
 import { ROLE_LABELS, useLive } from './LiveContext.tsx';
+import { parseTaskRoute, scopedTaskHash } from '../core/task-link.ts';
 import type { QuestBackend } from '../adapter/store.ts';
 import { Sidebar, useSidebar } from './Sidebar.tsx';
 import { NotificationDrawer } from './NotificationDrawer.tsx';
@@ -95,7 +96,8 @@ const MIN_CANVAS_BOTH = 480;
 
 function parseHash(): { view: View; taskId: string | null; leadId: string | null; roomId: string | null; feedbackId: string | null; lens: { lens: Lens; changes?: Partial<RegistryQuery> } | null } {
   const [, first = '', second = ''] = location.hash.split('?')[0]!.split('/');
-  if (first === 'task' && second) return { view: 'all-tasks', taskId: decodeURIComponent(second), leadId: null, roomId: null, feedbackId: null, lens: null };
+  const linked = parseTaskRoute(location.hash);
+  if (linked) return { view: 'all-tasks', taskId: linked.taskId, leadId: null, roomId: null, feedbackId: null, lens: null };
   const views = Object.keys(VIEW_LABELS) as View[];
   return {
     view: views.includes(first as View) ? canonicalPage(first as View) : 'home', taskId: null,
@@ -369,6 +371,18 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   for (let i = navigation.length - 1; i >= 0; i--) if (ARCHIVED_PAGES.includes(navigation[i]!.id as AppPageId)) navigation.splice(i, 1);
 
   const selected = taskId ? taskById(whole.state, taskId) : undefined;
+  // A task that was open and then went away (an undone create) returns to the list as before;
+  // only an address that never resolved here says it isn't available.
+  const opened = useRef<string | null>(null);
+  if (selected) opened.current = selected.id;
+  const taskUnavailable = !!taskId && !selected && opened.current !== taskId;
+  // The address of an open task always names its workspace, so it can be shared as it stands.
+  const liveOrg = live?.org.id;
+  useEffect(() => {
+    if (!selected || !liveOrg) return;
+    const scoped = scopedTaskHash(location.hash, selected.id, liveOrg);
+    if (scoped) history.replaceState(null, '', scoped);
+  }, [selected?.id, liveOrg]);
   // One labelled hierarchy for every destination: the expanded panel on wide screens, the menu on
   // phones. The rail is its collapsed form, built from the same `navigation` list.
   const workNavigator = <WorkNavigator
@@ -565,6 +579,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
               onCancel={() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); }}
               onCreated={id => evolve(() => { setCreating(false); setCreateDue(undefined); setCreateProjectId(undefined); openTask(id); })} />
           : selected && contextAllowed ? <TaskPage key={selected.id} quest={whole} task={selected} canCreate={canCreate} onClose={closeTask} onOpen={openTask} onCreate={() => setCreating(true)} />
+            : taskUnavailable ? <TaskUnavailable workspace={live?.org.name} onBack={closeTask} onSwitch={live?.canSwitch ? live.onLeaveWorkspace : undefined} />
             : focused && !grant && view === 'home'
             ? <CriticalFocus quest={quest} onOpen={openTask} />
             : view === 'home' ? <Home quest={quest} company={company} canCreate={canCreate} canDeck={deckAllowed}
@@ -690,6 +705,23 @@ function LoadError({ message }: { message: string }) {
         {live?.canSwitch && <button type="button" className="btn btn-ghost" onClick={live.onLeaveWorkspace}>Switch workspace</button>}
         {live && <button type="button" className="btn btn-ghost" onClick={live.onSignOut}>Sign out</button>}
       </p>
+    </div>
+  );
+}
+
+/** The same answer whether the task doesn't exist or belongs elsewhere: a link reveals nothing. */
+function TaskUnavailable({ workspace, onBack, onSwitch }: { workspace?: string; onBack: () => void; onSwitch?: () => void }) {
+  return (
+    <div className="view page-preview-view" role="status">
+      <header className="view-head"><div>
+        <p className="eyebrow">Task link</p>
+        <h1>This task isn’t available</h1>
+        <p className="lede">{workspace ? `It couldn’t be opened in ${workspace}.` : 'It couldn’t be opened here.'} It may have been removed, or the link may belong to another workspace.</p>
+        <p className="task-unavailable-actions">
+          <button type="button" className="btn btn-primary btn-sm" onClick={onBack}>Go to All Tasks</button>
+          {onSwitch && <button type="button" className="btn btn-ghost btn-sm" onClick={onSwitch}>Switch workspace</button>}
+        </p>
+      </div></header>
     </div>
   );
 }
