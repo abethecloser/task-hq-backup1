@@ -24,7 +24,7 @@ import { taskUrl } from '../core/task-link.ts';
 
 const when = (at: number) => new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 /** Copies this task's address. Anyone opening it still needs their own access to the workspace. */
-function CopyTaskLink({ quest, taskId }: { quest: Quest; taskId: string }) {
+export function CopyTaskLink({ quest, taskId }: { quest: Quest; taskId: string }) {
   const live = useLive();
   const copy = () => navigator.clipboard.writeText(taskUrl(`${location.origin}${location.pathname}`, taskId, live?.org.id))
     .then(() => quest.say(live ? 'Task link copied. It opens for people in this workspace.' : 'Task link copied. Sample work opens only in this browser.'));
