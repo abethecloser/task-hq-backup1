@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 // and Activity lists as before. Selecting a task notification from the Inbox opens that task's
 // existing conversation here (context, comments with @mentions, and an inline reply) without
 // leaving the page underneath, so scroll position and everything else stay put.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EdgeDrawer } from '../ui/EdgeDrawer.tsx';
 import { ChannelThread } from './Inbox.tsx';
 import type { InboxData } from './Inbox.tsx';
@@ -21,7 +21,7 @@ import { CommentReply, EventFeed, canReply, isComment, taskEvents } from './Task
 import { DigestLead, DigestTail, WorkspaceSummary } from './ContextDigest.tsx';
 import type { DigestActions } from './ContextDigest.tsx';
 
-export function NotificationDrawer({ quest, control, inbox, attention, data, detailsAllowed = true, open: visible, threadAllowed, onClose, onOpenTask, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity, embedded = false, context }: {
+export function NotificationDrawer({ quest, control, inbox, attention, data, detailsAllowed = true, open: visible, threadAllowed, onClose, onOpenTask, onOpenLead, onOpenInbox, onOpenAttention, onOpenActivity, embedded = false, context, focusTaskId }: {
   quest: Quest; control: SidebarControl; inbox: UniversalInbox; attention: Attention; data?: InboxData; detailsAllowed?: boolean; open: boolean;
   /** False for a task outside the person's Critical Focus: its thread is not shown. */
   threadAllowed: (taskId: string) => boolean;
@@ -29,7 +29,12 @@ export function NotificationDrawer({ quest, control, inbox, attention, data, det
   /** Rendered inside the shared right panel (App owns the drawer), not as its own drawer. */ embedded?: boolean;
   /** Wide-screen context around the lists (workspace progress, Needs a hand, Next actions, Recent activity). */
   context?: DigestActions;
+  /** Verified selected task; returning from focus restores the workspace context. */
+  focusTaskId?: string;
 }) {
+  const [dismissedFocus, setDismissedFocus] = useState<string | null>(null);
+  useEffect(() => { setDismissedFocus(null); }, [focusTaskId]);
+  const activeFocus = focusTaskId && focusTaskId !== dismissedFocus ? focusTaskId : null;
   const [thread, setThread] = useState<string | null>(null);
   const [item, setItem] = useState<InboxItem | null>(null);
   const [leadId, setLeadId] = useState<string | null>(null);
@@ -43,7 +48,7 @@ export function NotificationDrawer({ quest, control, inbox, attention, data, det
 
   return (
     <Shell embedded={embedded} open={visible} onClose={onClose}>
-      {(item || leadId) ? <>
+      {(item || leadId) && !activeFocus ? <>
         <header className="context-head"><button type="button" className="btn btn-ghost" onClick={back}>Back to notifications</button><button type="button" className="icon-btn" aria-label="Close notifications" onClick={onClose}>×</button></header>
         <div className="context-body">
           {!detailsAllowed ? <p role="alert">This detail is outside your Critical Focus. Request access first.</p> : leadId ? lead ? <LeadCard quest={quest} lead={lead} onOpen={selectTask} /> : <p>This lead no longer exists.</p>
@@ -51,8 +56,8 @@ export function NotificationDrawer({ quest, control, inbox, attention, data, det
             : <><h2>{item?.title}</h2><p>{item?.detail}</p><p className="muted">Conversation unavailable in this workspace.</p></>}
         </div>
       </> :
-      thread
-        ? <Thread quest={quest} taskId={thread} allowed={threadAllowed(thread)} onBack={() => setThread(null)} onClose={onClose} onOpenTask={id => { onOpenTask(id); if (control.isMobile) onClose(); }} />
+      (activeFocus || thread)
+        ? <Thread quest={quest} taskId={(activeFocus || thread)!} allowed={threadAllowed((activeFocus || thread)!)} onBack={() => { setThread(null); setDismissedFocus(focusTaskId ?? null); }} onClose={onClose} onOpenTask={id => { onOpenTask(id); if (control.isMobile) onClose(); }} />
         : <>
             <header className="context-head"><span className="context-label">{context ? 'Notifications & context' : 'Notifications'}</span><button type="button" className="icon-btn" aria-label="Close notifications" onClick={onClose}>×</button></header>
             <div className={`context-body notify-body ${context ? 'has-context' : ''}`}>
