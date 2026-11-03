@@ -1386,3 +1386,9 @@ button.aware-event-text:hover { text-decoration: underline; text-underline-offse
   .task-peek-clip { overflow: visible; }
   .row-peek, .row-peek .icon { transition: none; }
 }
+
+/* The task is the working surface; preserve Home sizing and the saved navigation layout. */
+.content.view-task { max-width: none; width: 100%; }
+
+.tp-synopsis { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin: 16px 0 0; }
+.tp-synopsis span { overflow-wrap: anywhere; color: var(--ink-2); }
