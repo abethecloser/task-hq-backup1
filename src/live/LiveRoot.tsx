@@ -8,6 +8,7 @@ import type { LiveAccount, OrgRole } from '../app/LiveContext.tsx';
 import { createLiveBackend } from '../adapter/live.ts';
 import { Glyph } from '../auth/AuthScreen.tsx';
 import { PRODUCT } from '../core/workspace.ts';
+import { destinationFrom, parseTaskRoute, pickWorkspace } from '../core/task-link.ts';
 import { PlatformConsole } from './PlatformConsole.tsx';
 import { WorkdayGate } from '../shifts/Workday.tsx';
 import './live.css';
@@ -35,12 +36,21 @@ export const errorText = (reason: unknown) => {
   return message.replace(/^.*?:\s(?=[A-Z])/, '') || 'Something went wrong. Try again.';
 };
 
-export function LiveRoot({ client, onSignOut, onDemo }: { client: SupabaseClient; onSignOut: () => void; onDemo: () => void }) {
+/** On arrival from a sign-in screen, its carried task link becomes the address the app opens. */
+function enterDestination() {
+  if (!location.hash.startsWith('#/auth/')) return;
+  const destination = destinationFrom(location.hash);
+  if (destination) history.replaceState(null, '', destination);
+}
+
+export function LiveRoot({ client, onSignOut, onDemo, onSwitchAccount }: { client: SupabaseClient; onSignOut: () => void; onDemo: () => void; onSwitchAccount: () => void }) {
   const [context, setContext] = useState<MyContext | null>(null);
   const [error, setError] = useState('');
   const [orgId, setOrgId] = useState<string | null>(() => { try { return localStorage.getItem(ORG_KEY); } catch { return null; } });
   const [console_, setConsole] = useState(false);
   const [skipInvites, setSkipInvites] = useState(false);
+  // The workspace a task link asks for, until it is opened or refused.
+  const [linkOrg, setLinkOrg] = useState<string | null>(() => { enterDestination(); return parseTaskRoute(location.hash)?.orgId ?? null; });
 
   const refresh = useCallback(async () => {
     setError('');
@@ -50,11 +60,30 @@ export function LiveRoot({ client, onSignOut, onDemo }: { client: SupabaseClient
   }, [client]);
   useEffect(() => { void refresh(); }, [refresh]);
 
+  // A link pasted into a tab that is already open.
+  useEffect(() => {
+    const onHash = () => { const org = parseTaskRoute(location.hash)?.orgId; if (org) setLinkOrg(org); };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
   const choose = (id: string | null) => {
+    // Leaving a workspace leaves its task link behind, so the next workspace doesn't try to open it.
+    const route = parseTaskRoute(location.hash);
+    if (route?.orgId && route.orgId !== id) history.replaceState(null, '', '#/home');
     try { if (id) localStorage.setItem(ORG_KEY, id); else localStorage.removeItem(ORG_KEY); } catch { /* remembered for this tab only */ }
     setOrgId(id);
     setConsole(false);
   };
+
+  const { membership, linkDenied } = pickWorkspace(context?.memberships ?? [], orgId, linkOrg);
+  // An opened link's workspace becomes the remembered one, as if it had been picked by hand.
+  const linkedOrg = linkOrg && membership ? membership.org_id : null;
+  useEffect(() => {
+    if (!linkedOrg) return;
+    choose(linkedOrg);
+    setLinkOrg(null);
+  }, [linkedOrg]);
 
   if (error) return <Card title="Couldn’t reach Task-HQ" subtitle={error}><button type="button" className="auth-primary" onClick={() => void refresh()}>Try again</button><button type="button" className="auth-demo" onClick={onSignOut}>Sign out</button></Card>;
   if (!context) return <Card title="Signing you in…" subtitle="Loading your workspaces." />;
@@ -65,7 +94,15 @@ export function LiveRoot({ client, onSignOut, onDemo }: { client: SupabaseClient
 
   // A platform admin who is also a member works in that workspace by default; the
   // console is one click away. Platform administration never implies membership.
-  const membership = context.memberships.find(item => item.org_id === orgId) ?? (context.memberships.length === 1 ? context.memberships[0] : undefined);
+  // The same answer whether the workspace doesn't exist or this account isn't in it.
+  if (linkDenied) {
+    return (
+      <Card title="This link isn’t available" subtitle={`Signed in as ${context.email}. This account can’t open that workspace, or the link is no longer valid.`}>
+        <button type="button" className="auth-primary" onClick={() => { history.replaceState(null, '', '#/home'); setLinkOrg(null); }}>Continue to Task-HQ</button>
+        <button type="button" className="auth-demo" onClick={onSwitchAccount}>Use a different account</button>
+      </Card>
+    );
+  }
   if (context.is_platform_admin && (console_ || !membership)) {
     return <PlatformConsole client={client} context={context} onOpen={choose} onSignOut={onSignOut} onRefresh={refresh} />;
   }

@@ -5,6 +5,7 @@
 // Expired or reused links come back as error_code / error_description instead.
 // This module turns any of them into a session, or into a plain-language notice, and cleans the address bar.
 import type { EmailOtpType, SupabaseClient } from '@supabase/supabase-js';
+import { authRoute, destinationFrom } from '../core/task-link.ts';
 
 export type AuthCallback =
   | { kind: 'token-hash'; tokenHash: string; type: EmailOtpType }
@@ -47,6 +48,12 @@ export function cleanUrl(href: string, route: string): string {
   return `${url.origin}${url.pathname}${url.search}${route}`;
 }
 
+/** Where a handled email link leaves the address: a task it was carrying, or the usual landing. */
+export function landingAfterLink(href: string, recovery: boolean): string {
+  const destination = destinationFrom(new URL(href).hash);
+  return recovery ? authRoute('reset', destination) : destination ?? '#/';
+}
+
 /** The address the page opened with, read before supabase-js consumes a `?code=` from it. */
 export const LANDING_HREF = typeof window === 'undefined' ? '' : window.location.href;
 
@@ -81,24 +88,25 @@ export function handleAuthCallback(client: SupabaseClient, href = LANDING_HREF |
 async function handleLink(client: SupabaseClient, href: string): Promise<CallbackResult> {
   const found = parseAuthCallback(href);
   const land = (route: string) => window.history.replaceState(null, '', cleanUrl(href, route));
+  const destination = destinationFrom(new URL(href).hash);
   switch (found.kind) {
     case 'none':
       return { recovery: false, notice: null };
     case 'error':
-      land('#/auth/sign-in');
+      land(authRoute('sign-in', destination));
       return { recovery: false, notice: linkProblem(found.code, found.description) };
     case 'token-hash': {
       const { error } = await client.auth.verifyOtp({ token_hash: found.tokenHash, type: found.type });
-      if (error) { land('#/auth/sign-in'); return { recovery: false, notice: linkProblem(error.code ?? '', error.message) }; }
+      if (error) { land(authRoute('sign-in', destination)); return { recovery: false, notice: linkProblem(error.code ?? '', error.message) }; }
       const recovery = found.type === 'recovery';
-      land(recovery ? '#/auth/reset' : '#/');
+      land(landingAfterLink(href, recovery));
       return { recovery, notice: null, offerPassword: found.type === 'magiclink' };
     }
     case 'implicit': {
       const { error } = await client.auth.setSession({ access_token: found.accessToken, refresh_token: found.refreshToken });
-      if (error) { land('#/auth/sign-in'); return { recovery: false, notice: linkProblem(error.code ?? '', error.message) }; }
+      if (error) { land(authRoute('sign-in', destination)); return { recovery: false, notice: linkProblem(error.code ?? '', error.message) }; }
       const recovery = found.type === 'recovery';
-      land(recovery ? '#/auth/reset' : '#/');
+      land(landingAfterLink(href, recovery));
       return { recovery, notice: null, offerPassword: found.type === 'magiclink' };
     }
     case 'code': {
@@ -106,7 +114,7 @@ async function handleLink(client: SupabaseClient, href: string): Promise<Callbac
       // was requested in another browser or app, so it can't be completed in this one.
       const { data } = await client.auth.getSession();
       if (data.session) return { recovery: false, notice: null, offerPassword: takeMagicLink() };
-      land('#/auth/forgot');
+      land(authRoute('forgot', destination));
       return { recovery: false, notice: 'Open the link in the same browser where you requested it, or request a new one here.' };
     }
   }

@@ -1,4 +1,5 @@
 import { parseAuthCallback } from './callback.ts';
+import { parseTaskRoute } from '../core/task-link.ts';
 
 export const MODE_KEY = 'tmhq.mode';
 export type EntryMode = 'demo' | 'auth';
@@ -15,8 +16,8 @@ export function saveMode(mode: EntryMode, storage: ModeStorage = localStorage) {
 export function entryMode(href: string, extension: boolean, badge: boolean, storage: ModeStorage = localStorage): EntryMode {
   if (extension) return 'demo';
   const url = new URL(href);
-  // Email callbacks and badge scans must never be hidden by a saved demo preference.
-  if (badge || url.hash.startsWith('#/auth/') || parseAuthCallback(href).kind !== 'none') {
+  // Email callbacks, badge scans and links to a real workspace's task must never be hidden by a saved demo preference.
+  if (badge || url.hash.startsWith('#/auth/') || parseTaskRoute(url.hash)?.orgId || parseAuthCallback(href).kind !== 'none') {
     saveMode('auth', storage);
     return 'auth';
   }
