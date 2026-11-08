@@ -6,6 +6,8 @@
 import type { QuestState, Task } from './contract.ts';
 import { coordinate, effectiveAuthority, participantById } from './participants.ts';
 import type { Authority, Brief, ParticipantId } from './participants.ts';
+import { viewFor } from './org-capabilities.ts';
+import type { OrgSnapshot, OrgView } from './org-capabilities.ts';
 
 export type CapabilityCategory = 'tool' | 'model' | 'framework' | 'resource' | 'participant';
 /** AVAILABLE: known, not connected. CONNECTED: usable now. CONFIGURED: connected and set up for this person.
@@ -108,16 +110,16 @@ export function applyTemplate(template: WorkbenchTemplate, catalog: readonly Cap
 }
 
 /** The history line for a chosen setup, recorded on the task through the existing comment action. */
-export function workbenchNote(names: string[], kind: WorkKind, specialists: { name: string; authority: Authority }[] = []): string {
+export function workbenchNote(names: string[], kind: WorkKind, specialists: { name: string; authority: Authority }[] = [], orgNote = ''): string {
   const team = specialists.length ? ` Specialists: ${specialists.map(s => `${s.name} (${s.authority})`).join(', ')}. No model is connected; they read the task with fixed checks.` : '';
-  return `Working setup chosen (${kind}): ${names.join(', ')}.${team}`;
+  return `Working setup chosen (${kind}): ${names.join(', ')}.${team}${orgNote}`;
 }
 
-export interface WorkbenchAnalysis { proposal: WorkbenchProposal; brief: Brief }
+export interface WorkbenchAnalysis { proposal: WorkbenchProposal; brief: Brief; /** What the context's organizational (or personal) brains offer, when a snapshot was provided. */ org?: OrgView }
 /** Tool and framework discovery plus the Overseer's coordination of relevant specialists, in one pass. */
-export function analyze(state: QuestState, task: Task, now: number, catalog: readonly CapabilityEntry[] = CATALOG): WorkbenchAnalysis {
+export function analyze(state: QuestState, task: Task, now: number, catalog: readonly CapabilityEntry[] = CATALOG, snapshot?: OrgSnapshot): WorkbenchAnalysis {
   const proposal = propose(task, catalog);
-  return { proposal, brief: coordinate(state, task, now, proposal.kind) };
+  return { proposal, brief: coordinate(state, task, now, proposal.kind), ...(snapshot ? { org: viewFor(snapshot, proposal.kind) } : {}) };
 }
 
 /** Authority per selected specialist, clamped to what each may hold. */

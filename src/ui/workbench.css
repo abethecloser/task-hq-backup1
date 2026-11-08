@@ -25,3 +25,8 @@
 .wb-findings em { color: var(--muted, #6b7280); font-style: normal; font-size: 12px; }
 .wb-findings .is-attention { color: var(--danger, #b42318); }
 @media (max-width: 640px) { .wb-auth select { min-height: 44px; width: 100%; } }
+.wb-env { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; color: var(--muted, #6b7280); }
+.wb-env select { min-height: 32px; font: inherit; max-width: 100%; }
+.wb-org { display: grid; gap: 8px; padding: 10px 12px; border: 1px dashed var(--accent-line, #c7d2fe); border-radius: 8px; }
+.wb-sample { margin: 0; font-size: 12px; padding: 4px 8px; border-radius: 6px; background: var(--sunk, #f3f4f6); color: var(--muted, #6b7280); }
+@media (max-width: 640px) { .wb-env select { min-height: 44px; width: 100%; } }

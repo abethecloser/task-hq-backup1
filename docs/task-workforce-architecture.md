@@ -1,41 +1,48 @@
-# Task HQ specialist participants — architecture (TASK-WORKFORCE-001)
+# Task HQ and organizational intelligence: architecture (corrected, QUEST-ARCH-003)
 
-**Synopsis.** A declared registry of seven functional participants and an Overseer that coordinates them,
-wired into the existing Working setup. Everything runs as deterministic checks over the task's own fields.
-**No model, runtime, NAN or QBIO integration exists or is implied.** Task HQ keeps the task record; participants
-only return findings a person reviews.
+**Synopsis.** The organization's functional intelligence participants ("brains") belong to **QuestBase**, not Task HQ.
+Task HQ is the execution instrument: it *consumes* them through an explicit contract, assembles a task workbench, and
+records a human's task-scoped delegation. This replaces the earlier TASK-WORKFORCE-001 framing, in which Task HQ's
+seven roles read as an organizational workforce. They are now **task-level roles** only.
+No model, runtime, NAN or QBIO integration exists or is implied.
 
-## Boundaries
-| Owner | Responsibility |
-|---|---|
-| Task HQ | Task lifecycle, assignments, execution records, permissions. Unchanged. |
-| Participants (`src/core/participants.ts`) | Functional readings and recommendations. Never write to a task. |
-| Overseer | Chooses relevant specialists, reconciles findings, surfaces conflicts, gaps and decisions. |
-| QBIO (QuestBase) | Contextual human-facing interaction. Its contract (`qb/src/qbio/contract.ts`) is project intelligence (source → observation → hypothesis → decision) and states task status and assignment belong to Task HQ. Read for alignment only. |
-| SYNAPSE (QuestBase) | Closed capability registry allowing four effects: prepare, review, record, request-decision. Adding capabilities there is a Director decision. |
-| NAN | Shared intelligence foundation. QuestBase records no NAN adapter. Not connected here. |
+## Who owns what
+| Level | Owner | Holds |
+|---|---|---|
+| Organizational | **QuestBase** | Structure, functional areas, human participants, brains and their responsibilities, tools, knowledge, authority boundaries, escalation. The agent registry, principals and grants (QB-ARCH-SPEC-002; ADR-0001 D-A). QBO initialization (not started). Personal QuestSpace and the personal working context. |
+| Connective | **QBIO** (QuestBase) | Interprets context; connects the person to the relevant brains, resources and environments. Contract leaves task lifecycle to Task HQ. Not a task engine, not a second workforce. |
+| Task | **Task HQ** | Tasks, projects, assignments, dependencies, scheduling, handoffs, execution, history and evidence. Task roles and the workbench. |
 
-## Participant contract
-`id`, `name`, `responsibility`, `areas` (work kinds), `uses` (catalog ids), `context` (what it may see),
-`input`/`output` (plain-words contract), `ceiling` and `defaultAuthority`, `state` + `stateNote`, `evidence`
-(every finding names the task fields it came from). Extend by adding a row.
+One source of truth per fact: Task HQ never stores organizational structure; QuestBase never stores task state.
 
-## Authority (graduated)
-observe → prepare → anticipate → propose for review → execute. `effectiveAuthority` clamps to the ceiling and
-never yields `execute` without explicit human authorization. All ceilings are `propose` today, so no participant
-can change anything; this also keeps every effect inside SYNAPSE's four. Raising a ceiling needs a connected
-runtime and a decision, not a code default.
+## What Task HQ built
+- `src/core/org-capabilities.ts` is the **consumer contract**: `OrgBrain`, `OrgSnapshot`, `OrgProvider`; `checkSnapshot`
+  (provider output is untrusted; wrong context refused); `viewFor` (which brains fit this kind of work; unusable ones named);
+  `delegate` / `delegationNote` (human-granted, task-scoped, clamped).
+- `src/core/org-fixtures.ts` is a **contract test double**, labelled sample data, used only in the demo and tests. It is not an organization.
+- `src/core/participants.ts` are **task roles** (Overseer, planning, operations, scheduling, execution, quality, resources),
+  each EXPERIMENTAL: fixed checks over task fields, with evidence.
+- `analyze()` returns tool/framework proposal, Overseer brief, and the organization view for the chosen environment.
+- The Working setup panel has an **Environment** switch (organization / personal). Contexts are never merged.
 
-## Flow
-1. `workKind(task)` classifies the work. 2. `propose(task)` picks tools and frameworks (unchanged).
-3. `coordinate(state, task, now, kind)` selects specialists by work kind and task signals (dependencies, due date,
-owner, review step), each with a reason; gathers `reading`s; derives conflicts, missing inputs, and decisions for a person.
-4. The person selects specialists and authority, then approves: one history line is written through the existing
-`task/comment` action. 5. Templates store capabilities and specialists, per person.
+## Rules
+1. **Authority only goes down.** Delegation <= brain ceiling and <= role ceiling; `execute` never without explicit human authorization and a connected runtime (none exists).
+2. **Every delegation names a human** (ADR-0001 D-A). Agent-to-agent delegation is an open Director decision (G3, default no), so a brain can be *proposed*, never self-delegating. Choosing a brain is the person's act; none is pre-selected.
+3. **Presence is not autonomy.** A brain in a snapshot carries a `state`; `experimental` or `unavailable` is shown as such.
+4. **Stateless runs.** Consistent with ADR-0001 G6: a future run receives a snapshot and returns proposals; it holds no authority.
+5. **No provider, no invention.** Live workspaces use `noProvider`: the panel says QuestBase has not provided capabilities.
 
-## Future integration contract (not built)
-A model-backed participant would implement `reading`'s shape: input = the permitted `context` keys only; output = `Finding[]`
-with `evidence` pointing at task fields or sources; no side effects. Requirements before any claim of intelligence:
-1. A decided model route and a connected provider. 2. A confirmed QBIO/NAN contract (what QBIO sends, what NAN stores,
-who owns memory) agreed with QuestBase's Director. 3. Server-side permission checks on the context handed over.
-4. A per-participant ceiling raise recorded as a decision. 5. A fallback to the rule-based reading, as Clarify has.
+## Traceability
+Approving writes one task-history line through the existing comment action, e.g. *Organization capabilities (Company): Finance (prepare). Authorized by <person> for this task only.*
+
+## What QuestBase must provide (proposed; Director decisions, not built)
+1. QBO organization initialization and its schema (migrations are Director-only; QuestBase handoff lists this as NOT STARTED).
+2. Brain records in the agent registry: owner humans, purpose, responsibilities, tools, ceiling, state, escalation (ADR-0001 G2 enrolment).
+3. A read-only snapshot endpoint per context returning `OrgSnapshot`, authorization checked server-side by QuestBase (`decide()`).
+4. The definition of "consequential action" (G4) and the G3 decision on sub-delegation.
+5. A QBIO-to-Task HQ context contract: what QBIO passes (task and context scope) and receives; NAN adapter, if any.
+6. For a model-backed brain: a decided model route, a recorded ceiling raise, and fallback to the rule-based reading.
+
+## Not demonstrated, and why
+- A **real configured organization** and a **persistent brain in QuestBase**: that needs QBO and schema decisions in QuestBase, which this work does not modify. The fixture proves the consumer contract only.
+- **QBIO** providing contextual interaction across environments: QBIO lives in QuestBase and has no Task HQ contract yet.
