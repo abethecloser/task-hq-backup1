@@ -8,6 +8,18 @@
 
 /* ── Home ──────────────────────────────────────────────────────────────── */
 .content.view-home { padding-top: 22px; }
+.home-operating { display: grid; gap: 16px; }
+.home-mode-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; padding-bottom: 12px; border-bottom: 1px solid var(--hair); }
+.home-mode-title { display: grid; gap: 3px; min-width: 0; }
+.home-mode-title .eyebrow { margin: 0; }
+.home-mode-title h1 { margin: 0; font: 800 clamp(30px, 3vw, 44px)/1.05 var(--display); letter-spacing: -.035em; }
+.home-mode-switch { flex: none; }
+.home-mode-switch button { min-width: 94px; }
+@media (max-width: 520px) {
+  .home-mode-bar { align-items: stretch; }
+  .home-mode-switch { width: 100%; }
+  .home-mode-switch button { flex: 1; }
+}
 /* Panels respond to the canvas width (which shrinks with the sidebar and the docked deck), not the viewport. */
 .home-dash { gap: 16px; container: home / inline-size; }
 .home-dash .seg button { min-height: 30px; }
