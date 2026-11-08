@@ -1,0 +1,37 @@
+/* Clarify: reviewed rewrite of an unfinished next-action note (src/app/ClarifyPanel.tsx). */
+.clarify-hint { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 8px 12px; border: 1px solid var(--accent-line); border-radius: 9px; background: var(--accent-pale); color: var(--ink-2); font-size: 14.5px; }
+.clarify-hint .btn { min-height: 36px; }
+.clarify { display: grid; gap: 14px; min-width: 0; padding: 14px; border: 1px solid var(--accent-line); border-radius: var(--radius); background: var(--panel); }
+.clarify-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.clarify-head h3 { margin: 0; font-size: 16px; }
+.clarify-head h3:focus { outline: none; }
+.clarify-head h3:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.clarify-badge { background: var(--sunk); color: var(--ink-2); white-space: normal; }
+.clarify-original, .clarify-diff > div { display: grid; gap: 4px; min-width: 0; padding: 10px 12px; border-radius: 9px; background: var(--sunk); }
+.clarify small, .clarify-original small { color: var(--muted); font-size: 13px; font-weight: 650; }
+.clarify q { quotes: none; color: var(--ink); font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+.clarify-block { display: grid; gap: 8px; min-width: 0; }
+.clarify-block h4 { margin: 0; font-size: 14px; color: var(--ink-2); }
+.clarify-block ul { display: grid; gap: 4px; margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 14.5px; }
+.clarify .field > input { width: 100%; min-height: 40px; }
+.clarify .field > textarea { width: 100%; min-height: 64px; padding: 9px 10px; field-sizing: content; resize: vertical; line-height: 1.4; }
+.clarify-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.clarify-meta .is-over { color: var(--danger); }
+.clarify-diff { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.clarify-diff .is-after { background: var(--accent-pale); }
+.clarify-diff strong { overflow-wrap: anywhere; font-size: 15px; line-height: 1.4; }
+.clarify-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.clarify-actions .btn { min-height: 40px; }
+.clarify-note { margin: 0; color: var(--muted); font-size: 14.5px; }
+.clarify-error, .clarify-alert { margin: 0; padding: 10px 12px; border-radius: 9px; background: var(--danger-pale); color: var(--danger); font-size: 14.5px; font-weight: 600; }
+.clarify-alert { display: grid; gap: 8px; }
+.clarify-alert p { margin: 0; }
+.clarify-done { display: grid; gap: 6px; padding: 10px 12px; border-radius: 9px; background: var(--done-pale); }
+.clarify-done p { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .clarify { padding: 12px; }
+  .clarify-diff { grid-template-columns: 1fr; }
+  .clarify-actions.is-footer { flex-direction: column; }
+  .clarify-actions.is-footer .btn { width: 100%; min-height: 44px; }
+  .clarify-hint .btn { min-height: 44px; }
+}
