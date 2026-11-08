@@ -642,7 +642,7 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
       <div className="notification-edge">
         <EdgeDrawer id="right-edge-drawer" open={rightPanelOpen} label={calendarShown ? 'Calendar' : askOpen && !focused ? 'Ask your tasks' : 'Notifications'} className="right-edge" onClose={closeRightPanel} modal={sidebar.isMobile}>
           <div className="right-slot" hidden={(askOpen && !focused) || calendarShown}>
-            <NotificationDrawer key={`${state.workspace.tenantId}:${actor}`} embedded quest={quest} control={sidebar} inbox={inbox} attention={awareAttention} data={inboxData} detailsAllowed={!focused || !!grant} open={notifOpen}
+            <NotificationDrawer key={`${state.workspace.tenantId}:${actor}`} embedded focusTaskId={contextAllowed ? selected?.id : undefined} quest={quest} control={sidebar} inbox={inbox} attention={awareAttention} data={inboxData} detailsAllowed={!focused || !!grant} open={notifOpen}
               threadAllowed={id => !focused || id === state.focus?.taskId || !!grant}
               onClose={closeRightPanel}
               onOpenTask={id => { if (!SIGNAL_VIEWS.includes(view) && view !== 'executive' && view !== 'inbox') go('all-tasks'); openTask(id); }}

@@ -21,6 +21,7 @@ import { TaskConversation } from './TaskComments.tsx';
 import { ClarifyPanel } from './ClarifyPanel.tsx';
 import { useWorkday } from '../shifts/Workday.tsx';
 import { useLive } from './LiveContext.tsx';
+import { rowSignal } from '../core/task-surface.ts';
 import { taskUrl } from '../core/task-link.ts';
 
 const when = (at: number) => new Date(at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -54,6 +55,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, dr
   useEffect(() => { setTitle(task.title); setNextAction(task.nextAction); setDescription(splitChecklist(task.description).notes); setWaitingOn(task.waitingOn); }, [task.title, task.nextAction, task.description, task.waitingOn]);
   useEffect(() => { window.scrollTo(0, 0); document.querySelector('.main > .content')?.scrollTo(0, 0); if (draft) document.getElementById('task-page-title')?.focus({ preventScroll: true }); else back.current?.focus({ preventScroll: true }); }, [task.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const signal = rowSignal(state, task, actor);
   const me = state.people.find(item => item.id === actor);
   const reviewer = me?.role === 'reviewer';
   const legacy = isLegacyArchived(task);
@@ -105,6 +107,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, dr
         {draft ? <><p className="ctx-sub">New task · fill in what you know; everything stays editable after it’s created.</p>{draft.error && <p className="form-error" role="alert">{draft.error}</p>}</>
           : <p className="ctx-sub">Created by {nameOf(state, task.createdBy, 'someone')}{created ? ` · ${when(created.at)}` : ''} · updated {when(task.updatedAt)}</p>}
         <div className="ctx-tags"><TaskTags state={state} task={task} now={quest.now} /></div>
+        {!draft && <p className="tp-synopsis" aria-label="Task synopsis"><strong>{signal.label}</strong><span>{signal.text}</span></p>}
       </header>
       {task.archivedAt && !draft && <ArchivedBanner quest={quest} task={task} />}
 
