@@ -19,6 +19,7 @@ import { AssigneeSelect, DueInput, PrioritySelect, StatusMenu } from './TaskCont
 import { TaskSituation } from './WorkSurface.tsx';
 import { TaskConversation } from './TaskComments.tsx';
 import { ClarifyPanel } from './ClarifyPanel.tsx';
+import { WorkbenchPanel } from './WorkbenchPanel.tsx';
 import { useWorkday } from '../shifts/Workday.tsx';
 import { useLive } from './LiveContext.tsx';
 import { taskUrl } from '../core/task-link.ts';
@@ -130,6 +131,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, dr
               </label>
             )}
             {task.status !== 'done' && !draft && <ClarifyPanel key={task.id} quest={quest} task={task} editable={editable} />}
+            {task.status !== 'done' && !draft && <WorkbenchPanel key={task.id} quest={quest} task={task} editable={editable} />}
             <label className="field"><span>Notes</span>
               <ReferenceTextarea referenceDocument={task.references?.description} rows={4} value={description} maxLength={1000} readOnly={!editable} placeholder={editable ? 'Context, @people and #tags' : 'No notes'}
                 onChange={event => setDescription(event.target.value)} onBlur={() => { const next = withNotes(task.description, description.trim()); if (next !== task.description) void update({ description: next }); }} />
