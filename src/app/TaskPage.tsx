@@ -18,6 +18,7 @@ import type { Quest } from '../ui/useQuest.ts';
 import { AssigneeSelect, DueInput, PrioritySelect, StatusMenu } from './TaskControls.tsx';
 import { TaskSituation } from './WorkSurface.tsx';
 import { TaskConversation } from './TaskComments.tsx';
+import { ClarifyPanel } from './ClarifyPanel.tsx';
 import { useWorkday } from '../shifts/Workday.tsx';
 import { useLive } from './LiveContext.tsx';
 import { rowSignal } from '../core/task-surface.ts';
@@ -131,6 +132,7 @@ export function TaskPage({ quest, task, canCreate, onClose, onOpen, onCreate, dr
                   onChange={event => setNextAction(event.target.value)} onBlur={() => saveText('nextAction', nextAction)} onKeyDown={event => { if (event.key === 'Enter') (event.target as HTMLInputElement).blur(); }} />
               </label>
             )}
+            {task.status !== 'done' && !draft && <ClarifyPanel key={task.id} quest={quest} task={task} editable={editable} />}
             <label className="field"><span>Notes</span>
               <ReferenceTextarea referenceDocument={task.references?.description} rows={4} value={description} maxLength={1000} readOnly={!editable} placeholder={editable ? 'Context, @people and #tags' : 'No notes'}
                 onChange={event => setDescription(event.target.value)} onBlur={() => { const next = withNotes(task.description, description.trim()); if (next !== task.description) void update({ description: next }); }} />

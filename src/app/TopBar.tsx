@@ -7,6 +7,7 @@ import { SPARK } from './AskTasks.tsx';
 import { ROLE_LABELS, useLive } from './LiveContext.tsx';
 import { useWorkday } from '../shifts/Workday.tsx';
 import { splitFilters } from '../core/task-filters.ts';
+import { CommandPalette } from './CommandPalette.tsx';
 
 // The top bar names the current section and carries the global search and notifications.
 // Task filters (the registry lenses plus Completed) appear only inside Tasks: a short set stays
@@ -72,6 +73,7 @@ export function TopBar({ quest, demo, focused, unread, askOpen, notifOpen, calen
         {/* New task closes the row: the primary action sits at the far right. */}
         {onCreate && <button type="button" className="btn btn-primary top-create" onClick={onCreate} title="New task (N)" aria-label="New task"><TopIcon d="M12 5v14M5 12h14" /><span>New task</span></button>}
       </div>
+      <CommandPalette quest={quest} onCreate={onCreate} />
     </header>
   );
 }

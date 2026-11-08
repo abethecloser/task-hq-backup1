@@ -27,6 +27,8 @@ import './ui/header.css';
 import './ui/sidebar-refinement.css';
 import './ui/nav-dock.css';
 import './ui/team.css';
+import './ui/clarify.css';
+import './ui/palette.css';
 import { applyLook } from './ui/look.ts';
 
 // Entry: real sign-in by default on the web; the synthetic demo is a separate,
