@@ -3,7 +3,9 @@
 // based and says so. Nothing is invoked here; a capability's state is its honest integration state,
 // never its catalog presence. Quest actions stay in capabilities.ts; this catalogs what a person
 // can bring to a task (tools, models, frameworks, resources, participants).
-import type { Task } from './contract.ts';
+import type { QuestState, Task } from './contract.ts';
+import { coordinate, effectiveAuthority, participantById } from './participants.ts';
+import type { Authority, Brief, ParticipantId } from './participants.ts';
 
 export type CapabilityCategory = 'tool' | 'model' | 'framework' | 'resource' | 'participant';
 /** AVAILABLE: known, not connected. CONNECTED: usable now. CONFIGURED: connected and set up for this person.
@@ -81,15 +83,15 @@ export function propose(task: Task, catalog: readonly CapabilityEntry[] = CATALO
 }
 
 /** A saved, reusable composition. Personal: it belongs to a person, not to an organization. */
-export interface WorkbenchTemplate { id: string; name: string; kind: WorkKind; capabilityIds: string[]; owner: string; createdAt: number; uses: number }
+export interface WorkbenchTemplate { id: string; name: string; kind: WorkKind; capabilityIds: string[]; /** Specialists chosen with the setup; absent on templates saved before participants existed. */ participantIds?: ParticipantId[]; owner: string; createdAt: number; uses: number }
 
-export function saveTemplate(templates: WorkbenchTemplate[], input: { name: string; kind: WorkKind; capabilityIds: string[]; owner: string; now: number }): WorkbenchTemplate[] {
+export function saveTemplate(templates: WorkbenchTemplate[], input: { name: string; kind: WorkKind; capabilityIds: string[]; participantIds?: ParticipantId[]; owner: string; now: number }): WorkbenchTemplate[] {
   const name = input.name.trim();
   if (!name) throw new Error('A template needs a name.');
   const ids = [...new Set(input.capabilityIds)];
   if (!ids.length) throw new Error('Pick at least one capability.');
   const rest = templates.filter(t => !(t.owner === input.owner && t.name.toLowerCase() === name.toLowerCase()));
-  return [...rest, { id: `wb-${input.now.toString(36)}-${rest.length}`, name, kind: input.kind, capabilityIds: ids, owner: input.owner, createdAt: input.now, uses: 0 }];
+  return [...rest, { id: `wb-${input.now.toString(36)}-${rest.length}`, name, kind: input.kind, capabilityIds: ids, ...(input.participantIds?.length ? { participantIds: [...new Set(input.participantIds)] } : {}), owner: input.owner, createdAt: input.now, uses: 0 }];
 }
 
 /** Reuse a template now: keeps only what is still in the catalog and usable, and says what dropped out and why. */
@@ -106,8 +108,21 @@ export function applyTemplate(template: WorkbenchTemplate, catalog: readonly Cap
 }
 
 /** The history line for a chosen setup, recorded on the task through the existing comment action. */
-export function workbenchNote(names: string[], kind: WorkKind): string {
-  return `Working setup chosen (${kind}): ${names.join(', ')}.`;
+export function workbenchNote(names: string[], kind: WorkKind, specialists: { name: string; authority: Authority }[] = []): string {
+  const team = specialists.length ? ` Specialists: ${specialists.map(s => `${s.name} (${s.authority})`).join(', ')}. No model is connected; they read the task with fixed checks.` : '';
+  return `Working setup chosen (${kind}): ${names.join(', ')}.${team}`;
+}
+
+export interface WorkbenchAnalysis { proposal: WorkbenchProposal; brief: Brief }
+/** Tool and framework discovery plus the Overseer's coordination of relevant specialists, in one pass. */
+export function analyze(state: QuestState, task: Task, now: number, catalog: readonly CapabilityEntry[] = CATALOG): WorkbenchAnalysis {
+  const proposal = propose(task, catalog);
+  return { proposal, brief: coordinate(state, task, now, proposal.kind) };
+}
+
+/** Authority per selected specialist, clamped to what each may hold. */
+export function grantAuthority(selected: Record<string, Authority>): { id: ParticipantId; authority: Authority }[] {
+  return Object.entries(selected).flatMap(([id, level]) => { const p = participantById(id); return p ? [{ id: p.id, authority: effectiveAuthority(p, level) }] : []; });
 }
 
 export interface WorkbenchFeedback { taskId: string; actor: string; at: number; worked: boolean; note: string }
