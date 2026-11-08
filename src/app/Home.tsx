@@ -1,6 +1,6 @@
 import { companyReport } from '../core/reports.ts';
 import { useMomentum } from '../ui/useMomentum.ts';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { QuestEvent, QuestState } from '../core/contract.ts';
 import { compose } from '../core/compose.ts';
@@ -24,6 +24,7 @@ import { ProjectTeam } from './ProjectTeam.tsx';
 import { BannerAdjust, BannerEditor, bannerLook, useBanner } from './HeroBanner.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import type { DeckSection } from './ContextPanel.tsx';
+import { WorkSurface } from './WorkSurface.tsx';
 
 // Home: the operating desk. Operating Desk (greeting and next step) · KPI strip · Today's Focus ·
 // Team Activity · Current Work · Signals — each an arrangeable dashboard module over existing records.
@@ -40,6 +41,16 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
   culture?: CultureItem[];
 }) {
   const { state, actor, now } = quest;
+  const modeKey = 'task.home-mode.v1.' + state.workspace.tenantId + '.' + actor;
+  const [homeMode, setHomeMode] = useState<'work' | 'overview'>('work');
+  useEffect(() => {
+    try { setHomeMode(localStorage.getItem(modeKey) === 'overview' ? 'overview' : 'work'); }
+    catch { setHomeMode('work'); }
+  }, [modeKey]);
+  const chooseHomeMode = (mode: 'work' | 'overview') => {
+    setHomeMode(mode);
+    try { localStorage.setItem(modeKey, mode); } catch { /* this visit only */ }
+  };
   const banner = useBanner(state.workspace.tenantId, actor);
   const minute = Math.floor(now / 60000) * 60000;
 
@@ -144,8 +155,24 @@ export function Home({ quest, company, canCreate, canDeck, onOpen, onOpenLead, o
   ];
 
   return (
-    <div className="view home-dash">
-      <Dashboard pageId="home" scope={state.workspace.tenantId} actor={actor} modules={modules} defaultItems={DEFAULT_ITEMS} />
+    <div className="home-operating">
+      <header className="home-mode-bar">
+        <div className="home-mode-title">
+          <p className="eyebrow">{state.workspace.name}</p>
+          <h1>{homeMode === 'work' ? 'My Work' : 'Overview'}</h1>
+        </div>
+        <div className="seg home-mode-switch" role="group" aria-label="Home view">
+          <button type="button" aria-pressed={homeMode === 'work'} onClick={() => chooseHomeMode('work')}>My Work</button>
+          <button type="button" aria-pressed={homeMode === 'overview'} onClick={() => chooseHomeMode('overview')}>Overview</button>
+        </div>
+      </header>
+      <div id="home-content">
+        {homeMode === 'work'
+          ? <WorkSurface quest={quest} onOpen={onOpen} />
+          : <div className="view home-dash">
+              <Dashboard pageId="home" scope={state.workspace.tenantId} actor={actor} modules={modules} defaultItems={DEFAULT_ITEMS} />
+            </div>}
+      </div>
     </div>
   );
 }
