@@ -1,15 +1,18 @@
-// Participant registry and Overseer coordination for the task workbench.
+// TASK-LEVEL roles for the task workbench, and the Overseer that coordinates them.
 //
-// A participant is a declared functional role (responsibility, context it needs, what it reads and
-// returns, how much authority it may hold), not a running process. Today every participant is served by
-// deterministic checks over the task's own fields (`reading`), so each is EXPERIMENTAL and says so. No
-// model or runtime is connected; selecting a participant never implies one is. Task HQ keeps ownership of
-// the task record: participants only return findings, which a person reviews.
+// These are NOT the organization's functional intelligence participants. Those ("brains": Finance, Sales,
+// Production, ...) belong to QuestBase, persist independently of any task, and reach Task HQ only through
+// the consumer contract in org-capabilities.ts. What is declared here are reusable, bounded roles a task
+// can be given (planning, scheduling, ...): each reads the task with fixed checks and returns findings. A
+// task role holds only authority a named human delegates for this task, never more than the organizational
+// brain it works with (when there is one), and never above its own ceiling. Task HQ keeps the task record.
 //
-// Alignment with QuestBase (read, not integrated): QBIO's contract leaves task lifecycle to Task HQ, and
-// SYNAPSE's registry allows only the effects prepare / review / record / request-decision. Authority here
-// stops at 'propose', so no participant can produce an effect outside those. There is no NAN or QBIO
-// adapter in this repository, and none is implied.
+// Every role here is EXPERIMENTAL: no model or runtime is connected, and selecting one never implies one is.
+//
+// Alignment with QuestBase (read, not integrated): QBIO's contract leaves task lifecycle to Task HQ;
+// QuestBase owns the agent registry, principals and grants; ADR-0001 makes agents principals with
+// delegated, human-attributable authority; SYNAPSE allows only prepare / review / record / request-decision.
+// Authority here stops at 'propose'. There is no NAN or QBIO adapter in this repository, and none is implied.
 import type { QuestState, Task } from './contract.ts';
 import { blockingDeps, dependents, isOverdue, isStalled, nameOf } from './selectors.ts';
 import type { CapabilityState, WorkKind } from './workbench.ts';
