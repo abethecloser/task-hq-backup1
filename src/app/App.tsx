@@ -13,7 +13,8 @@ import type { Lens, RegistryQuery } from '../core/registry.ts';
 import { LEGACY_LENSES, LENSES, LENS_LABELS, completedQuery, isCompletedQuery, lensCounts, queryTasks } from '../core/registry.ts';
 import { canCreateTask } from '../core/permissions.ts';
 import { insights, insightsFor } from '../core/rules.ts';
-import { activeGrant, activeLeads, activeProjects, inFocus, isOpen, leadBucket, myTasks, person, taskById, withoutLegacyArchived } from '../core/selectors.ts';
+import { ownerLandsOnOverview } from '../core/owner-home.ts';
+import { activeGrant, activeLeads, activeProjects, inFocus, isOpen, leadBucket, myTasks, owns, person, taskById, withoutLegacyArchived } from '../core/selectors.ts';
 import { LookSwitch, ModeChip, BrandMark, ToastBar, CtaArrow } from '../ui/components.tsx';
 import { useQuest } from '../ui/useQuest.ts';
 import type { Quest } from '../ui/useQuest.ts';
@@ -145,7 +146,15 @@ function Shell({ quest: whole, onExitDemo }: { quest: Quest; onExitDemo?: () => 
   const live = useLive();
   const feedbackOn = FEEDBACK_ON;
   const initial = parseHash();
-  const [requested, setRequested] = useState<View>(initial.view);
+  // An organization owner who opens the app with no page in the address lands on Owner overview.
+  // Demo entry links already choose My Work. Admins, supervisors, members, and a named page stay put.
+  const [requested, setRequested] = useState<View>(() => (
+    ownerLandsOnOverview(location.hash, location.search, location.pathname, owns(person(state, actor))) ? 'executive' : initial.view
+  ));
+  useLayoutEffect(() => {
+    if (!ownerLandsOnOverview(location.hash, location.search, location.pathname, owns(person(state, actor)))) return;
+    history.replaceState(null, '', '#/executive');
+  }, []);
   const [taskId, setTaskId] = useState<string | null>(initial.taskId);
   const [leadId, setLeadId] = useState<string | null>(initial.leadId);
   // Project room open on Projects (#/company-work/<projectId>).
