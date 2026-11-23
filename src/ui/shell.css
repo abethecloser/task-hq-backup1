@@ -288,6 +288,29 @@
 .exec-sub { display: grid; gap: 8px; padding-top: 12px; }
 .exec-sub + .exec-sub { margin-top: 12px; border-top: 1px solid var(--hair); }
 .exec .section-label[tabindex="-1"]:focus { outline: none; }
+/* This page only: section headings and row titles stay in Hanken Grotesk, large enough to read. */
+.exec .section-label {
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+.exec .section-label > span { color: var(--ink-2); font-size: 18px; font-weight: 650; letter-spacing: 0; text-transform: none; }
+.exec .exec-row { padding: 12px 14px; }
+.exec .exec-row b { font-family: var(--display); font-size: 20px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.25; }
+.exec .exec-row small { color: var(--ink-2); font-size: 15px; font-weight: 500; }
+.exec .overdue-row { gap: 14px; }
+.exec .overdue-row .overdue-copy { flex: 1; }
+.exec .overdue-status {
+  display: inline-flex; align-items: center; flex: none; padding: 3px 10px; border-radius: 999px;
+  background: var(--sunk); color: var(--ink-2); font-family: var(--font); font-size: 13px; font-weight: 750;
+  letter-spacing: 0; text-transform: none; white-space: nowrap;
+}
+.exec .overdue-status.is-working { background: var(--accent-pale); color: var(--accent-ink); }
+.exec .overdue-status.is-blocked { background: var(--danger-pale); color: var(--danger); }
+.exec .overdue-status.is-review { background: var(--warn-pale); color: var(--warn); }
 /* Long text reads in at most two columns. */
 .exec .brief-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
 @media (max-width: 760px) { .exec-strip { grid-template-columns: 1fr; } .exec .brief-grid { grid-template-columns: 1fr; } }

@@ -5,14 +5,16 @@
 // other action, and the server re-checks it.
 import { useEffect, useMemo, useState } from 'react';
 import type { Action } from '../core/contract.ts';
+import { STATUS_LABELS } from '../core/contract.ts';
 import { actionFor } from '../core/capabilities.ts';
 import type { Values } from '../core/capabilities.ts';
 import { dailySignal, decisionDesk, executiveBrief } from '../core/executive.ts';
 import { operationalMeasures } from '../core/metrics.ts';
 import type { Measure } from '../core/metrics.ts';
 import type { BriefItem, Decision, DecisionOption } from '../core/executive.ts';
+import { assigneeLabel, companyOverdue, daysLateLabel } from '../core/owner-home.ts';
 import { firstName, isOpen, nameOf } from '../core/selectors.ts';
-import { duration } from '../core/time.ts';
+import { duration, localDate, shortDate } from '../core/time.ts';
 import { Avatar } from '../ui/components.tsx';
 import type { Quest } from '../ui/useQuest.ts';
 import { OfferForm } from './WorkSurface.tsx';
@@ -45,7 +47,9 @@ export function ExecutiveDesk({ quest, onOpenTask, onOpenLead }: { quest: Quest;
   const riskItems = brief.sections.filter(section => section.key === 'blocked' || section.key === 'overdue').flatMap(section => section.items);
   const atRisk = new Set(riskItems.map(item => `${item.source.kind}:${item.source.id}`)).size;
   const live = quest.backend.kind === 'live';
-  const [movingOpen, setMovingOpen] = useState(false);
+  const overdue = companyOverdue(state, minute * 60000);
+  const today = localDate(minute * 60000);
+  const [movingOpen, setMovingOpen] = useState(true);
   const [allMoving, setAllMoving] = useState(false);
   /** In-page destinations. The app routes on the URL hash, so these never touch it (an #anchor would read as an unknown page and fall back to Home). */
   const reveal = (id: string) => {
@@ -74,6 +78,26 @@ export function ExecutiveDesk({ quest, onOpenTask, onOpenLead }: { quest: Quest;
           <p className="lede">{brief.headline}</p>
         </div>
       </header>
+
+      <section id="overdue-everyone" className="exec-section" aria-labelledby="overdue-everyone-title">
+        <h2 id="overdue-everyone-title" className="section-label" tabIndex={-1} data-focus-target>Overdue, everyone <span>{overdue.length}</span></h2>
+        {overdue.length === 0
+          ? <p className="exec-quiet"><i aria-hidden="true">✓</i> Nothing is overdue.</p>
+          : <ul className="exec-list">
+              {overdue.map(task => (
+                <li key={task.id}>
+                  <button type="button" className="exec-row overdue-row" onClick={() => onOpenTask(task.id)}
+                    aria-label={`${task.title}, ${assigneeLabel(state, task.owner)}, due ${shortDate(task.due, today)}, ${daysLateLabel(task.due, minute * 60000)}, ${STATUS_LABELS[task.status]}`}>
+                    <span className="overdue-copy">
+                      <b>{task.title}</b>
+                      <small>{assigneeLabel(state, task.owner)} · Due {shortDate(task.due, today)} · {daysLateLabel(task.due, minute * 60000)}</small>
+                    </span>
+                    <span className={`overdue-status is-${task.status}`}>{STATUS_LABELS[task.status]}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>}
+      </section>
 
       {/* Summary strip: each item goes to its own information on this page. */}
       <div className="exec-strip" role="list" aria-label="Summary">
